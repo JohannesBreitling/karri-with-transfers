@@ -85,7 +85,15 @@ namespace karri {
             // Filter feasible PD-locations between ordinary stops:
             relevantPdLocsFilter.filterOrdinary();
 
-            // * Find vehicles that are suitable for a ordinary pickup / dropoff
+            std::cout << "Dispatching Request<id: " << req.requestId
+                                                     << ", orig: "
+                                                     << req.origin
+                                                     << ", dest: "
+                                                     << req.destination
+                                                     << ">"
+                                                     << std::endl;
+
+            //* Find vehicles that are feasible for a ordinary pickup / dropoff
             ordAssignments.findPickupAndDropoffVehicles();
 
             // Try ordinary assignments:
@@ -96,6 +104,9 @@ namespace karri {
 
             // Try DALS assignments:
             dalsAssignments.findAssignments();
+
+            //* Find vehicles that are feasible for a Pickup / Dropoff before the next stop
+            pbnsAssignments.findPickupAndDropoffVehicles();
 
             // Try PBNS assignments:
             pbnsAssignments.findAssignments();

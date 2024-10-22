@@ -72,15 +72,29 @@ namespace karri {
     private:
 
         void findVehiclesForOrdinaryPickup() {
+            std::cout << "vehicles for ordinary pickup : {";
+            auto separator = "";
+
             for (const auto &vehId: relPickups.getVehiclesWithRelevantPDLocs()) {
-                std::cout << "pickup vehicle : " << vehId << std::endl;
+                std::cout << separator;
+                std::cout << vehId;
+                separator = ", ";
             }
+
+            std::cout << "}" << std::endl;
         }
 
         void findVehiclesForOrdinaryDropoff() {
+            std::cout << "vehicles for ordinary dropoff : {";
+            auto separator = "";
+
             for (const auto &vehId: relDropoffs.getVehiclesWithRelevantPDLocs()) {
-                std::cout << "dropoff vehicle : " << vehId << std::endl;
+                std::cout << separator;
+                std::cout << vehId;
+                separator = ", ";
             }
+
+            std::cout << "}" << std::endl;
         }
 
         // Try assignments where pickup is inserted at or just after stop i and dropoff is inserted at or just after stop j

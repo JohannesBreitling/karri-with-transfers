@@ -68,6 +68,11 @@ namespace karri {
                   routeState(routeState),
                   requestState(requestState) {}
 
+        void findPickupAndDropoffVehicles() {
+            findVehiclesForPBNS();
+            findVehiclesForDBNS();
+        }
+
         void findAssignments() {
             numAssignmentsTriedWithPickupBeforeNextStop = 0;
             Timer timer;
@@ -113,6 +118,31 @@ namespace karri {
 
     private:
 
+        void findVehiclesForPBNS() {
+            std::cout << "vehicles for pickups bns : {";
+            auto separator = "";
+
+            for (const auto &vehId: relPickupsBNS.getVehiclesWithRelevantPDLocs()) {
+                std::cout << separator;
+                std::cout << vehId;
+                separator = ", ";
+            }
+
+            std::cout << "}" << std::endl;
+        }
+
+        void findVehiclesForDBNS() {
+            std::cout << "vehicles for dropoff bns : {";
+            auto separator = "";
+
+            for (const auto &vehId: relDropoffsBNS.getVehiclesWithRelevantPDLocs()) {
+                std::cout << separator;
+                std::cout << vehId;
+                separator = ", ";
+            }
+
+            std::cout << "}" << std::endl;
+        }
 
         // Filters combinations of pickups and dropoffs using a cost lower bound.
         // If a combination is found for a pickup that cannot be filtered, we need the exact distance from the vehicle

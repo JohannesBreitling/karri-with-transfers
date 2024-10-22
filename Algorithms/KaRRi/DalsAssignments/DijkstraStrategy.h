@@ -91,6 +91,29 @@ namespace karri::DropoffAfterLastStopStrategies {
                   dijSearchToDropoff(reverseGraph, {*this, calculator, requestState}),
                   vehiclesSeen(fleet.size()) {}
 
+        void findVehiclesForDALS() {
+            
+            
+            /*
+            runDijkstraSearches();
+            
+            std::cout << "vehicles for dropoff als : {";
+            auto separator = "";
+
+            for (const auto &vehId: vehiclesSeen) {
+                const int numStops = routeState.numStopsOf(vehId);
+                if (numStops == 0)
+                    continue;
+                
+                std::cout << separator;
+                std::cout << vehId;
+                separator = ", ";
+            }
+
+            std::cout << "}" << std::endl
+            */
+        }
+
         void tryDropoffAfterLastStop() {
 
             vehiclesSeen.clear();
