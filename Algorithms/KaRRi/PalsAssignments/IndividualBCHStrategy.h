@@ -174,6 +174,8 @@ namespace karri::PickupAfterLastStopStrategies {
                   vehiclesSeenForPickups(fleet.size()) {}
 
         void tryPickupAfterLastStop() {
+            // TODO
+            std::cout << "BCH!" << std::endl;
             runBchSearches();
             enumerateAssignments();
         }

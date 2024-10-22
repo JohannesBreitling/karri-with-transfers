@@ -94,6 +94,8 @@ namespace karri::PickupAfterLastStopStrategies {
                   vehiclesSeen(fleet.size()) {}
 
         void tryPickupAfterLastStop() {
+            // TODO
+            std::cout << "DIJKSTRA!" << std::endl;
             runDijkstraSearches();
             enumerateAssignments();
         }

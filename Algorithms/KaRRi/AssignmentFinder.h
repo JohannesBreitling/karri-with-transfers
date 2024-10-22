@@ -85,6 +85,9 @@ namespace karri {
             // Filter feasible PD-locations between ordinary stops:
             relevantPdLocsFilter.filterOrdinary();
 
+            // * Find vehicles that are suitable for a ordinary pickup / dropoff
+            ordAssignments.findPickupAndDropoffVehicles();
+
             // Try ordinary assignments:
             ordAssignments.findAssignments();
 

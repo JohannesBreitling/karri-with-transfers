@@ -75,7 +75,8 @@ namespace karri::PickupAfterLastStopStrategies {
                                    requestState, minCostSearch.getUpperBoundCostWithHardConstraints()) {}
 
         void tryPickupAfterLastStop() {
-
+            // TODO
+            // std::cout << "COLLECTIVE BCH!" << std::endl;
 
             auto &stats = requestState.stats().palsAssignmentsStats;
             Timer timer;

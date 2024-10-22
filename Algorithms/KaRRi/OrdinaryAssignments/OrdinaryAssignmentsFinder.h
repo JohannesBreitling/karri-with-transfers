@@ -60,11 +60,28 @@ namespace karri {
             findOrdinaryPairedAssignments();
         }
 
+        void findPickupAndDropoffVehicles() {
+            findVehiclesForOrdinaryPickup();
+            findVehiclesForOrdinaryDropoff();
+        }
+
         void init() {
             // no op
         }
 
     private:
+
+        void findVehiclesForOrdinaryPickup() {
+            for (const auto &vehId: relPickups.getVehiclesWithRelevantPDLocs()) {
+                std::cout << "pickup vehicle : " << vehId << std::endl;
+            }
+        }
+
+        void findVehiclesForOrdinaryDropoff() {
+            for (const auto &vehId: relDropoffs.getVehiclesWithRelevantPDLocs()) {
+                std::cout << "dropoff vehicle : " << vehId << std::endl;
+            }
+        }
 
         // Try assignments where pickup is inserted at or just after stop i and dropoff is inserted at or just after stop j
         // with j > i. Does not deal with inserting the pickup at or after a last stop. Does not deal with inserting the
