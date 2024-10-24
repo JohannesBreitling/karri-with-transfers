@@ -45,12 +45,15 @@ namespace karri {
 
         OrdinaryAssignmentsFinder(const RelevantPDLocs &relPickups, const RelevantPDLocs &relDropoffs,
                                   const PDDistancesT &pdDistances, const Fleet &fleet,
+                                  PickupVehicles &pVehs, DropoffVehicles &dVehs,
                                   const CostCalculator &calculator, const RouteState &routeState,
                                   RequestState &requestState)
                 : relPickups(relPickups),
                   relDropoffs(relDropoffs),
                   pdDistances(pdDistances),
                   fleet(fleet),
+                  pVehs(pVehs),
+                  dVehs(dVehs),
                   calculator(calculator),
                   routeState(routeState),
                   requestState(requestState) {}
@@ -72,29 +75,15 @@ namespace karri {
     private:
 
         void findVehiclesForOrdinaryPickup() {
-            std::cout << "vehicles for ordinary pickup : {";
-            auto separator = "";
-
             for (const auto &vehId: relPickups.getVehiclesWithRelevantPDLocs()) {
-                std::cout << separator;
-                std::cout << vehId;
-                separator = ", ";
+                pVehs.pushBack(fleet[vehId]);
             }
-
-            std::cout << "}" << std::endl;
         }
 
         void findVehiclesForOrdinaryDropoff() {
-            std::cout << "vehicles for ordinary dropoff : {";
-            auto separator = "";
-
             for (const auto &vehId: relDropoffs.getVehiclesWithRelevantPDLocs()) {
-                std::cout << separator;
-                std::cout << vehId;
-                separator = ", ";
+                dVehs.pushBack(fleet[vehId]);
             }
-
-            std::cout << "}" << std::endl;
         }
 
         // Try assignments where pickup is inserted at or just after stop i and dropoff is inserted at or just after stop j
@@ -324,6 +313,8 @@ namespace karri {
         const RelevantPDLocs &relDropoffs;
         const PDDistancesT &pdDistances;
         const Fleet &fleet;
+        PickupVehicles &pVehs;
+        DropoffVehicles &dVehs;
         const CostCalculator &calculator;
         const RouteState &routeState;
         RequestState &requestState;

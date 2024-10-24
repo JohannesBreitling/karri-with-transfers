@@ -51,6 +51,8 @@ namespace karri {
 
         AssignmentFinder(RequestState &requestState,
                          RequestStateInitializerT &requestStateInitializer,
+                         PickupVehicles &pVehs, // TODO only for test reason
+                         DropoffVehicles &dVehs, // TODO
                          EllipticBCHSearchesT &ellipticBchSearches,
                          PDDistanceSearchesT &pdDistanceSearches,
                          OrdAssignmentsT &ordinaryAssigments,
@@ -60,6 +62,8 @@ namespace karri {
                          RelevantPDLocsFilterT &relevantPdLocsFilter)
                 : reqState(requestState),
                   requestStateInitializer(requestStateInitializer),
+                  pVehs(pVehs),
+                  dVehs(dVehs),
                   ellipticBchSearches(ellipticBchSearches),
                   pdDistanceSearches(pdDistanceSearches),
                   ordAssignments(ordinaryAssigments),
@@ -73,6 +77,15 @@ namespace karri {
             // Initialize finder for this request:
             initializeForRequest(req);
 
+            // * Output information about the request that is currently dispatched
+            std::cout << "Dispatching Request<id: " << req.requestId
+                                                     << ", orig: "
+                                                     << req.origin
+                                                     << ", dest: "
+                                                     << req.destination
+                                                     << ">"
+                                                     << std::endl;
+
             // Compute PD distances:
             pdDistanceSearches.run();
 
@@ -85,17 +98,6 @@ namespace karri {
             // Filter feasible PD-locations between ordinary stops:
             relevantPdLocsFilter.filterOrdinary();
 
-            std::cout << "Dispatching Request<id: " << req.requestId
-                                                     << ", orig: "
-                                                     << req.origin
-                                                     << ", dest: "
-                                                     << req.destination
-                                                     << ">"
-                                                     << std::endl;
-
-            //* Find vehicles that are feasible for a ordinary pickup / dropoff
-            ordAssignments.findPickupAndDropoffVehicles();
-
             // Try ordinary assignments:
             ordAssignments.findAssignments();
 
@@ -105,11 +107,37 @@ namespace karri {
             // Try DALS assignments:
             dalsAssignments.findAssignments();
 
-            //* Find vehicles that are feasible for a Pickup / Dropoff before the next stop
-            pbnsAssignments.findPickupAndDropoffVehicles();
-
             // Try PBNS assignments:
             pbnsAssignments.findAssignments();
+
+            // * Output the best cost found by the dispatching without transfers
+            std::cout << "Best Cost without transfer : " << reqState.getBestCost() << std::endl;
+
+            //* Find vehicles that are feasible for a ordinary pickup / dropoff
+            ordAssignments.findPickupAndDropoffVehicles();
+
+            //* Find vehicles that are feasible for a Pickup / Dropoff before the next stop
+            // pbnsAssignments.findPickupAndDropoffVehicles();
+
+            std::cout << "Pickup Vehicles : {";
+            auto separator = "";
+            for (const auto &v : *pVehs.getVehicles()) {
+                std::cout << separator << v.vehicleId;
+                separator = ", ";
+            }
+
+            std::cout << "}" << std::endl;
+            separator = "";
+
+            std::cout << "Dropoff Vehicles : {";
+            for (const auto &v : *dVehs.getVehicles()) {
+                std::cout << separator << v.vehicleId;
+                separator = ", ";
+            }
+
+            std::cout << "}" << std::endl;
+
+            // * Construct pairs of one pickup and one dropoff car and
 
             return reqState;
         }
@@ -130,6 +158,8 @@ namespace karri {
 
         RequestState &reqState;
         RequestStateInitializerT &requestStateInitializer;
+        PickupVehicles &pVehs; // TODO only for test reason
+        DropoffVehicles &dVehs; // TODO
         EllipticBCHSearchesT &ellipticBchSearches; // Elliptic BCH searches that find distances between existing stops and PD-locations (except after last stop).
         PDDistanceSearchesT &pdDistanceSearches; // PD-distance searches that compute distances from pickups to dropoffs.
         OrdAssignmentsT &ordAssignments; // Tries ordinary assignments where pickup and dropoff are inserted between existing stops.

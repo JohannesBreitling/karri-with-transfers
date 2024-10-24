@@ -489,9 +489,12 @@ int main(int argc, char *argv[]) {
 #endif
 
         // Construct ordinary assignments finder:
+        PickupVehicles pVehs = PickupVehicles();
+        DropoffVehicles dVehs = DropoffVehicles();
         using OrdinaryAssignmentsFinderImpl = OrdinaryAssignmentsFinder<PDDistancesImpl>;
         OrdinaryAssignmentsFinderImpl ordinaryInsertionsFinder(relOrdinaryPickups, relOrdinaryDropoffs,
-                                                               pdDistances, fleet, calc, routeState,
+                                                               pdDistances, fleet, pVehs, dVehs,
+                                                               calc, routeState,
                                                                reqState);
 
         // Construct PBNS assignments finder:
@@ -574,7 +577,7 @@ int main(int argc, char *argv[]) {
                 PALSInsertionsFinderImpl,
                 DALSInsertionsFinderImpl,
                 RelevantPDLocsFilterImpl>;
-        InsertionFinderImpl insertionFinder(reqState, requestStateInitializer, ellipticSearches, pdDistanceQuery,
+        InsertionFinderImpl insertionFinder(reqState, requestStateInitializer, pVehs, dVehs, ellipticSearches, pdDistanceQuery,
                                             ordinaryInsertionsFinder, pbnsInsertionsFinder, palsInsertionsFinder,
                                             dalsInsertionsFinder, relevantPdLocsFilter);
 

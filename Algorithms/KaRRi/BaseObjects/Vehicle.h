@@ -38,4 +38,31 @@ namespace karri {
 
     using Fleet = std::vector<Vehicle>;
 
+    class UniqueVehicleCollection {
+
+        public:
+            UniqueVehicleCollection() {
+                containedKeys = std::map<int, int>{};
+                vehicles = std::vector<Vehicle>{};
+            }
+
+            std::vector<Vehicle> *getVehicles() {
+                return &vehicles;
+            }
+
+            void pushBack(Vehicle v) {
+                if (!containedKeys.count(v.vehicleId)) {
+                    vehicles.push_back(v);
+                    containedKeys[v.vehicleId] = vehicles.size() - 1;
+                }
+            }
+
+        private:
+            std::vector<Vehicle> vehicles;
+            std::map<int, int> containedKeys;
+    };
+
+    using PickupVehicles = UniqueVehicleCollection;
+    using DropoffVehicles = UniqueVehicleCollection;
+
 }
