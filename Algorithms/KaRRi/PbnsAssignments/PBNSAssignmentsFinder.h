@@ -56,7 +56,9 @@ namespace karri {
         PBNSAssignmentsFinder(const RelevantPDLocs &relPickupsBns, const RelevantPDLocs &relOrdinaryDropoffs,
                               const RelevantPDLocs &relDropoffsBns, const PDDistancesT &pdDistances,
                               CurVehLocToPickupSearchesT &curVehLocToPickupSearches,
-                              const Fleet &fleet, const CostCalculator &calculator,
+                              const Fleet &fleet,
+                              PickupVehicles &pVehs, DropoffVehicles &dVehs,
+                              const CostCalculator &calculator,
                               const RouteState &routeState, RequestState &requestState)
                 : relPickupsBNS(relPickupsBns),
                   relOrdinaryDropoffs(relOrdinaryDropoffs),
@@ -64,6 +66,8 @@ namespace karri {
                   pdDistances(pdDistances),
                   curVehLocToPickupSearches(curVehLocToPickupSearches),
                   fleet(fleet),
+                  pVehs(pVehs),
+                  dVehs(dVehs),
                   calculator(calculator),
                   routeState(routeState),
                   requestState(requestState) {}
@@ -119,29 +123,15 @@ namespace karri {
     private:
 
         void findVehiclesForPBNS() {
-            std::cout << "vehicles for pickups bns : {";
-            auto separator = "";
-
             for (const auto &vehId: relPickupsBNS.getVehiclesWithRelevantPDLocs()) {
-                std::cout << separator;
-                std::cout << vehId;
-                separator = ", ";
+                pVehs.pushBack(fleet[vehId]);
             }
-
-            std::cout << "}" << std::endl;
         }
 
         void findVehiclesForDBNS() {
-            std::cout << "vehicles for dropoff bns : {";
-            auto separator = "";
-
             for (const auto &vehId: relDropoffsBNS.getVehiclesWithRelevantPDLocs()) {
-                std::cout << separator;
-                std::cout << vehId;
-                separator = ", ";
+                dVehs.pushBack(fleet[vehId]);
             }
-
-            std::cout << "}" << std::endl;
         }
 
         // Filters combinations of pickups and dropoffs using a cost lower bound.
@@ -364,6 +354,8 @@ namespace karri {
         const PDDistancesT &pdDistances;
         CurVehLocToPickupSearchesT &curVehLocToPickupSearches;
         const Fleet &fleet;
+        PickupVehicles &pVehs;
+        DropoffVehicles &dVehs;
         const CostCalculator &calculator;
         const RouteState &routeState;
         RequestState &requestState;

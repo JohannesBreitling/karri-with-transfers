@@ -113,11 +113,11 @@ namespace karri {
             // * Output the best cost found by the dispatching without transfers
             std::cout << "Best Cost without transfer : " << reqState.getBestCost() << std::endl;
 
-            //* Find vehicles that are feasible for a ordinary pickup / dropoff
+            // * Find vehicles that are feasible for a ordinary pickup / dropoff
             ordAssignments.findPickupAndDropoffVehicles();
 
-            //* Find vehicles that are feasible for a Pickup / Dropoff before the next stop
-            // pbnsAssignments.findPickupAndDropoffVehicles();
+            // * Find vehicles that are feasible for a Pickup / Dropoff before the next stop
+            pbnsAssignments.findPickupAndDropoffVehicles();
 
             std::cout << "Pickup Vehicles : {";
             auto separator = "";
@@ -137,7 +137,13 @@ namespace karri {
 
             std::cout << "}" << std::endl;
 
-            // * Construct pairs of one pickup and one dropoff car and
+            // * Construct pairs of one pickup and one dropoff car
+
+            // * For every vehicle, and stop pair run 4 dijkstra searches and determine the intersection of the 4 search spaces
+
+            // * Evaluate the possible insertions
+
+            // * Output the solution with the best costs
 
             return reqState;
         }
