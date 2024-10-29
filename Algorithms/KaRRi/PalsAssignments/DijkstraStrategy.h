@@ -65,7 +65,6 @@ namespace karri::PickupAfterLastStopStrategies {
             }
 
         private:
-
             DijkstraStrategy &strategy;
             const CostCalculator &calculator;
             const RequestState &requestState;

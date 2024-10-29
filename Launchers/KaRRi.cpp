@@ -569,9 +569,16 @@ int main(int argc, char *argv[]) {
         using RequestStateInitializerImpl = RequestStateInitializer<VehicleInputGraph, PsgInputGraph, VehCHEnv, PsgCHEnv, VehicleToPDLocQueryImpl>;
         RequestStateInitializerImpl requestStateInitializer(vehicleInputGraph, psgInputGraph, *vehChEnv, *psgChEnv,
                                                             reqState, vehicleToPdLocQuery);
-        using TransferPointStrategyImpl = TransferPointStrategies::DijkstraTransferPointStrategy<VehicleInputGraph>;
-        TransferPointStrategyImpl transferPointStrategy = TransferPointStrategyImpl(routeState, vehicleInputGraph, revVehicleGraph);
-        using TransferPointFinderImpl = TransferPointFinder<TransferPointStrategyImpl>;
+        
+        using TransferPointsLabelSet = BasicLabelSet<1, ParentInfo::NO_PARENT_INFO>;
+        using TransferPointStrategy = TransferPointStrategies::DijkstraTransferPointStrategy<VehicleInputGraph, TransferPointsLabelSet>;
+        
+        
+        // using PALSStrategy = PickupAfterLastStopStrategies::DijkstraStrategy<VehicleInputGraph, PDDistancesImpl, PALSLabelSet>;
+        // PALSStrategy palsStrategy(vehicleInputGraph, revVehicleGraph, fleet, routeState, lastStopsAtVertices, calc, pdDistances, reqState);
+        
+        TransferPointStrategy transferPointStrategy = TransferPointStrategy(routeState, vehicleInputGraph, revVehicleGraph);
+        using TransferPointFinderImpl = TransferPointFinder<TransferPointStrategy>;
         TransferPointFinderImpl transferPoints = TransferPointFinderImpl(transferPointStrategy, fleet, routeState, pVehs, dVehs);
 
         using InsertionFinderImpl = AssignmentFinder<RequestStateInitializerImpl,

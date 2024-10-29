@@ -29,8 +29,11 @@
 
 namespace karri::TransferPointStrategies {
 
+
+
     template<
-        typename InputGraphT
+        typename InputGraphT,
+        typename DijLabelSet
     >
     class DijkstraTransferPointStrategy {
 
@@ -41,16 +44,38 @@ namespace karri::TransferPointStrategies {
                 const InputGraphT &reverseGraph) : 
                 routeState(routeState),
                 inputGraph(inputGraph),
-                reverseGraph(reverseGraph) {}
+                reverseGraph(reverseGraph),
+                dijSearchTransferPointsFw(inputGraph, {}),
+                dijSearchTransferPointsBw(reverseGraph, {}) {}
 
         void findTransferPoints() {
-
+            
         }
 
     private:
+        using DistanceLabel = typename DijLabelSet::DistanceLabel;
+        using LabelMask = typename DijLabelSet::LabelMask;
+
+
+        struct TransferPointSearch {
+            TransferPointSearch() {}
+
+            template<typename DistLabelT, typename DistLabelContainerT>
+            bool operator()(const int v, DistLabelT &distFromV, const DistLabelContainerT & /*distLabels*/) {
+                std::cout << "Dijkstra Check Stop Criterion" << std::endl;
+                return false;
+            }
+
+        private:
+            
+        };
+
         const RouteState &routeState;
         const InputGraphT &inputGraph;
         const InputGraphT &reverseGraph;
+
+        Dijkstra<InputGraphT, TravelTimeAttribute, DijLabelSet, TransferPointSearch> dijSearchTransferPointsFw;
+        Dijkstra<InputGraphT, TravelTimeAttribute, DijLabelSet, TransferPointSearch> dijSearchTransferPointsBw;
     };
 
 }

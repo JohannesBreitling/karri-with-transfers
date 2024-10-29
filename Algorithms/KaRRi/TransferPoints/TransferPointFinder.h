@@ -26,6 +26,49 @@
 #pragma once
 
 namespace karri {
+
+    class SearchSpaceIntersection {
+    
+    public:
+        SearchSpaceIntersection(const int numSearches) : numSearches(numSearches), currSearch(0), verteciesFound(std::map<int, int>{}) {}
+        
+        void nextSearch() {
+            assert(currSearch < numSearches + 1);
+            currSearch++;
+        }
+
+        void vertexFound(int v) {
+            if (currSearch == 0) {
+                verteciesFound[v] = 1;
+                return;
+            }
+
+            if (verteciesFound.count(v)) {
+                verteciesFound[v] = currSearch + 1;
+                return;
+            }
+
+            verteciesFound.erase(v);
+        }
+
+        std::vector<int> getIntersection() {
+            auto intersection = std::vector<int>{};
+
+            for (auto it = verteciesFound.begin(); it != verteciesFound.end(); it++) {
+                if (it->second < numSearches)
+                    continue;
+                
+                intersection.push_back(it->first);
+            }
+
+            return intersection;
+        }
+
+    private:
+        const int numSearches;
+        int currSearch;
+        std::map<int, int> verteciesFound;
+    };
     
     template<
         typename StrategyT
@@ -41,7 +84,7 @@ namespace karri {
             DropoffVehicles &dVehs
         ) : strategy(strategy),
             fleet(fleet), routeState(routeState),
-            pVehs(pVehs), dVehs(dVehs) {}
+            pVehs(pVehs), dVehs(dVehs), intersectedPoints(SearchSpaceIntersection(4)) {}
 
         void init() {
             pVehs.init();
@@ -60,16 +103,36 @@ namespace karri {
 
                 const auto &stopLocationsPickupVehicle = routeState.stopLocationsFor(pVeh.vehicleId);
                 const auto &stopLocationsDropoffVehicle = routeState.stopLocationsFor(dVeh.vehicleId);
+
+
+                // TODO In DijkstraTransferPointStrategy verschieben
+                // Get the hard constraints for the vehicles 
+                const auto &maxArrTimesPickup = routeState.maxArrTimesFor(pVeh.vehicleId);
+                const auto &maxArrTimesDropoff = routeState.maxArrTimesFor(dVeh.vehicleId);
+                const auto &schedDepTimesPickup = routeState.schedDepTimesFor(pVeh.vehicleId);
+                const auto &schedDepTimesDropoff = routeState.schedDepTimesFor(dVeh.vehicleId); 
                 
                 for (int pIndex = 0; pIndex < routeState.numStopsOf(pVeh.vehicleId) - 1; pIndex++) {
                     for (int dIndex = 0; dIndex < routeState.numStopsOf(dVeh.vehicleId) - 1; dIndex++) {
+                        // Get the start locations for the dijkstra searches 
                         int pickupVehicleStop = stopLocationsPickupVehicle[pIndex];
                         int pickupVehicleNextStop = stopLocationsPickupVehicle[pIndex + 1];
-                        int dropoffVehicleStop = stopLocationsPickupVehicle[dIndex];
-                        int dropoffVehicleNextStop = stopLocationsPickupVehicle[dIndex + 1];
+                        int dropoffVehicleStop = stopLocationsDropoffVehicle[dIndex];
+                        int dropoffVehicleNextStop = stopLocationsDropoffVehicle[dIndex + 1];
 
-                        // Run 4 dijkstra searches to determine the intersection of the search spaces
-                        // TODO
+                        // Get the hard constraints for stopping criterions for the dijkstra searches
+                        int maxDetourPickup = maxArrTimesPickup[pIndex + 1] - schedDepTimesPickup[pIndex];
+                        int maxDetourDropoff = maxArrTimesDropoff[dIndex + 1] - schedDepTimesDropoff[dIndex];
+
+                        // TODO Fall mit Transfer at stop eventuell extra behandeln....
+                        if (maxDetourPickup < 0 || maxDetourDropoff < 0)
+                            continue;
+                        
+                        // Run 4 dijkstra searches to determine the intersection of the search spaces                    
+                        runForwardSearch(pickupVehicleStop, maxDetourPickup);
+                        runBackwardSearch(pickupVehicleNextStop, maxDetourPickup);
+                        runForwardSearch(dropoffVehicleStop, maxDetourDropoff);
+                        runBackwardSearch(dropoffVehicleNextStop, maxDetourDropoff);
                     }
                 }
 
@@ -92,6 +155,13 @@ namespace karri {
             }
         }
 
+        void runForwardSearch(int s, int maxRadius) {
+            std::cout << "fw s: " << s << " with r : " << maxRadius << std::endl;
+        }
+
+        void runBackwardSearch(int s, int maxRadius) {
+            std::cout << "bw s: " << s << " with r : " << maxRadius << std::endl;
+        }
 
         StrategyT &strategy;
         const Fleet &fleet;
@@ -99,6 +169,7 @@ namespace karri {
         PickupVehicles &pVehs;
         DropoffVehicles &dVehs;
         std::vector<std::tuple<Vehicle, Vehicle>> pickupDropoffPairs;
+        SearchSpaceIntersection intersectedPoints;
     };
 
 }
