@@ -1,7 +1,7 @@
 /// ******************************************************************************
 /// MIT License
 ///
-/// Copyright (c) 2023 Moritz Laupichler <moritz.laupichler@kit.edu>
+/// Copyright (c) 2024 Johannes Breitling <johannes.breitling@student.kit.edu>
 ///
 /// Permission is hereby granted, free of charge, to any person obtaining a copy
 /// of this software and associated documentation files (the "Software"), to deal
@@ -25,48 +25,33 @@
 
 #pragma once
 
-namespace karri {
+#include "Algorithms/Dijkstra/Dijkstra.h"
 
-// Models a vehicle with an ID, a capacity, an initial location, and a service time interval.
-    struct Vehicle {
-        int vehicleId;
-        int initialLocation;
-        int startOfServiceTime;
-        int endOfServiceTime;
-        int capacity;
+namespace karri::TransferPointStrategies {
+
+    template<
+        typename InputGraphT
+    >
+    class DijkstraTransferPointStrategy {
+
+    public:
+        DijkstraTransferPointStrategy(
+                const RouteState &routeState,
+                const InputGraphT &inputGraph,
+                const InputGraphT &reverseGraph) : 
+                routeState(routeState),
+                inputGraph(inputGraph),
+                reverseGraph(reverseGraph) {}
+
+        void findTransferPoints() {
+
+        }
+
+    private:
+        const RouteState &routeState;
+        const InputGraphT &inputGraph;
+        const InputGraphT &reverseGraph;
     };
-
-    using Fleet = std::vector<Vehicle>;
-
-    class UniqueVehicleCollection {
-
-        public:
-            UniqueVehicleCollection() {
-                init();
-            }
-
-            void init() {
-                containedKeys = std::map<int, int>{};
-                vehicles = std::vector<Vehicle>{}; 
-            }
-
-            std::vector<Vehicle> *getVehicles() {
-                return &vehicles;
-            }
-
-            void pushBack(Vehicle v) {
-                if (!containedKeys.count(v.vehicleId)) {
-                    vehicles.push_back(v);
-                    containedKeys[v.vehicleId] = vehicles.size() - 1;
-                }
-            }
-
-        private:
-            std::vector<Vehicle> vehicles;
-            std::map<int, int> containedKeys;
-    };
-
-    using PickupVehicles = UniqueVehicleCollection;
-    using DropoffVehicles = UniqueVehicleCollection;
 
 }
+

@@ -43,7 +43,8 @@ namespace karri {
             typename PbnsAssignmentsT,
             typename PalsAssignmentsT,
             typename DalsAssignmentsT,
-            typename RelevantPDLocsFilterT
+            typename RelevantPDLocsFilterT,
+            typename TransferPointFinderT
     >
     class AssignmentFinder {
 
@@ -59,7 +60,8 @@ namespace karri {
                          PbnsAssignmentsT &pbnsAssignments,
                          PalsAssignmentsT &palsAssignments,
                          DalsAssignmentsT &dalsAssignments,
-                         RelevantPDLocsFilterT &relevantPdLocsFilter)
+                         RelevantPDLocsFilterT &relevantPdLocsFilter,
+                         TransferPointFinderT &transferPoints)
                 : reqState(requestState),
                   requestStateInitializer(requestStateInitializer),
                   pVehs(pVehs),
@@ -70,7 +72,8 @@ namespace karri {
                   pbnsAssignments(pbnsAssignments),
                   palsAssignments(palsAssignments),
                   dalsAssignments(dalsAssignments),
-                  relevantPdLocsFilter(relevantPdLocsFilter) {}
+                  relevantPdLocsFilter(relevantPdLocsFilter),
+                  transferPoints(transferPoints) {}
 
         const RequestState &findBestAssignment(const Request &req) {
 
@@ -110,35 +113,15 @@ namespace karri {
             // Try PBNS assignments:
             pbnsAssignments.findAssignments();
 
-            // * Output the best cost found by the dispatching without transfers
-            std::cout << "Best Cost without transfer : " << reqState.getBestCost() << std::endl;
-
             // * Find vehicles that are feasible for a ordinary pickup / dropoff
             ordAssignments.findPickupAndDropoffVehicles();
 
             // * Find vehicles that are feasible for a Pickup / Dropoff before the next stop
             pbnsAssignments.findPickupAndDropoffVehicles();
 
-            std::cout << "Pickup Vehicles : {";
-            auto separator = "";
-            for (const auto &v : *pVehs.getVehicles()) {
-                std::cout << separator << v.vehicleId;
-                separator = ", ";
-            }
-
-            std::cout << "}" << std::endl;
-            separator = "";
-
-            std::cout << "Dropoff Vehicles : {";
-            for (const auto &v : *dVehs.getVehicles()) {
-                std::cout << separator << v.vehicleId;
-                separator = ", ";
-            }
-
-            std::cout << "}" << std::endl;
-
             // * Construct pairs of one pickup and one dropoff car
-
+            transferPoints.findTransferPoints();
+            
             // * For every vehicle, and stop pair run 4 dijkstra searches and determine the intersection of the 4 search spaces
 
             // * Evaluate the possible insertions
@@ -160,6 +143,7 @@ namespace karri {
             pbnsAssignments.init();
             palsAssignments.init();
             dalsAssignments.init();
+            transferPoints.init();
         }
 
         RequestState &reqState;
@@ -173,7 +157,6 @@ namespace karri {
         PalsAssignmentsT &palsAssignments; // Tries PALS assignments where pickup and dropoff are inserted after the last stop.
         DalsAssignmentsT &dalsAssignments; // Tries DALS assignments where only the dropoff is inserted after the last stop.
         RelevantPDLocsFilterT &relevantPdLocsFilter; // Additionally filters feasible pickups/dropoffs found by elliptic BCH searches.
-
-
+        TransferPointFinderT &transferPoints;
     };
 }

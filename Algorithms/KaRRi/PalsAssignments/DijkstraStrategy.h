@@ -94,29 +94,12 @@ namespace karri::PickupAfterLastStopStrategies {
                   vehiclesSeen(fleet.size()) {}
 
         void tryPickupAfterLastStop() {
-            // TODO
-            std::cout << "DIJKSTRA!" << std::endl;
             runDijkstraSearches();
             enumerateAssignments();
         }
 
         void findVehiclesForPALS() {
-            runDijkstraSearches();
-            
-            std::cout << "vehicles for pickups als : {";
-            auto separator = "";
-
-            for (const auto &vehId: vehiclesSeen) {
-                const int numStops = routeState.numStopsOf(vehId);
-                if (numStops == 0)
-                    continue;
-                
-                std::cout << separator;
-                std::cout << vehId;
-                separator = ", ";
-            }
-
-            std::cout << "}" << std::endl;
+            // TODO
         }
 
     private:

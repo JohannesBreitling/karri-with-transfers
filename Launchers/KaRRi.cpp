@@ -61,6 +61,7 @@
 #include "Algorithms/KaRRi/PalsAssignments/PALSAssignmentsFinder.h"
 #include "Algorithms/KaRRi/DalsAssignments/DALSAssignmentsFinder.h"
 #include "Algorithms/KaRRi/TransferPoints/TransferPointFinder.h"
+#include "Algorithms/KaRRi/TransferPoints/DijkstraTransferPointStrategy.h"
 #include "Algorithms/KaRRi/LastStopSearches/SortedLastStopBucketsEnvironment.h"
 #include "Algorithms/KaRRi/LastStopSearches/UnsortedLastStopBucketsEnvironment.h"
 #include "Algorithms/KaRRi/RequestState/VehicleToPDLocQuery.h"
@@ -568,7 +569,10 @@ int main(int argc, char *argv[]) {
         using RequestStateInitializerImpl = RequestStateInitializer<VehicleInputGraph, PsgInputGraph, VehCHEnv, PsgCHEnv, VehicleToPDLocQueryImpl>;
         RequestStateInitializerImpl requestStateInitializer(vehicleInputGraph, psgInputGraph, *vehChEnv, *psgChEnv,
                                                             reqState, vehicleToPdLocQuery);
-
+        using TransferPointStrategyImpl = TransferPointStrategies::DijkstraTransferPointStrategy<VehicleInputGraph>;
+        TransferPointStrategyImpl transferPointStrategy = TransferPointStrategyImpl(routeState, vehicleInputGraph, revVehicleGraph);
+        using TransferPointFinderImpl = TransferPointFinder<TransferPointStrategyImpl>;
+        TransferPointFinderImpl transferPoints = TransferPointFinderImpl(transferPointStrategy, fleet, routeState, pVehs, dVehs);
 
         using InsertionFinderImpl = AssignmentFinder<RequestStateInitializerImpl,
                 EllipticBCHSearchesImpl,
@@ -577,10 +581,12 @@ int main(int argc, char *argv[]) {
                 PBNSInsertionsFinderImpl,
                 PALSInsertionsFinderImpl,
                 DALSInsertionsFinderImpl,
-                RelevantPDLocsFilterImpl>;
+                RelevantPDLocsFilterImpl,
+                TransferPointFinderImpl
+                >;
         InsertionFinderImpl insertionFinder(reqState, requestStateInitializer, pVehs, dVehs, ellipticSearches, pdDistanceQuery,
                                             ordinaryInsertionsFinder, pbnsInsertionsFinder, palsInsertionsFinder,
-                                            dalsInsertionsFinder, relevantPdLocsFilter);
+                                            dalsInsertionsFinder, relevantPdLocsFilter, transferPoints);
 
 
 #if KARRI_OUTPUT_VEHICLE_PATHS
