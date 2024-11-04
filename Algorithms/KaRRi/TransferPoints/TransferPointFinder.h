@@ -27,49 +27,6 @@
 
 namespace karri {
 
-    class SearchSpaceIntersection {
-    
-    public:
-        SearchSpaceIntersection(const int numSearches) : numSearches(numSearches), currSearch(0), verteciesFound(std::map<int, int>{}) {}
-        
-        void nextSearch() {
-            assert(currSearch < numSearches + 1);
-            currSearch++;
-        }
-
-        void vertexFound(int v) {
-            if (currSearch == 0) {
-                verteciesFound[v] = 1;
-                return;
-            }
-
-            if (verteciesFound.count(v)) {
-                verteciesFound[v] = currSearch + 1;
-                return;
-            }
-
-            verteciesFound.erase(v);
-        }
-
-        std::vector<int> getIntersection() {
-            auto intersection = std::vector<int>{};
-
-            for (auto it = verteciesFound.begin(); it != verteciesFound.end(); it++) {
-                if (it->second < numSearches)
-                    continue;
-                
-                intersection.push_back(it->first);
-            }
-
-            return intersection;
-        }
-
-    private:
-        const int numSearches;
-        int currSearch;
-        std::map<int, int> verteciesFound;
-    };
-    
     template<
         typename StrategyT
     >
@@ -81,14 +38,19 @@ namespace karri {
             const Fleet &fleet,
             const RouteState &routeState,
             PickupVehicles &pVehs,
-            DropoffVehicles &dVehs
+            DropoffVehicles &dVehs,
+            std::vector<int> &possibleTransferPoints
         ) : strategy(strategy),
             fleet(fleet), routeState(routeState),
-            pVehs(pVehs), dVehs(dVehs), intersectedPoints(SearchSpaceIntersection(4)) {}
+            pVehs(pVehs), dVehs(dVehs),
+            possibleTransferPoints(possibleTransferPoints), 
+            totalTransferPointsForRequest(0) {}
 
         void init() {
             pVehs.init();
             dVehs.init();
+            possibleTransferPoints = std::vector<int>{};
+            totalTransferPointsForRequest = 0;
             pickupDropoffPairs = std::vector<std::tuple<Vehicle, Vehicle>>{};         
         }
 
@@ -101,20 +63,24 @@ namespace karri {
                 const auto &pVeh = std::get<0>(pickupDropoffPair);
                 const auto &dVeh = std::get<1>(pickupDropoffPair);
 
+                std::cout << "Trying Pickup Vehicle " << pVeh.vehicleId << " / Dropoff Vehicle " << dVeh.vehicleId << std::endl;  
+
                 const auto &stopLocationsPickupVehicle = routeState.stopLocationsFor(pVeh.vehicleId);
                 const auto &stopLocationsDropoffVehicle = routeState.stopLocationsFor(dVeh.vehicleId);
 
-
-                // TODO In DijkstraTransferPointStrategy verschieben
-                // Get the hard constraints for the vehicles 
+                // Get the hard constraints for the vehicles
+                // TODO Nochmals checken ob die so richtig sind
                 const auto &maxArrTimesPickup = routeState.maxArrTimesFor(pVeh.vehicleId);
                 const auto &maxArrTimesDropoff = routeState.maxArrTimesFor(dVeh.vehicleId);
                 const auto &schedDepTimesPickup = routeState.schedDepTimesFor(pVeh.vehicleId);
-                const auto &schedDepTimesDropoff = routeState.schedDepTimesFor(dVeh.vehicleId); 
+                const auto &schedDepTimesDropoff = routeState.schedDepTimesFor(dVeh.vehicleId);
                 
                 for (int pIndex = 0; pIndex < routeState.numStopsOf(pVeh.vehicleId) - 1; pIndex++) {
                     for (int dIndex = 0; dIndex < routeState.numStopsOf(dVeh.vehicleId) - 1; dIndex++) {
-                        // Get the start locations for the dijkstra searches 
+
+                        std::cout << "Trying Stop of Pickup Vehicle " << pIndex << " / Stop of Dropoff Vehicle " << dIndex << std::endl;
+
+                        // Get the start locations for the searches 
                         int pickupVehicleStop = stopLocationsPickupVehicle[pIndex];
                         int pickupVehicleNextStop = stopLocationsPickupVehicle[pIndex + 1];
                         int dropoffVehicleStop = stopLocationsDropoffVehicle[dIndex];
@@ -128,17 +94,19 @@ namespace karri {
                         if (maxDetourPickup < 0 || maxDetourDropoff < 0)
                             continue;
                         
-                        // Run 4 dijkstra searches to determine the intersection of the search spaces                    
-                        runForwardSearch(pickupVehicleStop, maxDetourPickup);
-                        runBackwardSearch(pickupVehicleNextStop, maxDetourPickup);
-                        runForwardSearch(dropoffVehicleStop, maxDetourDropoff);
-                        runBackwardSearch(dropoffVehicleNextStop, maxDetourDropoff);
+                        // Use the strategy to find the points for a possible transfer
+                        strategy.setMaxDetours(maxDetourPickup, maxDetourDropoff);                    
+                        strategy.findTransferPoints(pickupVehicleStop, pickupVehicleNextStop, dropoffVehicleStop, dropoffVehicleNextStop);
+
+                        std::cout << "Num Transfer Points : " << possibleTransferPoints.size() << std::endl;
+
+                        // TODO Bauen der Assignments
+
+                        // TODO Kosten der Assignments bestimmen
+
+                        // TODO Bestes Assignment durchführen
                     }
                 }
-
-
-
-
             }
         }
 
@@ -155,21 +123,14 @@ namespace karri {
             }
         }
 
-        void runForwardSearch(int s, int maxRadius) {
-            std::cout << "fw s: " << s << " with r : " << maxRadius << std::endl;
-        }
-
-        void runBackwardSearch(int s, int maxRadius) {
-            std::cout << "bw s: " << s << " with r : " << maxRadius << std::endl;
-        }
-
         StrategyT &strategy;
         const Fleet &fleet;
         const RouteState &routeState;
         PickupVehicles &pVehs;
         DropoffVehicles &dVehs;
         std::vector<std::tuple<Vehicle, Vehicle>> pickupDropoffPairs;
-        SearchSpaceIntersection intersectedPoints;
+        std::vector<int> &possibleTransferPoints;
+        int totalTransferPointsForRequest;
     };
 
 }

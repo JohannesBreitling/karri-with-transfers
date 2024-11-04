@@ -39,7 +39,7 @@
 
 namespace karri {
 
-// A facility for computing the cost of an assignment of a request into a vehicle's route.
+    // A facility for computing the cost of an assignment of a request into a vehicle's route.
     template<typename CostFunctionT>
     class CostCalculatorTemplate {
 
@@ -264,7 +264,7 @@ namespace karri {
 
             // Calculations with INFTY don't work like mathematical infinity, so set cost to INFTY later.
             const LabelMask inftyMask = ~((detourTillDepAtPickup < INFTY) & (tripTimeTillDepAtPickup < INFTY));
-//            const DistanceLabel adaptedVehTimeTillDepAtPickup = select(vehTimeInftyMask, 0, vehTimeTillDepAtPickup);
+            // const DistanceLabel adaptedVehTimeTillDepAtPickup = select(vehTimeInftyMask, 0, vehTimeTillDepAtPickup);
 
             const DistanceLabel detourCost = F::calcKVehicleCosts(detourTillDepAtPickup + directDist + stopTime);
             const DistanceLabel tripCost = F::calcKTripCosts(tripTimeTillDepAtPickup + directDist, context);

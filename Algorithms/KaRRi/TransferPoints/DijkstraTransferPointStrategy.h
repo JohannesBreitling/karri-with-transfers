@@ -29,6 +29,54 @@
 
 namespace karri::TransferPointStrategies {
 
+    class SearchSpaceIntersection {
+    
+    public:
+        SearchSpaceIntersection(const int numSearches) : numSearches(numSearches), currSearch(0), verteciesFound(std::map<int, int>{}) {}
+        
+        void init() {
+            currSearch = 0;
+            verteciesFound = std::map<int, int>{};
+        }
+
+        void nextSearch() {
+            assert(currSearch < numSearches + 1);
+            currSearch++;
+        }
+
+        void vertexFound(int v) {
+            if (currSearch == 0) {
+                verteciesFound[v] = 1;
+                return;
+            }
+
+            if (verteciesFound.count(v)) {
+                verteciesFound[v] = currSearch + 1;
+                return;
+            }
+
+            verteciesFound.erase(v);
+        }
+
+        std::vector<int> getIntersection() {
+            auto intersection = std::vector<int>{};
+
+            for (auto it = verteciesFound.begin(); it != verteciesFound.end(); it++) {
+                if (it->second < numSearches)
+                    continue;
+                
+                intersection.push_back(it->first);
+            }
+
+            return intersection;
+        }
+
+    private:
+        const int numSearches;
+        int currSearch;
+        std::map<int, int> verteciesFound;
+    };
+
 
 
     template<
@@ -41,15 +89,49 @@ namespace karri::TransferPointStrategies {
         DijkstraTransferPointStrategy(
                 const RouteState &routeState,
                 const InputGraphT &inputGraph,
-                const InputGraphT &reverseGraph) : 
+                const InputGraphT &reverseGraph,
+                std::vector<int> &posTransferPoints) : 
                 routeState(routeState),
                 inputGraph(inputGraph),
                 reverseGraph(reverseGraph),
-                dijSearchTransferPointsFw(inputGraph, {}),
-                dijSearchTransferPointsBw(reverseGraph, {}) {}
+                maxDetour(-1),
+                maxDetourP(-1),
+                maxDetourD(-1),
+                settledVertecies(0),
+                searchSpaceIntersection(SearchSpaceIntersection(4)),
+                currSearch(0),
+                dijSearchTransferPointsFw(inputGraph, {*this, maxDetour, settledVertecies}, {}),
+                dijSearchTransferPointsBw(reverseGraph, {*this, maxDetour, settledVertecies}, {}),
+                possibleTransferPoints(posTransferPoints) {}
 
-        void findTransferPoints() {
+        void setMaxDetours(int detourP, int detourD) {
+            maxDetourP = detourP;
+            maxDetourD = detourD;
+        }
+
+        void findTransferPoints(int pStop, int pNextStop, int dStop, int dNextStop) {
+            searchSpaceIntersection.init();
             
+            maxDetour = maxDetourP;
+
+            dijSearchTransferPointsFw.run(pStop);
+            searchSpaceIntersection.nextSearch();
+        
+            dijSearchTransferPointsBw.run(pNextStop);
+            searchSpaceIntersection.nextSearch();
+
+            maxDetour = maxDetourD;
+            
+            dijSearchTransferPointsFw.run(dStop);
+            searchSpaceIntersection.nextSearch();
+            
+            dijSearchTransferPointsBw.run(dNextStop);
+
+            possibleTransferPoints = searchSpaceIntersection.getIntersection();
+        }
+
+        void settleVertex(int v) {
+            searchSpaceIntersection.vertexFound(v);
         }
 
     private:
@@ -58,24 +140,47 @@ namespace karri::TransferPointStrategies {
 
 
         struct TransferPointSearch {
-            TransferPointSearch() {}
+            TransferPointSearch(DijkstraTransferPointStrategy &strategy, int &maxDetour, int &settledVertecies)
+                            : strategy(strategy),
+                              maxDetour(maxDetour),
+                              setteledVertecies(settledVertecies) {}
 
             template<typename DistLabelT, typename DistLabelContainerT>
-            bool operator()(const int v, DistLabelT &distFromV, const DistLabelContainerT & /*distLabels*/) {
-                std::cout << "Dijkstra Check Stop Criterion" << std::endl;
+            bool operator()(const int v, DistLabelT &distToV, const DistLabelContainerT & /*distLabels*/) {
+                // Check stopping criterion
+                LabelMask radiusExceeded = distToV > DistanceLabel(maxDetour); 
+
+                if (allSet(radiusExceeded)) {
+                    return true;
+                }
+
+                // Settle the found vertex (add to search space intersection)
+                strategy.settleVertex(v);
+
+                setteledVertecies++;
                 return false;
             }
 
         private:
-            
+            DijkstraTransferPointStrategy &strategy;
+            int &maxDetour;
+            int &setteledVertecies; 
         };
 
         const RouteState &routeState;
         const InputGraphT &inputGraph;
         const InputGraphT &reverseGraph;
+        int maxDetour;
+        int maxDetourP;
+        int maxDetourD;
+        int settledVertecies;
+        SearchSpaceIntersection searchSpaceIntersection;
+        int currSearch;
 
         Dijkstra<InputGraphT, TravelTimeAttribute, DijLabelSet, TransferPointSearch> dijSearchTransferPointsFw;
         Dijkstra<InputGraphT, TravelTimeAttribute, DijLabelSet, TransferPointSearch> dijSearchTransferPointsBw;
+
+        std::vector<int> &possibleTransferPoints;
     };
 
 }

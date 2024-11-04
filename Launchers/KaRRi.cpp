@@ -577,9 +577,10 @@ int main(int argc, char *argv[]) {
         // using PALSStrategy = PickupAfterLastStopStrategies::DijkstraStrategy<VehicleInputGraph, PDDistancesImpl, PALSLabelSet>;
         // PALSStrategy palsStrategy(vehicleInputGraph, revVehicleGraph, fleet, routeState, lastStopsAtVertices, calc, pdDistances, reqState);
         
-        TransferPointStrategy transferPointStrategy = TransferPointStrategy(routeState, vehicleInputGraph, revVehicleGraph);
+        std::vector<int> possibleTransferPoints = std::vector<int>{};
+        TransferPointStrategy transferPointStrategy = TransferPointStrategy(routeState, vehicleInputGraph, revVehicleGraph, possibleTransferPoints);
         using TransferPointFinderImpl = TransferPointFinder<TransferPointStrategy>;
-        TransferPointFinderImpl transferPoints = TransferPointFinderImpl(transferPointStrategy, fleet, routeState, pVehs, dVehs);
+        TransferPointFinderImpl transferPoints = TransferPointFinderImpl(transferPointStrategy, fleet, routeState, pVehs, dVehs, possibleTransferPoints);
 
         using InsertionFinderImpl = AssignmentFinder<RequestStateInitializerImpl,
                 EllipticBCHSearchesImpl,
