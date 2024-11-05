@@ -30,6 +30,7 @@
 #include <cmath>
 
 #include "Algorithms/KaRRi/BaseObjects/Assignment.h"
+#include "Algorithms/KaRRi/BaseObjects/AssignmentWithTransfer.h"
 #include "Algorithms/KaRRi/RouteState.h"
 #include "Algorithms/KaRRi/InputConfig.h"
 #include "Algorithms/KaRRi/TimeUtils.h"
@@ -101,6 +102,33 @@ namespace karri {
 
             return calcCost(asgn, context, initialPickupDetour, residualDetourAtEnd,
                             actualDepTimeAtPickup, dropoffAtExistingStop, addedTripTime);
+        }
+
+        template<typename RequestContext>
+        int calcBaseWithTransfer(const AssignmentWithTransfer &asgn /*, const RequestContext &context */) {
+            assert(asgn.pickup && asgn.dropoff && asgn.dVeh && asgn.pVeh && asgn.transfer);
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            return 0;
         }
 
         // Calculate the cost for a passenger moving to their destination independently without using a vehicle.

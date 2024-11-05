@@ -26,17 +26,18 @@
 #pragma once
 
 #include "Algorithms/Dijkstra/Dijkstra.h"
+#include "cassert"
 
 namespace karri::TransferPointStrategies {
 
     class SearchSpaceIntersection {
     
     public:
-        SearchSpaceIntersection(const int numSearches) : numSearches(numSearches), currSearch(0), verteciesFound(std::map<int, int>{}) {}
+        SearchSpaceIntersection(const int numSearches) : numSearches(numSearches), currSearch(0), verteciesFound(std::map<int, std::tuple<int, TransferPoint>>{}) {}
         
         void init() {
             currSearch = 0;
-            verteciesFound = std::map<int, int>{};
+            verteciesFound = std::map<int, std::tuple<int, TransferPoint>>{};
         }
 
         void nextSearch() {
@@ -44,29 +45,45 @@ namespace karri::TransferPointStrategies {
             currSearch++;
         }
 
-        void vertexFound(int v) {
+        void vertexFound(int v, int distance) {
             if (currSearch == 0) {
-                verteciesFound[v] = 1;
+                verteciesFound[v] = {1, TransferPoint()};
+                std::get<1>(verteciesFound[v]).loc = v;
+                std::get<1>(verteciesFound[v]).distancePVehToTransfer = distance;
                 return;
             }
 
-            if (verteciesFound.count(v)) {
-                verteciesFound[v] = currSearch + 1;
+            if (!verteciesFound.count(v)) {
+                verteciesFound.erase(v);
                 return;
-            }
+            } 
 
-            verteciesFound.erase(v);
+            switch (currSearch) {
+                case 1:
+                    std::get<1>(verteciesFound[v]).distancePVehFromTransfer = distance;
+                    break;
+                case 2:
+                    std::get<1>(verteciesFound[v]).distanceDVehToTransfer = distance;
+                    break;
+                case 3:
+                    std::get<1>(verteciesFound[v]).distanceDVehFromTransfer = distance;
+                    break;
+            }
         }
 
-        std::vector<int> getIntersection() {
-            auto intersection = std::vector<int>{};
+        std::vector<TransferPoint> getIntersection() {
+            auto intersection = std::vector<TransferPoint>{};
 
             for (auto it = verteciesFound.begin(); it != verteciesFound.end(); it++) {
-                if (it->second < numSearches)
-                    continue;
-                
-                intersection.push_back(it->first);
+
             }
+
+/*
+            for (auto it = verteciesFound.begin(); it != verteciesFound.end(); it++) 
+                // int found = std::get<0>(it->second);
+                //if (found < numSearches) continue;
+                // intersection.push_back({it->first, it->second[1], it->second[2], it->second[3], it->second[4]});
+            }*/
 
             return intersection;
         }
@@ -74,7 +91,7 @@ namespace karri::TransferPointStrategies {
     private:
         const int numSearches;
         int currSearch;
-        std::map<int, int> verteciesFound;
+        std::map<int, std::tuple<int, TransferPoint>> verteciesFound;
     };
 
 
@@ -90,7 +107,7 @@ namespace karri::TransferPointStrategies {
                 const RouteState &routeState,
                 const InputGraphT &inputGraph,
                 const InputGraphT &reverseGraph,
-                std::vector<int> &posTransferPoints) : 
+                std::vector<TransferPoint> &posTransferPoints) : 
                 routeState(routeState),
                 inputGraph(inputGraph),
                 reverseGraph(reverseGraph),
@@ -130,8 +147,8 @@ namespace karri::TransferPointStrategies {
             possibleTransferPoints = searchSpaceIntersection.getIntersection();
         }
 
-        void settleVertex(int v) {
-            searchSpaceIntersection.vertexFound(v);
+        void settleVertex(int v, int distance) {
+            searchSpaceIntersection.vertexFound(v, distance);
         }
 
     private:
@@ -155,7 +172,9 @@ namespace karri::TransferPointStrategies {
                 }
 
                 // Settle the found vertex (add to search space intersection)
-                strategy.settleVertex(v);
+                strategy.settleVertex(v, distToV[v]);
+
+                std::cout << "<" << v << ", " << distToV[v] << ">" << std::endl; 
 
                 setteledVertecies++;
                 return false;
@@ -180,7 +199,7 @@ namespace karri::TransferPointStrategies {
         Dijkstra<InputGraphT, TravelTimeAttribute, DijLabelSet, TransferPointSearch> dijSearchTransferPointsFw;
         Dijkstra<InputGraphT, TravelTimeAttribute, DijLabelSet, TransferPointSearch> dijSearchTransferPointsBw;
 
-        std::vector<int> &possibleTransferPoints;
+        std::vector<TransferPoint> &possibleTransferPoints;
     };
 
 }

@@ -29,20 +29,18 @@
 
 #include "Vehicle.h"
 #include "Request.h"
-#include "TransferPoints/TransferPoint.h"
+#include "Algorithms/KaRRi/TransferPoints/TransferPoint.h"
 
 namespace karri {
 
     struct AssignmentWithTransfer {
 
-        const Vehicle* pVehicle = nullptr;
-        const Vehicle* dVehicle = nullptr;
+        const Vehicle* pVeh = nullptr;
+        const Vehicle* dVeh = nullptr;
         const PDLoc *pickup = nullptr;
         const PDLoc *dropoff = nullptr;
 
         TransferPoint* transfer = nullptr;
-
-        const int transferpoint = INVALID_INDEX;
 
         int pickupStopIdx = INVALID_INDEX;  // Pickup is inserted at or after stop with index pickupStopIdx in route of pickup vehicle
         int dropoffStopIdx = INVALID_INDEX;  // Dropoff is inserted at or after stop with index dropoffStopIdx in route of dropoff vehicle

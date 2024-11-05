@@ -39,7 +39,7 @@ namespace karri {
             const RouteState &routeState,
             PickupVehicles &pVehs,
             DropoffVehicles &dVehs,
-            std::vector<int> &possibleTransferPoints
+            std::vector<TransferPoint> &possibleTransferPoints
         ) : strategy(strategy),
             fleet(fleet), routeState(routeState),
             pVehs(pVehs), dVehs(dVehs),
@@ -49,7 +49,7 @@ namespace karri {
         void init() {
             pVehs.init();
             dVehs.init();
-            possibleTransferPoints = std::vector<int>{};
+            possibleTransferPoints = std::vector<TransferPoint>{};
             totalTransferPointsForRequest = 0;
             pickupDropoffPairs = std::vector<std::tuple<Vehicle, Vehicle>>{};         
         }
@@ -129,7 +129,7 @@ namespace karri {
         PickupVehicles &pVehs;
         DropoffVehicles &dVehs;
         std::vector<std::tuple<Vehicle, Vehicle>> pickupDropoffPairs;
-        std::vector<int> &possibleTransferPoints;
+        std::vector<TransferPoint> &possibleTransferPoints;
         int totalTransferPointsForRequest;
     };
 

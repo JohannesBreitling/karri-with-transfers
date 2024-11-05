@@ -76,6 +76,8 @@ namespace karri {
 
         void findVehiclesForOrdinaryPickup() {
             for (const auto &vehId: relPickups.getVehiclesWithRelevantPDLocs()) {
+                // std::cout <<  
+                
                 pVehs.pushBack(fleet[vehId]);
             }
         }

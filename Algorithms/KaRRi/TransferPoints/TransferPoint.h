@@ -2,20 +2,22 @@
 #pragma once
 
 #include "Tools/Constants.h"
-#include "BaseObjects/Vehicle.h"
+#include "Algorithms/KaRRi/BaseObjects/Vehicle.h"
 
 namespace karri {
     
     
     struct TransferPoint {
 
-        const Vehicle* pVeh = nullptr;
-        const Vehicle* pVeh = nullptr;
+        TransferPoint() {} 
+
+        Vehicle* pVeh = nullptr;
+        Vehicle* dVeh = nullptr;
 
         int dropoffAtTransferStopIdx = INVALID_INDEX;
         int pickupFromTransferStopIdx = INVALID_INDEX;
        
-        const int loc = INVALID_EDGE; // Location in the road network
+        int loc = INVALID_EDGE; // Location in the road network
         
         int distancePVehToTransfer = 0;
         int distancePVehFromTransfer = 0;

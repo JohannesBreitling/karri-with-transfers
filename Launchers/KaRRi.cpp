@@ -577,7 +577,7 @@ int main(int argc, char *argv[]) {
         // using PALSStrategy = PickupAfterLastStopStrategies::DijkstraStrategy<VehicleInputGraph, PDDistancesImpl, PALSLabelSet>;
         // PALSStrategy palsStrategy(vehicleInputGraph, revVehicleGraph, fleet, routeState, lastStopsAtVertices, calc, pdDistances, reqState);
         
-        std::vector<int> possibleTransferPoints = std::vector<int>{};
+        std::vector<TransferPoint> possibleTransferPoints = std::vector<TransferPoint>{};
         TransferPointStrategy transferPointStrategy = TransferPointStrategy(routeState, vehicleInputGraph, revVehicleGraph, possibleTransferPoints);
         using TransferPointFinderImpl = TransferPointFinder<TransferPointStrategy>;
         TransferPointFinderImpl transferPoints = TransferPointFinderImpl(transferPointStrategy, fleet, routeState, pVehs, dVehs, possibleTransferPoints);
