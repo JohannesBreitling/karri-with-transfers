@@ -81,13 +81,15 @@ namespace karri {
             initializeForRequest(req);
 
             // * Output information about the request that is currently dispatched
-            std::cout << "Dispatching Request<id: " << req.requestId
-                                                     << ", orig: "
-                                                     << req.origin
-                                                     << ", dest: "
-                                                     << req.destination
-                                                     << ">"
-                                                     << std::endl;
+            // ! ------------------------------
+            //std::cout << "Dispatching Request<id: " << req.requestId
+            //                                         << ", orig: "
+            //                                         << req.origin
+            //                                         << ", dest: "
+            //                                         << req.destination
+            //                                         << ">"
+            //                                         << std::endl;
+            
 
             // Compute PD distances:
             pdDistanceSearches.run();
@@ -120,7 +122,7 @@ namespace karri {
             pbnsAssignments.findPickupAndDropoffVehicles();
 
             // * Construct pairs of one pickup and one dropoff car
-            transferPoints.findTransferPoints();
+            // transferPoints.findTransferPoints();
             
             // * For every vehicle, and stop pair run 4 dijkstra searches and determine the intersection of the 4 search spaces
 

@@ -19,10 +19,10 @@ namespace karri {
        
         int loc = INVALID_EDGE; // Location in the road network
         
-        int distancePVehToTransfer = 0;
-        int distancePVehFromTransfer = 0;
-        int distanceDVehToTransfer = 0;
-        int distanceDVehFromTransfer = 0;
+        int distancePVehToTransfer = -1;
+        int distancePVehFromTransfer = -1;
+        int distanceDVehToTransfer = -1;
+        int distanceDVehFromTransfer = -1;
 
     };
 

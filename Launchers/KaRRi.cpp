@@ -62,6 +62,7 @@
 #include "Algorithms/KaRRi/DalsAssignments/DALSAssignmentsFinder.h"
 #include "Algorithms/KaRRi/TransferPoints/TransferPointFinder.h"
 #include "Algorithms/KaRRi/TransferPoints/DijkstraTransferPointStrategy.h"
+#include "Algorithms/KaRRi/TransferPoints/TransferVehicles.h"
 #include "Algorithms/KaRRi/LastStopSearches/SortedLastStopBucketsEnvironment.h"
 #include "Algorithms/KaRRi/LastStopSearches/UnsortedLastStopBucketsEnvironment.h"
 #include "Algorithms/KaRRi/RequestState/VehicleToPDLocQuery.h"

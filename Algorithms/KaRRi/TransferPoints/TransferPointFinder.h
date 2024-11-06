@@ -63,7 +63,7 @@ namespace karri {
                 const auto &pVeh = std::get<0>(pickupDropoffPair);
                 const auto &dVeh = std::get<1>(pickupDropoffPair);
 
-                std::cout << "Trying Pickup Vehicle " << pVeh.vehicleId << " / Dropoff Vehicle " << dVeh.vehicleId << std::endl;  
+                // ! std::cout << "Trying Pickup Vehicle " << pVeh.vehicleId << " / Dropoff Vehicle " << dVeh.vehicleId << std::endl;  
 
                 const auto &stopLocationsPickupVehicle = routeState.stopLocationsFor(pVeh.vehicleId);
                 const auto &stopLocationsDropoffVehicle = routeState.stopLocationsFor(dVeh.vehicleId);
@@ -78,7 +78,7 @@ namespace karri {
                 for (int pIndex = 0; pIndex < routeState.numStopsOf(pVeh.vehicleId) - 1; pIndex++) {
                     for (int dIndex = 0; dIndex < routeState.numStopsOf(dVeh.vehicleId) - 1; dIndex++) {
 
-                        std::cout << "Trying Stop of Pickup Vehicle " << pIndex << " / Stop of Dropoff Vehicle " << dIndex << std::endl;
+                        // ! std::cout << "Trying Stop of Pickup Vehicle " << pIndex << " / Stop of Dropoff Vehicle " << dIndex << std::endl;
 
                         // Get the start locations for the searches 
                         int pickupVehicleStop = stopLocationsPickupVehicle[pIndex];
@@ -98,9 +98,18 @@ namespace karri {
                         strategy.setMaxDetours(maxDetourPickup, maxDetourDropoff);                    
                         strategy.findTransferPoints(pickupVehicleStop, pickupVehicleNextStop, dropoffVehicleStop, dropoffVehicleNextStop);
 
-                        std::cout << "Num Transfer Points : " << possibleTransferPoints.size() << std::endl;
+                        //if (possibleTransferPoints.size() > 0)
+                            //std::cout << "NUM TPs : " << possibleTransferPoints.size() << std::endl; 
 
-                        // TODO Bauen der Assignments
+                        
+                        // Build the possible transfer points
+                        //for (auto &tp : possibleTransferPoints) {
+                            //std::cout << "TP<id: " << tp.loc << ", dists: [" << tp.distancePVehToTransfer << ", " << tp.distancePVehFromTransfer << ", " << tp.distanceDVehToTransfer << ", " << tp.distanceDVehFromTransfer << "]>" << std::endl;    
+                            // tp.pVeh = pVeh;
+                            // tp.dVeh = dVeh;
+                            // tp.dropoffAtTransferStopIdx = pIndex;
+                            // tp.pickupFromTransferStopIdx = dIndex;
+                        //}
 
                         // TODO Kosten der Assignments bestimmen
 
@@ -115,10 +124,10 @@ namespace karri {
             for (const auto &pVeh : *pVehs.getVehicles()) {
                 for (const auto &dVeh : *dVehs.getVehicles()) {
                     // If the pickup is the same as the dropoff vehicle, we already tested the assignment without a transfer
-                    if (pVeh.vehicleId == dVeh.vehicleId)
+                    if (pVeh->vehicleId == dVeh->vehicleId)
                         continue;
 
-                    pickupDropoffPairs.push_back(std::make_tuple(pVeh, dVeh));
+                    pickupDropoffPairs.push_back(std::make_tuple(*pVeh, *dVeh));
                 }
             }
         }

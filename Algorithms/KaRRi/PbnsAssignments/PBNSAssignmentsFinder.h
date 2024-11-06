@@ -27,6 +27,7 @@
 
 #include "Algorithms/KaRRi/RequestState/RelevantPDLocs.h"
 #include "Algorithms/KaRRi/PbnsAssignments/CurVehLocToPickupSearches.h"
+#include "Algorithms/KaRRi/TransferPoints/TransferVehicles.h"
 
 namespace karri {
 
@@ -124,13 +125,25 @@ namespace karri {
 
         void findVehiclesForPBNS() {
             for (const auto &vehId: relPickupsBNS.getVehiclesWithRelevantPDLocs()) {
-                pVehs.pushBack(fleet[vehId]);
+                std::vector<RelevantPDLocs::RelevantPDLoc> plocs = std::vector<RelevantPDLocs::RelevantPDLoc>{};
+                const auto relPickupForVeh = relPickupsBNS.relevantSpotsFor(vehId);
+                for (auto it = relPickupForVeh.begin(); it != relPickupForVeh.end(); ++it) {
+                    plocs.push_back(*it);
+                }
+
+                pVehs.pushBack(&fleet[vehId] , plocs);
             }
         }
 
         void findVehiclesForDBNS() {
             for (const auto &vehId: relDropoffsBNS.getVehiclesWithRelevantPDLocs()) {
-                dVehs.pushBack(fleet[vehId]);
+                std::vector<RelevantPDLocs::RelevantPDLoc> dlocs = std::vector<RelevantPDLocs::RelevantPDLoc>{};
+
+                const auto relDropoffsForVeh = relDropoffsBNS.relevantSpotsFor(vehId);
+                for (auto it = relDropoffsForVeh.begin(); it != relDropoffsForVeh.end(); ++it) {
+                    dlocs.push_back(*it);
+                }
+                dVehs.pushBack(&fleet[vehId] , dlocs);
             }
         }
 

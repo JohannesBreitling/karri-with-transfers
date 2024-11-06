@@ -33,11 +33,12 @@ namespace karri::TransferPointStrategies {
     class SearchSpaceIntersection {
     
     public:
-        SearchSpaceIntersection(const int numSearches) : numSearches(numSearches), currSearch(0), verteciesFound(std::map<int, std::tuple<int, TransferPoint>>{}) {}
+        SearchSpaceIntersection(const int numSearches) : numSearches(numSearches), currSearch(0), vertecies(std::map<int, int>{}), distances(std::map<int, int[4]>{}) {}
         
         void init() {
             currSearch = 0;
-            verteciesFound = std::map<int, std::tuple<int, TransferPoint>>{};
+            vertecies = std::map<int, int>{};
+            distances = std::map<int, int[4]>{};
         }
 
         void nextSearch() {
@@ -47,43 +48,47 @@ namespace karri::TransferPointStrategies {
 
         void vertexFound(int v, int distance) {
             if (currSearch == 0) {
-                verteciesFound[v] = {1, TransferPoint()};
-                std::get<1>(verteciesFound[v]).loc = v;
-                std::get<1>(verteciesFound[v]).distancePVehToTransfer = distance;
+                vertecies[v] = 1;
+                distances[v][0] = distance;
                 return;
             }
 
-            if (!verteciesFound.count(v)) {
-                verteciesFound.erase(v);
+            if (!vertecies.count(v)) {
+                // Vertex would be seen the first time in a search later than the first search
                 return;
-            } 
-
-            switch (currSearch) {
-                case 1:
-                    std::get<1>(verteciesFound[v]).distancePVehFromTransfer = distance;
-                    break;
-                case 2:
-                    std::get<1>(verteciesFound[v]).distanceDVehToTransfer = distance;
-                    break;
-                case 3:
-                    std::get<1>(verteciesFound[v]).distanceDVehFromTransfer = distance;
-                    break;
             }
+
+            if (vertecies[v] < currSearch) {
+                // vertecies.erase(v);
+                return;
+            }
+
+            vertecies[v] = (vertecies[v] + 1);
+            distances[v][currSearch] = distance;
         }
 
         std::vector<TransferPoint> getIntersection() {
             auto intersection = std::vector<TransferPoint>{};
 
-            for (auto it = verteciesFound.begin(); it != verteciesFound.end(); it++) {
+            for (auto it = vertecies.begin(); it != vertecies.end(); it++) {
+                
+                const auto v = it->first;
+                const auto numFound = it->second;
+                
+                const auto foundDistances = distances[v];
 
+                if (numFound < numSearches)
+                    continue;
+                
+                TransferPoint tp = TransferPoint();
+                tp.loc = v;
+                tp.distancePVehToTransfer = foundDistances[0];
+                tp.distancePVehFromTransfer = foundDistances[1];
+                tp.distanceDVehToTransfer = foundDistances[2];
+                tp.distanceDVehFromTransfer = foundDistances[3];
+
+                intersection.push_back(tp);
             }
-
-/*
-            for (auto it = verteciesFound.begin(); it != verteciesFound.end(); it++) 
-                // int found = std::get<0>(it->second);
-                //if (found < numSearches) continue;
-                // intersection.push_back({it->first, it->second[1], it->second[2], it->second[3], it->second[4]});
-            }*/
 
             return intersection;
         }
@@ -91,7 +96,8 @@ namespace karri::TransferPointStrategies {
     private:
         const int numSearches;
         int currSearch;
-        std::map<int, std::tuple<int, TransferPoint>> verteciesFound;
+        std::map<int, int> vertecies;
+        std::map<int, int[4]> distances;
     };
 
 
@@ -172,9 +178,7 @@ namespace karri::TransferPointStrategies {
                 }
 
                 // Settle the found vertex (add to search space intersection)
-                strategy.settleVertex(v, distToV[v]);
-
-                std::cout << "<" << v << ", " << distToV[v] << ">" << std::endl; 
+                strategy.settleVertex(v, distToV[0]);
 
                 setteledVertecies++;
                 return false;
