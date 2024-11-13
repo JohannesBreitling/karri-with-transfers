@@ -27,6 +27,7 @@
 
 #include "Tools/Timer.h"
 #include "Algorithms/KaRRi/BaseObjects/Assignment.h"
+#include "Algorithms/KaRRi/BaseObjects/PD.h"
 #include "Algorithms/KaRRi/RequestState/RelevantPDLocs.h"
 #include "Algorithms/KaRRi/PDDistanceQueries/PDDistances.h"
 #include "Algorithms/KaRRi/TransferPoints/TransferVehicles.h"
@@ -75,27 +76,57 @@ namespace karri {
 
     private:
 
+        // TODO Frage: Was bedeutet dass ein Spot in den Relevant Dropoff liegt?
+
         void findVehiclesForOrdinaryPickup() {
-            for (const auto &vehId: relPickups.getVehiclesWithRelevantPDLocs()) {
-                std::vector<RelevantPDLocs::RelevantPDLoc> plocs = std::vector<RelevantPDLocs::RelevantPDLoc>{};
-                const auto relPickupForVeh = relPickups.relevantSpotsFor(vehId);
-                for (auto it = relPickupForVeh.begin(); it != relPickupForVeh.end(); ++it) {
-                    plocs.push_back(*it);
+            // Loop over all relavant vehicles
+            for (const auto &vehId : relPickups.getVehiclesWithRelevantPDLocs()) {
+                
+                const auto &vehicle = &fleet[vehId];
+                std::vector<Pickup> pickups = std::vector<Pickup>{};
+
+                // Loop over the relevant spots for each vehicle
+                for (const auto &pickupEntry : relPickups.relevantSpotsFor(vehId)) {
+                    // Construct a pickup object for the vehicle and the possible pickup entry
+                    Pickup pickup = Pickup(vehicle);
+                    pickup.type = ORD;
+                    pickup.detourToPD = pickupEntry.distToPDLoc;
+                    pickup.detourFromPD = pickupEntry.distFromPDLocToNextStop;
+                    pickup.pdIdx = pickupEntry.stopIndex;
+
+                    const auto pdLoc = requestState.pickups[pickupEntry.pdId];
+                    pickup.walkingDistance = pdLoc.walkingDist;
+
+                    pickups.push_back(pickup);
                 }
 
-                pVehs.pushBack(&fleet[vehId] , plocs);
+                pVehs.pushBack(vehicle, pickups, ORD);
             }
         }
 
         void findVehiclesForOrdinaryDropoff() {
-            for (const auto &vehId: relDropoffs.getVehiclesWithRelevantPDLocs()) {
-                std::vector<RelevantPDLocs::RelevantPDLoc> dlocs = std::vector<RelevantPDLocs::RelevantPDLoc>{};
+            // Loop over all relevant vehicles for ordinary dropoff
+            for (const auto &vehId : relDropoffs.getVehiclesWithRelevantPDLocs()) {
 
-                const auto relDropoffsForVeh = relDropoffs.relevantSpotsFor(vehId);
-                for (auto it = relDropoffsForVeh.begin(); it != relDropoffsForVeh.end(); ++it) {
-                    dlocs.push_back(*it);
+                const auto &vehicle = &fleet[vehId];
+                std::vector<Dropoff> dropoffs = std::vector<Dropoff>{};
+
+                // Loop over the relevant spots for each vehicle
+                for (const auto &dropoffEntry : relDropoffs.relevantSpotsFor(vehId)) {
+                    // Construct a dropoff object for the vehicle and the possible dropoff entry 
+                    Dropoff dropoff = Dropoff(vehicle);
+                    dropoff.type = ORD;
+                    dropoff.detourToPD = dropoffEntry.distToPDLoc;
+                    dropoff.detourFromPD = dropoffEntry.distFromPDLocToNextStop;
+                    dropoff.pdIdx = dropoffEntry.stopIndex;
+
+                    const auto pdLoc = requestState.dropoffs[dropoffEntry.pdId];
+                    dropoff.walkingDistance = pdLoc.walkingDist;
+
+                    dropoffs.push_back(dropoff);
                 }
-                dVehs.pushBack(&fleet[vehId] , dlocs);
+
+                dVehs.pushBack(vehicle, dropoffs, ORD);
             }
         }
 
@@ -116,7 +147,7 @@ namespace karri {
                     !relDropoffs.hasRelevantSpotsFor(vehId))
                     continue;
 
-                ++numCandidateVehicles;
+                ++numCandidateVehicles; 
                 Assignment asgn(&fleet[vehId]);
 
                 const auto relevantDropoffs = relDropoffs.relevantSpotsFor(vehId);

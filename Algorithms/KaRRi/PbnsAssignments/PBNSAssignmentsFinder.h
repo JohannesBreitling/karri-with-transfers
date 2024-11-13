@@ -26,6 +26,7 @@
 #pragma once
 
 #include "Algorithms/KaRRi/RequestState/RelevantPDLocs.h"
+#include "Algorithms/KaRRi/BaseObjects/PD.h"
 #include "Algorithms/KaRRi/PbnsAssignments/CurVehLocToPickupSearches.h"
 #include "Algorithms/KaRRi/TransferPoints/TransferVehicles.h"
 
@@ -125,25 +126,47 @@ namespace karri {
 
         void findVehiclesForPBNS() {
             for (const auto &vehId: relPickupsBNS.getVehiclesWithRelevantPDLocs()) {
-                std::vector<RelevantPDLocs::RelevantPDLoc> plocs = std::vector<RelevantPDLocs::RelevantPDLoc>{};
-                const auto relPickupForVeh = relPickupsBNS.relevantSpotsFor(vehId);
-                for (auto it = relPickupForVeh.begin(); it != relPickupForVeh.end(); ++it) {
-                    plocs.push_back(*it);
+                
+                const auto vehicle = &fleet[vehId];
+                std::vector<Pickup> pickups = std::vector<Pickup>{}; 
+
+                for (const auto &pickupEntry : relPickupsBNS.relevantSpotsFor(vehId)) {
+                    Pickup pickup = Pickup(vehicle);
+                    pickup.type = BNS;
+                    pickup.detourToPD = pickupEntry.distToPDLoc;
+                    pickup.detourFromPD = pickupEntry.distFromPDLocToNextStop;
+                    pickup.pdIdx = pickupEntry.stopIndex;
+
+                    const auto pdLoc = requestState.pickups[pickupEntry.pdId];
+                    pickup.walkingDistance = pdLoc.walkingDist;
+
+                    pickups.push_back(pickup);
                 }
 
-                pVehs.pushBack(&fleet[vehId] , plocs);
+                pVehs.pushBack(vehicle, pickups, BNS);
             }
         }
 
         void findVehiclesForDBNS() {
             for (const auto &vehId: relDropoffsBNS.getVehiclesWithRelevantPDLocs()) {
-                std::vector<RelevantPDLocs::RelevantPDLoc> dlocs = std::vector<RelevantPDLocs::RelevantPDLoc>{};
 
-                const auto relDropoffsForVeh = relDropoffsBNS.relevantSpotsFor(vehId);
-                for (auto it = relDropoffsForVeh.begin(); it != relDropoffsForVeh.end(); ++it) {
-                    dlocs.push_back(*it);
+                const auto vehicle = &fleet[vehId];
+                std::vector<Dropoff> dropoffs = std::vector<Dropoff>{};
+
+                for (const auto &dropoffEntry : relDropoffsBNS.relevantSpotsFor(vehId)) {
+                    Dropoff dropoff = Dropoff(vehicle);
+                    dropoff.type = ORD;
+                    dropoff.detourToPD = dropoffEntry.distToPDLoc;
+                    dropoff.detourFromPD = dropoffEntry.distFromPDLocToNextStop;
+                    dropoff.pdIdx = dropoffEntry.stopIndex;
+
+                    const auto pdLoc = requestState.dropoffs[dropoffEntry.pdId];
+                    dropoff.walkingDistance = pdLoc.walkingDist;
+
+                    dropoffs.push_back(dropoff);
                 }
-                dVehs.pushBack(&fleet[vehId] , dlocs);
+
+                dVehs.pushBack(vehicle, dropoffs, BNS);
             }
         }
 

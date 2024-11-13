@@ -30,6 +30,7 @@
 #include <cmath>
 
 #include "Algorithms/KaRRi/BaseObjects/Assignment.h"
+#include "Algorithms/KaRRi/TransferPoints/TransferPoint.h"
 #include "Algorithms/KaRRi/BaseObjects/AssignmentWithTransfer.h"
 #include "Algorithms/KaRRi/RouteState.h"
 #include "Algorithms/KaRRi/InputConfig.h"
@@ -107,7 +108,7 @@ namespace karri {
         template<typename RequestContext>
         int calcBaseWithTransfer(const AssignmentWithTransfer &asgn /*, const RequestContext &context */) {
             assert(asgn.pickup && asgn.dropoff && asgn.dVeh && asgn.pVeh && asgn.transfer);
-            
+
             
             
             
@@ -129,6 +130,36 @@ namespace karri {
             
             
             return 0;
+        }
+
+        int calcDetourForTransferpoint(const TransferPoint &tp) {
+            auto detour = time_utils::calcDetourForTransferPoint(tp, routeState); 
+            return detour;
+        }
+
+        int calcAddedTripTimeForTransferPoint(const TransferPoint &tp) {
+            auto addedTripTimeForPVeh = 0;
+            auto addedTripTimeForDVeh = 0;
+
+            auto pVeh = tp.pVeh;
+            auto dVeh = tp.dVeh;
+
+            const auto pVehSchedDep = routeState.schedDepTimesFor(pVeh->vehicleId);
+            const auto pVehOcc = routeState.occupanciesFor(pVeh->vehicleId);
+            
+            const auto dVehSchedDep = routeState.schedDepTimesFor(dVeh->vehicleId);
+            const auto dVehOcc = routeState.occupanciesFor(dVeh->vehicleId);
+
+            // TODO Hierfür muss halt der Pickup und der Dropoff stehen....
+            // for (int pIdx = routeState.tp)
+
+
+            (void) pVehSchedDep;
+            (void) pVehOcc;
+            (void) dVehSchedDep;
+            (void) dVehOcc;
+
+            return addedTripTimeForPVeh + addedTripTimeForDVeh;
         }
 
         // Calculate the cost for a passenger moving to their destination independently without using a vehicle.

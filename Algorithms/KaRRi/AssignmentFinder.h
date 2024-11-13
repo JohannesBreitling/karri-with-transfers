@@ -44,7 +44,8 @@ namespace karri {
             typename PalsAssignmentsT,
             typename DalsAssignmentsT,
             typename RelevantPDLocsFilterT,
-            typename TransferPointFinderT
+            typename TransferPointFinderT,
+            typename AssignmentsWithTransferT
     >
     class AssignmentFinder {
 
@@ -61,7 +62,9 @@ namespace karri {
                          PalsAssignmentsT &palsAssignments,
                          DalsAssignmentsT &dalsAssignments,
                          RelevantPDLocsFilterT &relevantPdLocsFilter,
-                         TransferPointFinderT &transferPoints)
+                         TransferPointFinderT &transferPoints,
+                         AssignmentsWithTransferT &assignmentsWithTransfer
+                         )
                 : reqState(requestState),
                   requestStateInitializer(requestStateInitializer),
                   pVehs(pVehs),
@@ -73,7 +76,8 @@ namespace karri {
                   palsAssignments(palsAssignments),
                   dalsAssignments(dalsAssignments),
                   relevantPdLocsFilter(relevantPdLocsFilter),
-                  transferPoints(transferPoints) {}
+                  transferPoints(transferPoints),
+                  assignmentsWithTransfer(assignmentsWithTransfer) {}
 
         const RequestState &findBestAssignment(const Request &req) {
 
@@ -115,19 +119,18 @@ namespace karri {
             // Try PBNS assignments:
             pbnsAssignments.findAssignments();
 
+            // * Get the best know cost without transfer as upper bound
+            const auto bestCostWithoutTransfer = reqState.getBestCost();
+
             // * Find vehicles that are feasible for a ordinary pickup / dropoff
             ordAssignments.findPickupAndDropoffVehicles();
 
             // * Find vehicles that are feasible for a Pickup / Dropoff before the next stop
             pbnsAssignments.findPickupAndDropoffVehicles();
 
-            // * Construct pairs of one pickup and one dropoff car
-            // transferPoints.findTransferPoints();
+            // * Find the best assignment that contains a transfer
+            assignmentsWithTransfer.findBestAssignment(bestCostWithoutTransfer);
             
-            // * For every vehicle, and stop pair run 4 dijkstra searches and determine the intersection of the 4 search spaces
-
-            // * Evaluate the possible insertions
-
             // * Output the solution with the best costs
 
             return reqState;
@@ -146,6 +149,7 @@ namespace karri {
             palsAssignments.init();
             dalsAssignments.init();
             transferPoints.init();
+            assignmentsWithTransfer.init();
         }
 
         RequestState &reqState;
@@ -160,5 +164,6 @@ namespace karri {
         DalsAssignmentsT &dalsAssignments; // Tries DALS assignments where only the dropoff is inserted after the last stop.
         RelevantPDLocsFilterT &relevantPdLocsFilter; // Additionally filters feasible pickups/dropoffs found by elliptic BCH searches.
         TransferPointFinderT &transferPoints;
+        AssignmentsWithTransferT &assignmentsWithTransfer;
     };
 }

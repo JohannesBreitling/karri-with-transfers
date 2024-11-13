@@ -28,6 +28,8 @@
 #include "Algorithms/KaRRi/RouteState.h"
 #include "Algorithms/KaRRi/InputConfig.h"
 #include "Algorithms/KaRRi/BaseObjects/Request.h"
+#include "Algorithms/KaRRi/TransferPoints/TransferPoint.h"
+#include "cassert"
 
 #define DO_INLINE true
 #if DO_INLINE
@@ -502,6 +504,30 @@ namespace karri::time_utils {
             return true;
 
         return false;
+    }
+
+    static INLINE int calcDetourForTransferPoint(const TransferPoint &tp, const RouteState &routeState) {
+
+        auto pVeh = tp.pVeh;
+        auto dVeh = tp.dVeh;
+
+        assert(routeState.numStopsOf(pVeh->vehicleId) - 1 != tp.dropoffAtTransferStopIdx);
+        assert(0 != tp.pickupFromTransferStopIdx);
+
+        // Length in 10th seconds
+        const auto lengthOfReplacedLegPVeh = calcLengthOfLegStartingAt(tp.dropoffAtTransferStopIdx, pVeh->vehicleId, routeState);
+        const auto lengthOfReplacedLegDVeh = calcLengthOfLegStartingAt(tp.pickupFromTransferStopIdx, dVeh->vehicleId, routeState);
+
+        assert(lengthOfReplacedLegPVeh > 0);
+        assert(lengthOfReplacedLegDVeh > 0);
+        // int sum = 0;
+
+        int sumPVeh = tp.distancePVehToTransfer + tp.distancePVehFromTransfer + InputConfig::getInstance().stopTime - lengthOfReplacedLegPVeh;
+        int sumDVeh = tp.distanceDVehToTransfer + tp.distanceDVehFromTransfer + InputConfig::getInstance().stopTime - lengthOfReplacedLegDVeh;
+        
+        return sumPVeh + sumDVeh;
+
+
     }
 
 } // end namespace

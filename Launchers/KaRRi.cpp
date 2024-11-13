@@ -61,6 +61,7 @@
 #include "Algorithms/KaRRi/PalsAssignments/PALSAssignmentsFinder.h"
 #include "Algorithms/KaRRi/DalsAssignments/DALSAssignmentsFinder.h"
 #include "Algorithms/KaRRi/TransferPoints/TransferPointFinder.h"
+#include "Algorithms/KaRRi/TransferPoints/AssignmentsWithTransferFinder.h"
 #include "Algorithms/KaRRi/TransferPoints/DijkstraTransferPointStrategy.h"
 #include "Algorithms/KaRRi/TransferPoints/TransferVehicles.h"
 #include "Algorithms/KaRRi/LastStopSearches/SortedLastStopBucketsEnvironment.h"
@@ -494,6 +495,7 @@ int main(int argc, char *argv[]) {
         // Construct ordinary assignments finder:
         PickupVehicles pVehs = PickupVehicles();
         DropoffVehicles dVehs = DropoffVehicles();
+    
         using OrdinaryAssignmentsFinderImpl = OrdinaryAssignmentsFinder<PDDistancesImpl>;
         OrdinaryAssignmentsFinderImpl ordinaryInsertionsFinder(relOrdinaryPickups, relOrdinaryDropoffs,
                                                                pdDistances, fleet, pVehs, dVehs,
@@ -583,6 +585,10 @@ int main(int argc, char *argv[]) {
         using TransferPointFinderImpl = TransferPointFinder<TransferPointStrategy>;
         TransferPointFinderImpl transferPoints = TransferPointFinderImpl(transferPointStrategy, fleet, routeState, pVehs, dVehs, possibleTransferPoints);
 
+
+        using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<TransferPointStrategy>;
+        AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(transferPointStrategy, fleet, routeState, calc, pVehs, dVehs, transferPoints, possibleTransferPoints);
+
         using InsertionFinderImpl = AssignmentFinder<RequestStateInitializerImpl,
                 EllipticBCHSearchesImpl,
                 PDDistanceQueryImpl,
@@ -591,11 +597,12 @@ int main(int argc, char *argv[]) {
                 PALSInsertionsFinderImpl,
                 DALSInsertionsFinderImpl,
                 RelevantPDLocsFilterImpl,
-                TransferPointFinderImpl
+                TransferPointFinderImpl,
+                AssignmentsWithTransferFinderImpl
                 >;
         InsertionFinderImpl insertionFinder(reqState, requestStateInitializer, pVehs, dVehs, ellipticSearches, pdDistanceQuery,
                                             ordinaryInsertionsFinder, pbnsInsertionsFinder, palsInsertionsFinder,
-                                            dalsInsertionsFinder, relevantPdLocsFilter, transferPoints);
+                                            dalsInsertionsFinder, relevantPdLocsFilter, transferPoints, insertionsWithTransferFinder);
 
 
 #if KARRI_OUTPUT_VEHICLE_PATHS
