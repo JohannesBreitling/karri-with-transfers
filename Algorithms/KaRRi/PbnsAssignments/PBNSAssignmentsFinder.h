@@ -131,13 +131,13 @@ namespace karri {
                 std::vector<Pickup> pickups = std::vector<Pickup>{}; 
 
                 for (const auto &pickupEntry : relPickupsBNS.relevantSpotsFor(vehId)) {
+                    const auto pdLoc = requestState.pickups[pickupEntry.pdId];
                     Pickup pickup = Pickup(vehicle);
+                    pickup.pdLocId = pickupEntry.pdId;
                     pickup.type = BNS;
                     pickup.detourToPD = pickupEntry.distToPDLoc;
                     pickup.detourFromPD = pickupEntry.distFromPDLocToNextStop;
                     pickup.pdIdx = pickupEntry.stopIndex;
-
-                    const auto pdLoc = requestState.pickups[pickupEntry.pdId];
                     pickup.walkingDistance = pdLoc.walkingDist;
 
                     pickups.push_back(pickup);
@@ -154,13 +154,13 @@ namespace karri {
                 std::vector<Dropoff> dropoffs = std::vector<Dropoff>{};
 
                 for (const auto &dropoffEntry : relDropoffsBNS.relevantSpotsFor(vehId)) {
+                    const auto pdLoc = requestState.dropoffs[dropoffEntry.pdId];
                     Dropoff dropoff = Dropoff(vehicle);
+                    dropoff.pdLocId = dropoffEntry.pdId;
                     dropoff.type = ORD;
                     dropoff.detourToPD = dropoffEntry.distToPDLoc;
                     dropoff.detourFromPD = dropoffEntry.distFromPDLocToNextStop;
                     dropoff.pdIdx = dropoffEntry.stopIndex;
-
-                    const auto pdLoc = requestState.dropoffs[dropoffEntry.pdId];
                     dropoff.walkingDistance = pdLoc.walkingDist;
 
                     dropoffs.push_back(dropoff);

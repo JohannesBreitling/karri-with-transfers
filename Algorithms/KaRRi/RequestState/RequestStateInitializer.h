@@ -128,6 +128,6 @@ namespace karri {
 
         FindPDLocsInRadiusQuery<PsgInputGraphT> findPdLocsInRadiusQuery;
         VehicleToPDLocQueryT &vehicleToPdLocQuery;
-
+    
     };
 }

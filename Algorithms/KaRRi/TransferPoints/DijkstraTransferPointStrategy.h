@@ -133,22 +133,30 @@ namespace karri::TransferPointStrategies {
         }
 
         void findTransferPoints(int pStop, int pNextStop, int dStop, int dNextStop) {
+            // Convert the stop locations, that are edges to the respective vertecies
+
+            int pStopVertex = inputGraph.edgeHead(pStop);
+            int pNextStopVertex = inputGraph.edgeTail(pNextStop);
+            int dStopVertex = inputGraph.edgeHead(dStop);
+            int dNextStopVertex = inputGraph.edgeTail(dNextStop);
+            
+            
             searchSpaceIntersection.init();
             
             maxDetour = maxDetourP;
 
-            dijSearchTransferPointsFw.run(pStop);
+            dijSearchTransferPointsFw.run(pStopVertex);
             searchSpaceIntersection.nextSearch();
         
-            dijSearchTransferPointsBw.run(pNextStop);
+            dijSearchTransferPointsBw.run(pNextStopVertex);
             searchSpaceIntersection.nextSearch();
 
             maxDetour = maxDetourD;
             
-            dijSearchTransferPointsFw.run(dStop);
+            dijSearchTransferPointsFw.run(dStopVertex);
             searchSpaceIntersection.nextSearch();
             
-            dijSearchTransferPointsBw.run(dNextStop);
+            dijSearchTransferPointsBw.run(dNextStopVertex);
 
             possibleTransferPoints = searchSpaceIntersection.getIntersection();
         }

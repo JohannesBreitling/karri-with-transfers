@@ -2,6 +2,7 @@
 /// MIT License
 ///
 /// Copyright (c) 2023 Moritz Laupichler <moritz.laupichler@kit.edu>
+/// Copyright (c) 2024 Johannes Breitling <johannes.breitling@student.kit.edu>
 ///
 /// Permission is hereby granted, free of charge, to any person obtaining a copy
 /// of this software and associated documentation files (the "Software"), to deal
@@ -88,13 +89,13 @@ namespace karri {
                 // Loop over the relevant spots for each vehicle
                 for (const auto &pickupEntry : relPickups.relevantSpotsFor(vehId)) {
                     // Construct a pickup object for the vehicle and the possible pickup entry
+                    const auto pdLoc = requestState.pickups[pickupEntry.pdId];
                     Pickup pickup = Pickup(vehicle);
+                    pickup.pdLocId = pickupEntry.pdId;
                     pickup.type = ORD;
                     pickup.detourToPD = pickupEntry.distToPDLoc;
                     pickup.detourFromPD = pickupEntry.distFromPDLocToNextStop;
                     pickup.pdIdx = pickupEntry.stopIndex;
-
-                    const auto pdLoc = requestState.pickups[pickupEntry.pdId];
                     pickup.walkingDistance = pdLoc.walkingDist;
 
                     pickups.push_back(pickup);
@@ -114,13 +115,13 @@ namespace karri {
                 // Loop over the relevant spots for each vehicle
                 for (const auto &dropoffEntry : relDropoffs.relevantSpotsFor(vehId)) {
                     // Construct a dropoff object for the vehicle and the possible dropoff entry 
+                    const auto pdLoc = requestState.dropoffs[dropoffEntry.pdId];
                     Dropoff dropoff = Dropoff(vehicle);
+                    dropoff.pdLocId = dropoffEntry.pdId;
                     dropoff.type = ORD;
                     dropoff.detourToPD = dropoffEntry.distToPDLoc;
                     dropoff.detourFromPD = dropoffEntry.distFromPDLocToNextStop;
                     dropoff.pdIdx = dropoffEntry.stopIndex;
-
-                    const auto pdLoc = requestState.dropoffs[dropoffEntry.pdId];
                     dropoff.walkingDistance = pdLoc.walkingDist;
 
                     dropoffs.push_back(dropoff);
@@ -309,7 +310,7 @@ namespace karri {
                         const auto endOfStopInPickups = pickupIt;
                         const auto endOfStopInDropoffs = dropoffIt;
 
-                        // With collected lower bounds, we check whether an assignment better than the best known is possible with this vehicle
+                        // With collected lower bounds, we check whether an assignment is better than the best known is possible with this vehicle
                         asgn.pickup = &requestState.pickups[minPickupId];
                         asgn.dropoff = &requestState.dropoffs[minDropoffId];
                         asgn.pickupStopIdx = stopPos;

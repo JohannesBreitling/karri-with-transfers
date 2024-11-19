@@ -2,6 +2,7 @@
 /// MIT License
 ///
 /// Copyright (c) 2023 Moritz Laupichler <moritz.laupichler@kit.edu>
+/// Copyright (c) 2024 Johannes Breitling <johannes.breitling@student.kit.edu>
 ///
 /// Permission is hereby granted, free of charge, to any person obtaining a copy
 /// of this software and associated documentation files (the "Software"), to deal

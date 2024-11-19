@@ -29,28 +29,37 @@
 
 #include "Vehicle.h"
 #include "Request.h"
+#include "PD.h"
 #include "Algorithms/KaRRi/TransferPoints/TransferPoint.h"
 
 namespace karri {
 
     struct AssignmentWithTransfer {
+        
+        AssignmentWithTransfer() {}
 
-        const Vehicle* pVeh = nullptr;
-        const Vehicle* dVeh = nullptr;
+        const Vehicle *pVeh = nullptr;
+        const Vehicle *dVeh = nullptr;
+
         const PDLoc *pickup = nullptr;
+        const TransferPoint transfer;
         const PDLoc *dropoff = nullptr;
 
-        TransferPoint* transfer = nullptr;
-
-        int pickupStopIdx = INVALID_INDEX;  // Pickup is inserted at or after stop with index pickupStopIdx in route of pickup vehicle
-        int dropoffStopIdx = INVALID_INDEX;  // Dropoff is inserted at or after stop with index dropoffStopIdx in route of dropoff vehicle
-
-        int distToPickup = 0; // Distance from previous stop to pickup
-        int distFromPickup = 0; // Distance from pickup to next stop (or 0 if pickupStopIdx == dropoffStopIdx)
-        int distToDropoff = 0; // Distance from previous stop to dropoff (or from pickup to dropoff if pickupStopIdx == dropoffStopIdx)
-        int distFromDropoff = 0; // Distance from dropoff to next stop
+        int pickupIdx = INVALID_INDEX;
+        int transferIdxPVeh = INVALID_INDEX;
+        int transferIdxDVeh = INVALID_INDEX;
+        int dropoffIdx = INVALID_INDEX;
+        
+        int distToPickup; // distance from previous stop to pickup
+        int distFromPickup; // distance from pickup to next stop (or 0 if pickupIdx == transferIdxPVeh)
+        int distToTransferPVeh; // distance from previous stop to transfer point (or from transfer point if pickupIdx == transferIdxPVeh) 
+        int distFromTransferPVeh; // distance from transfer point to next stop (or 0 if there is no next stop)
+        
+        int distToTransferDVeh; // distance from previous stop to transfer point
+        int distFromTransferDVeh; // distance from transfer point to next stop (or 0 if transferIdxDVeh == dropoffIdx)
+        int distToDropoff; // distance from previous stop to dropoff (or from transfer point if transferIdxDVeh == dropoffIdx)
+        int distFromDropoff; // distance from dropoff to next stop (or 0 if there is no next stop)
 
     };
-
 
 }

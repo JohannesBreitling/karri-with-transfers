@@ -5,14 +5,13 @@
 #include "Algorithms/KaRRi/BaseObjects/Vehicle.h"
 
 namespace karri {
-    
-    
+
     struct TransferPoint {
 
-        TransferPoint() {} 
+        TransferPoint() {}
 
-        Vehicle* pVeh = nullptr;
-        Vehicle* dVeh = nullptr;
+        Vehicle *pVeh = nullptr;
+        Vehicle *dVeh = nullptr;
 
         int dropoffAtTransferStopIdx = INVALID_INDEX;
         int pickupFromTransferStopIdx = INVALID_INDEX;
@@ -25,6 +24,5 @@ namespace karri {
         int distanceDVehFromTransfer = -1;
 
     };
-
 
 }

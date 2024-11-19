@@ -2,6 +2,7 @@
 /// MIT License
 ///
 /// Copyright (c) 2023 Moritz Laupichler <moritz.laupichler@kit.edu>
+/// Copyright (c) 2024 Johannes Breitling <johannes.breitling@student.kit.edu>
 ///
 /// Permission is hereby granted, free of charge, to any person obtaining a copy
 /// of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +27,7 @@
 #pragma once
 
 #include "Algorithms/KaRRi/RouteState.h"
+#include "Algorithms/KaRRi/BaseObjects/AssignmentWithTransfer.h"
 #include "Algorithms/KaRRi/InputConfig.h"
 #include "Algorithms/KaRRi/BaseObjects/Request.h"
 #include "Algorithms/KaRRi/TransferPoints/TransferPoint.h"
@@ -100,6 +102,10 @@ namespace karri::time_utils {
                                         context, routeState);
     }
 
+    template<typename RequestContext>
+    static INLINE int getActualDepTimeAtPickup(const AssignmentWithTransfer &asgn, const RequestContext &context, const RouteState &routeState) {
+        return getActualDepTimeAtPickup(asgn.pVeh->vehicleId, asgn.pickupIdx, asgn.distToPickup, *asgn.pickup, context, routeState);
+    }
 
     template<typename LabelSet, typename RequestContext>
     static INLINE typename LabelSet::DistanceLabel
@@ -163,6 +169,32 @@ namespace karri::time_utils {
         return depTimeAtPrevious + asgn.distToDropoff;
     }
 
+    static INLINE int
+    getArrTimeAtTransfer(const int actualDepTimeAtPickup, const AssignmentWithTransfer &asgn, const int initialPickupDetour,
+                        const bool transferAtExistingStop, const RouteState &routeState) {
+
+        const auto pickupIndex = asgn.pickupIdx;
+        const auto transferIndex = asgn.transferIdxPVeh;
+        const auto &minDepTimes = routeState.schedDepTimesFor(asgn.pVeh->vehicleId);
+        const auto &minArrTimes = routeState.schedArrTimesFor(asgn.pVeh->vehicleId);
+        const auto &vehWaitTimesPrefixSum = routeState.vehWaitTimesPrefixSumFor(asgn.pVeh->vehicleId);
+
+        if (pickupIndex == transferIndex) {
+            return actualDepTimeAtPickup + asgn.distToTransferPVeh;
+        }
+
+        assert(transferIndex > 0);
+        const auto stopLengthsBetween = vehWaitTimesPrefixSum[transferIndex - 1] - vehWaitTimesPrefixSum[pickupIndex];
+        const auto arrTimeAtPrevious = minArrTimes[transferIndex] + std::max(initialPickupDetour - stopLengthsBetween, 0);
+
+        if (transferAtExistingStop) {
+            return arrTimeAtPrevious;
+        }
+
+        const auto depTimeAtPrevious = std::max(minDepTimes[transferIndex], arrTimeAtPrevious + InputConfig::getInstance().stopTime);
+        return depTimeAtPrevious + asgn.distToTransferPVeh;
+    }
+
     // Returns the accumulated vehicle wait time in the stop interval (fromIndex, toIndex].
     static INLINE int
     getTotalVehWaitTimeInInterval(const int vehId, const int fromIndex, const int toIndex,
@@ -195,6 +227,15 @@ namespace karri::time_utils {
     calcInitialPickupDetour(const Assignment &asgn, const int depTimeAtPickup, const RequestContext &context,
                             const RouteState &routeState) {
         return calcInitialPickupDetour(asgn.vehicle->vehicleId, asgn.pickupStopIdx, asgn.dropoffStopIdx,
+                                       depTimeAtPickup, asgn.distFromPickup,
+                                       context, routeState);
+    }
+
+    template<typename RequestContext>
+    static INLINE int
+    calcInitialPickupDetour(const AssignmentWithTransfer &asgn, const int depTimeAtPickup, const RequestContext &context,
+                            const RouteState &routeState) {
+        return calcInitialPickupDetour(asgn.pVeh->vehicleId, asgn.pickupIdx, asgn.transferIdxPVeh,
                                        depTimeAtPickup, asgn.distFromPickup,
                                        context, routeState);
     }
@@ -258,6 +299,14 @@ namespace karri::time_utils {
     }
 
     static INLINE int
+    calcInitialTransferDetourPVeh(const AssignmentWithTransfer &asgn, const bool transferAtExistingStop, const RouteState routeState) {
+        if (transferAtExistingStop) return 0;
+
+        const auto lengthOfReplacedLeg = calcLengthOfLegStartingAt(asgn.transferIdxPVeh, asgn.pVeh->vehicleId, routeState);
+        return asgn.distToTransferPVeh + InputConfig::getInstance().stopTime + asgn.distFromTransferPVeh - lengthOfReplacedLeg;
+    }
+
+    static INLINE int
     calcDetourRightAfterDropoff(const int vehId, const int pickupIndex, const int dropoffIndex,
                                 const int initialPickupDetour, const int initialDropoffDetour,
                                 const RouteState &routeState) {
@@ -273,6 +322,14 @@ namespace karri::time_utils {
                                 const RouteState &routeState) {
         return calcDetourRightAfterDropoff(asgn.vehicle->vehicleId, asgn.pickupStopIdx, asgn.dropoffStopIdx,
                                            initialPickupDetour, initialDropoffDetour, routeState);
+    }
+
+    static INLINE int
+    calcDetourRightAfterTransferPVeh(const AssignmentWithTransfer &asgn, const int initialPickupDetour, const int initialTransferDetour, const RouteState &routeState) {
+        const auto detour = calcResidualPickupDetour(asgn.pVeh->vehicleId, asgn.pickupIdx, asgn.transferIdxPVeh + 1, initialPickupDetour, routeState) + initialTransferDetour;
+        
+        assert(detour >= 0 || asgn.pickupIdx == asgn.transferIdxPVeh);
+        return std::max(detour, 0);
     }
 
     static INLINE int
@@ -365,6 +422,10 @@ namespace karri::time_utils {
                                                            detourRightAfterDropoff, routeState);
     }
 
+    static INLINE int calcAddedTripTimeAffectedByPickupAndTransfer(const AssignmentWithTransfer &asgn, const int detourRightAfterTransfer, const RouteState &routeState) {
+        return calcAddedTripTimeAffectedByPickupAndDropoff(asgn.pVeh->vehicleId, asgn.transferIdxPVeh, detourRightAfterTransfer, routeState);
+    }
+
     template<typename RequestContext>
     static INLINE bool isAnyHardConstraintViolated(const Vehicle &veh, const int pickupIndex, const int dropoffIndex,
                                                    const RequestContext &context, const int initialPickupDetour,
@@ -415,6 +476,14 @@ namespace karri::time_utils {
             return true;
 
         return false;
+    }
+
+    template<typename RequestContext>
+    static INLINE bool
+    isAnyHardConstraintViolated(const AssignmentWithTransfer &asgn, const RequestContext &context, const int initialPickupDetour,
+                                const int detourRightAfterTransfer, const int residualDetourAtEnd,
+                                const bool transferAtExistingStop, const RouteState &routeState) {
+        return isAnyHardConstraintViolated(*asgn.pVeh, asgn.pickupIdx, asgn.transferIdxPVeh, context, initialPickupDetour, detourRightAfterTransfer, residualDetourAtEnd, transferAtExistingStop, routeState);                                    
     }
 
     template<typename RequestContext>

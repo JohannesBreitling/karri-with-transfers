@@ -586,8 +586,8 @@ int main(int argc, char *argv[]) {
         TransferPointFinderImpl transferPoints = TransferPointFinderImpl(transferPointStrategy, fleet, routeState, pVehs, dVehs, possibleTransferPoints);
 
 
-        using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<TransferPointStrategy>;
-        AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(transferPointStrategy, fleet, routeState, calc, pVehs, dVehs, transferPoints, possibleTransferPoints);
+        using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<TransferPointStrategy, VehicleInputGraph, VehCHEnv>;
+        AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(transferPointStrategy, fleet, routeState, reqState, vehicleInputGraph, *vehChEnv, calc, pVehs, dVehs, transferPoints, possibleTransferPoints);
 
         using InsertionFinderImpl = AssignmentFinder<RequestStateInitializerImpl,
                 EllipticBCHSearchesImpl,
