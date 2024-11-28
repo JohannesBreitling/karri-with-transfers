@@ -60,6 +60,10 @@ namespace karri {
         int distToDropoff; // distance from previous stop to dropoff (or from transfer point if transferIdxDVeh == dropoffIdx)
         int distFromDropoff; // distance from dropoff to next stop (or 0 if there is no next stop)
 
+        int costPVeh; // Cost of the trip until the passenger arrives at the transfer point
+        int waitTimeAtPickup; // Wait time at pickup
+        int arrAtTransferPoint; // Arrival time of pVeh at transfer point
+
     };
 
 }

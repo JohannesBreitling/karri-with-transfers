@@ -50,6 +50,13 @@ namespace karri::time_utils {
         return (numStops == 1 ? std::max(minDepTimes[0], context.originalRequest.requestTime) : minDepTimes[stopIdx]);
     }
 
+    static INLINE int getVehDepTimeAtStopForTransfer(const int vehId, const int stopIdx, const int arrAtTransfer,
+                                                    const RouteState &routeState) {
+        const auto numStops = routeState.numStopsOf(vehId);
+        const auto &minDepTimes = routeState.schedDepTimesFor(vehId);
+        return (numStops == 1 ? std::max(minDepTimes[0], arrAtTransfer) : minDepTimes[stopIdx]);
+    }
+
     static INLINE bool isMakingStop(const int vehId, const int now, const RouteState &routeState) {
         return routeState.schedDepTimesFor(vehId)[0] > now;
     }
@@ -58,6 +65,15 @@ namespace karri::time_utils {
                                               const RouteState &routeState) {
         return (stopIndex > 0 || isMakingStop(vehId, now, routeState)) &&
                pickup.loc == routeState.stopLocationsFor(vehId)[stopIndex];
+    }
+
+    template <typename InputGraphT>
+    static INLINE bool isTransferAtExistingStop(const int transferLoc, const int vehId, const int now, const int stopIndex,
+                                              const RouteState &routeState, const InputGraphT &inputGraph) {
+        const int tailOfStop = inputGraph.edgeTail(routeState.stopLocationsFor(vehId)[stopIndex]);
+        
+        return (stopIndex > 0 || isMakingStop(vehId, now, routeState)) &&
+               transferLoc == tailOfStop;
     }
 
     template<typename LabelSet>
@@ -93,6 +109,14 @@ namespace karri::time_utils {
         // passenger arrives there. The vehicle can depart as soon as both the vehicle and the passenger are at the
         // location. This is how LOUD originally did it, so we adhere to it.
         return std::max(minVehicleDepTimeAtPickup, context.getPassengerArrAtPickup(pickup.id));
+    }
+
+    template<typename RequestContext, typename InputGraphT>
+    static INLINE int getActualDepTimeAtTranfer(const AssignmentWithTransfer &asgn, const RequestContext &context, RouteState &routeState, const InputGraphT &inputGraph) {
+        const bool atStop = isTransferAtExistingStop(asgn.transfer.loc, asgn.pVeh->vehicleId, context.now(), asgn.transferIdxDVeh, routeState, inputGraph);
+        const auto minVehicleDepTimeAtTransfer = getVehDepTimeAtStopForTransfer(asgn.dVeh->vehicleId, asgn.transferIdxDVeh, asgn.arrAtTransferPoint, routeState) + !atStop * (asgn.distToTransferDVeh + InputConfig::getInstance().stopTime);
+
+        return std::max(minVehicleDepTimeAtTransfer, asgn.arrAtTransferPoint);
     }
 
     template<typename RequestContext>
@@ -143,6 +167,11 @@ namespace karri::time_utils {
                asgn.dropoff->loc == routeState.stopLocationsFor(asgn.vehicle->vehicleId)[asgn.dropoffStopIdx];
     }
 
+    static INLINE bool isDropoffAtExistingStop(const AssignmentWithTransfer &asgn, const RouteState &routeState) {
+        return asgn.transferIdxDVeh != asgn.dropoffIdx &&
+               asgn.dropoff->loc == routeState.stopLocationsFor(asgn.pVeh->vehicleId)[asgn.dropoffIdx];
+    }
+
     static INLINE int
     getArrTimeAtDropoff(const int actualDepTimeAtPickup, const Assignment &asgn, const int initialPickupDetour,
                         const bool dropoffAtExistingStop, const RouteState &routeState) {
@@ -170,14 +199,40 @@ namespace karri::time_utils {
     }
 
     static INLINE int
+    getArrTimeAtDropoff(const int actualDepTimeAtTransfer, const AssignmentWithTransfer &asgn, const int initialTransferDetour, const bool dropoffAtExistingStop, const RouteState &routeState) {
+        const auto vehIdDVeh = asgn.dVeh->vehicleId;
+        const auto pickupIndex = asgn.transferIdxDVeh;
+        const auto dropoffIndex = asgn.dropoffIdx;
+        const auto &minDepTimes = routeState.schedDepTimesFor(vehIdDVeh);
+        const auto &minArrTimes = routeState.schedArrTimesFor(vehIdDVeh);
+        const auto &vehWaitTimesPrefixSum = routeState.vehWaitTimesPrefixSumFor(vehIdDVeh);
+    
+        if (pickupIndex == dropoffIndex) {
+            return actualDepTimeAtTransfer + asgn.distToDropoff;
+        }
+
+        assert(dropoffIndex > 0);
+        const auto stopLengthsBetween = vehWaitTimesPrefixSum[dropoffIndex - 1] - vehWaitTimesPrefixSum[pickupIndex];
+        const auto arrTimeAtPrevious =
+                minArrTimes[dropoffIndex] + std::max(initialTransferDetour - stopLengthsBetween, 0);
+
+        if (dropoffAtExistingStop) {
+            return arrTimeAtPrevious;
+        }
+
+        const auto depTimeAtPrevious = std::max(minDepTimes[dropoffIndex], arrTimeAtPrevious + InputConfig::getInstance().stopTime);
+        return depTimeAtPrevious + asgn.distToDropoff;
+    }
+
+    static INLINE int
     getArrTimeAtTransfer(const int actualDepTimeAtPickup, const AssignmentWithTransfer &asgn, const int initialPickupDetour,
                         const bool transferAtExistingStop, const RouteState &routeState) {
-
+        const auto vehIdPVeh = asgn.pVeh->vehicleId; 
         const auto pickupIndex = asgn.pickupIdx;
         const auto transferIndex = asgn.transferIdxPVeh;
-        const auto &minDepTimes = routeState.schedDepTimesFor(asgn.pVeh->vehicleId);
-        const auto &minArrTimes = routeState.schedArrTimesFor(asgn.pVeh->vehicleId);
-        const auto &vehWaitTimesPrefixSum = routeState.vehWaitTimesPrefixSumFor(asgn.pVeh->vehicleId);
+        const auto &minDepTimes = routeState.schedDepTimesFor(vehIdPVeh);
+        const auto &minArrTimes = routeState.schedArrTimesFor(vehIdPVeh);
+        const auto &vehWaitTimesPrefixSum = routeState.vehWaitTimesPrefixSumFor(vehIdPVeh);
 
         if (pickupIndex == transferIndex) {
             return actualDepTimeAtPickup + asgn.distToTransferPVeh;
@@ -242,6 +297,27 @@ namespace karri::time_utils {
 
     template<typename RequestContext>
     static INLINE int
+    calcInitialTransferDetourDVeh(const AssignmentWithTransfer &asgn, int depTimeAtTransfer, const RequestContext /* &context */, const RouteState &routeState) {
+        const auto vehDepTimeAtPrevStop = getVehDepTimeAtStopForTransfer(asgn.dVeh->vehicleId, asgn.transferIdxDVeh, asgn.arrAtTransferPoint, routeState);
+        const auto timeUntilDep = depTimeAtTransfer - vehDepTimeAtPrevStop;
+
+        if (asgn.transferIdxDVeh == asgn.dropoffIdx)
+            return timeUntilDep;
+
+        const auto legLength = calcLengthOfLegStartingAt(asgn.transferIdxDVeh, asgn.dVeh->vehicleId, routeState);
+
+        /*
+        if (legLength > asgn.distFromTransferDVeh) {
+            std::cout << "Leg Length : " << legLength << " DistFromTransfer: " << asgn.distFromTransferDVeh << std::endl;
+        }
+        */
+
+        return timeUntilDep + asgn.distFromTransferDVeh - legLength;
+        // return calcInitialPickupDetour(asgn.dVeh->vehicleId, asgn.transferIdxDVeh, asgn.dropoffIdx, depTimeAtTransfer, asgn.distFromTransferDVeh, context, routeState);
+    }
+
+    template<typename RequestContext>
+    static INLINE int
     calcInitialPickupDetour(const Assignment &asgn, const RequestContext &context,
                             const RouteState &routeState) {
         const auto actualDepTime = getActualDepTimeAtPickup(asgn, context, routeState);
@@ -299,6 +375,11 @@ namespace karri::time_utils {
     }
 
     static INLINE int
+    calcInitialDropoffDetour(const AssignmentWithTransfer &asgn, const bool dropoffAtExistingStop, const RouteState &routeState) {
+        return calcInitialDropoffDetour(asgn.dVeh->vehicleId, asgn.dropoffIdx, asgn.distToDropoff, asgn.distFromDropoff, dropoffAtExistingStop, routeState);
+    }
+
+    static INLINE int
     calcInitialTransferDetourPVeh(const AssignmentWithTransfer &asgn, const bool transferAtExistingStop, const RouteState routeState) {
         if (transferAtExistingStop) return 0;
 
@@ -322,6 +403,11 @@ namespace karri::time_utils {
                                 const RouteState &routeState) {
         return calcDetourRightAfterDropoff(asgn.vehicle->vehicleId, asgn.pickupStopIdx, asgn.dropoffStopIdx,
                                            initialPickupDetour, initialDropoffDetour, routeState);
+    }
+
+    static INLINE int
+    calcDetourRightAfterDropoff(const AssignmentWithTransfer &asgn, const int initialTransferDetour, const int initalDropoffDetour, const RouteState &routeState) {
+        return calcDetourRightAfterDropoff(asgn.dVeh->vehicleId, asgn.transferIdxDVeh, asgn.dropoffIdx, initialTransferDetour, initalDropoffDetour, routeState);
     }
 
     static INLINE int
@@ -415,6 +501,18 @@ namespace karri::time_utils {
         return calcAddedTripTimeInInterval(vehId, newDropoffIndex, numStops - 1, detourRightAfterDropoff, routeState);
     }
 
+    static INLINE int calcAddedTripTimeAffectedByTransferAndDropoff(const int vehId, const int newDropoffIndex, const int detourRightAfterDropoff, const RouteState &routeState) {
+        assert(detourRightAfterDropoff >= 0);
+        const auto numStops = routeState.numStopsOf(vehId);
+        assert(newDropoffIndex < numStops);
+
+        return calcAddedTripTimeInInterval(vehId, newDropoffIndex, numStops - 1, detourRightAfterDropoff, routeState);
+    }
+
+    static INLINE int calcAddedTripTimeAffectedByTransferAndDropoff(const AssignmentWithTransfer &asgn, const int detourRightAfterDropoff, const RouteState &routeState) {
+        return calcAddedTripTimeAffectedByTransferAndDropoff(asgn.dVeh->vehicleId, asgn.pickupIdx, detourRightAfterDropoff, routeState);
+    }
+
     static INLINE int
     calcAddedTripTimeAffectedByPickupAndDropoff(const Assignment &asgn, const int detourRightAfterDropoff,
                                                 const RouteState &routeState) {
@@ -494,6 +592,66 @@ namespace karri::time_utils {
         return isAnyHardConstraintViolated(*asgn.vehicle, asgn.pickupStopIdx, asgn.dropoffStopIdx, context,
                                            initialPickupDetour, detourRightAfterDropoff, residualDetourAtEnd,
                                            dropoffAtExistingStop, routeState);
+    }
+
+    template<typename RequestContext>
+    static INLINE bool isAnyHardConstraintViolated(const int arrAtTransfer, const Vehicle &dVeh, const int transferIdx, const int dropoffIdx,
+                                                   const RequestContext &context, const int initialTransferDetour,
+                                                   const int detourRightAfterDropoff, const int residualDetourAtEnd,
+                                                   const bool dropoffAtExistingStop, const RouteState &routeState) {
+        const auto vehId = dVeh.vehicleId;
+        const auto endServiceTime = dVeh.endOfServiceTime;
+        const auto numStops = routeState.numStopsOf(vehId);
+        const auto &minDepTimes = routeState.schedDepTimesFor(vehId);
+        const auto &minArrTimes = routeState.schedArrTimesFor(vehId);
+        const auto &maxArrTimes = routeState.maxArrTimesFor(vehId);
+        const auto &occupancies = routeState.occupanciesFor(vehId);
+
+        // If departure time at the last stop (which may be the time of issuing this request if the vehicle is currently
+        // idling) is moved past the end of the service time by the total detour, the assignment violates the service
+        // time constraint.
+        if (std::max(minDepTimes[numStops - 1], arrAtTransfer) + residualDetourAtEnd >
+            endServiceTime)
+            return true;
+
+        // If the pickup is inserted at/after the last stop and the service time constraint is not violated, the
+        // assignment is ok.
+        if (transferIdx + 1 == numStops)
+            return false;
+
+        // If the pickup detour moves the planned arrival time at the stop after the pickup past the latest permissible
+        // arrival time, this assignment violates some trip time or wait time hard constraint.
+        if (transferIdx != dropoffIdx && initialTransferDetour != 0 &&
+            minArrTimes[transferIdx + 1] + initialTransferDetour > maxArrTimes[transferIdx + 1])
+            return true;
+
+        // If somewhere between pickup and dropoff the vehicle is already full, we cannot insert another passenger.
+        for (int i = transferIdx; i < transferIdx; ++i)
+            if (occupancies[i] + context.originalRequest.numRiders > dVeh.capacity)
+                return true;
+        if (!dropoffAtExistingStop && occupancies[transferIdx] + context.originalRequest.numRiders > dVeh.capacity)
+            return true;
+
+        // If the dropoff is inserted at/after the last stop, the service time constraint is kept and the pickup does
+        // not violate the trip time or wait time constraints, the assignment is ok.
+        if (transferIdx + 1 == numStops)
+            return false;
+
+        // If the total detour moves the planned arrival time at the stop after the dropoff past the latest permissible
+        // arrival time, this assignment violates some trip time or wait time constraint.
+        if (detourRightAfterDropoff != 0 &&
+            minArrTimes[dropoffIdx + 1] + detourRightAfterDropoff > maxArrTimes[dropoffIdx + 1])
+            return true;
+
+        return false;
+    }
+
+    template<typename RequestContext>
+    static INLINE bool isAnyHardConstraintViolated(const AssignmentWithTransfer &asgn, RequestContext &context,
+                                                   const int initalTransferDetour, const int detourRightAfterDropoff, const int residualDetourAtEnd,
+                                                   const bool dropoffAtExistingStop, const RouteState &routeState) {
+        return isAnyHardConstraintViolated(asgn.arrAtTransferPoint, *asgn.dVeh, asgn.transferIdxDVeh, asgn.dropoffIdx, context,
+                                           initalTransferDetour, detourRightAfterDropoff, residualDetourAtEnd, dropoffAtExistingStop, routeState);
     }
 
     template<typename RequestContext>

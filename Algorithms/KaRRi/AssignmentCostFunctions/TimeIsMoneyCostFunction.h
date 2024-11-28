@@ -112,6 +112,11 @@ namespace karri {
             return WAIT_TIME_VIOLATION_WEIGHT * std::max(actualDepTimeAtPickup - context.getMaxDepTimeAtPickup(), 0);
         }
 
+        template<typename RequestContext>
+        static inline int calcWaitViolationCost(const int arrAtTransfer, const int actualDepTimeAtTransfer, const int waitedAtPickup, const RequestContext) {
+            return WAIT_TIME_VIOLATION_WEIGHT * std::max(actualDepTimeAtTransfer - arrAtTransfer + waitedAtPickup - InputConfig::getInstance().maxWaitTime, 0);
+        }
+
         template<typename DistanceLabel, typename RequestContext>
         static inline DistanceLabel calcKWaitViolationCosts(const DistanceLabel &actualDepTimeAtPickup,
                                                             const RequestContext &context) {
