@@ -115,7 +115,11 @@ namespace karri {
                   updatePerfLogger(LogManager<LoggerT>::getLogger(stats::UpdatePerformanceStats::LOGGER_NAME,
                                                                   "request_id, " +
                                                                   std::string(
-                                                                          stats::UpdatePerformanceStats::LOGGER_COLS))) {}
+                                                                          stats::UpdatePerformanceStats::LOGGER_COLS))),
+                  transferPerfLogger(LogManager<LoggerT>::getLogger(stats::AssignmentsWithTransferPerformanceStats::LOGGER_NAME,
+                                                                  "request_id, " +
+                                                                  std::string(
+                                                                          stats::AssignmentsWithTransferPerformanceStats::LOGGER_COLS))) {}
 
 
         void insertBestAssignment(int &pickupStopId, int &dropoffStopId) {
@@ -252,6 +256,8 @@ namespace karri {
                            << requestState.stats().dalsAssignmentsStats.getLoggerRow() << "\n";
             updatePerfLogger << requestState.originalRequest.requestId << ", "
                              << requestState.stats().updateStats.getLoggerRow() << "\n";
+            transferPerfLogger << requestState.originalRequest.requestId << ", "
+                               << requestState.stats().transferStats.getLoggerRow() << "\n";
         }
 
     private:
@@ -361,6 +367,7 @@ namespace karri {
         LoggerT &palsPerfLogger;
         LoggerT &dalsPerfLogger;
         LoggerT &updatePerfLogger;
+        LoggerT &transferPerfLogger;
 
     };
 }

@@ -281,6 +281,98 @@ namespace karri::stats {
         }
     };
 
+    struct AssignmentsWithTransferPerformanceStats {
+        int64_t numPickupDropoffPairs;
+        int64_t numStopPairs;
+        int64_t numTransferPoints;
+
+        // TODO numDijkstraSearches....
+
+        int64_t numPartialAssignmentsTried;
+        int64_t numAssignmentsTried;
+
+        int64_t vehiclePairupTime;
+        int64_t transferPointCalculationTime;
+
+        int64_t pickupBnsTime;
+        int64_t pickupPairedTime;
+        int64_t transferBnsTime;
+        int64_t transferPairedTime;
+
+        int64_t postponedPartialsTime;
+        int64_t postponedAssignmentsTime;
+
+        int64_t totalTime;
+
+        void clear() {
+            numPickupDropoffPairs = 0;
+            numStopPairs = 0;
+            numTransferPoints = 0;
+
+            numPartialAssignmentsTried = 0;
+            numAssignmentsTried = 0;
+            
+            vehiclePairupTime = 0;
+            transferPointCalculationTime = 0;
+            
+            pickupBnsTime = 0;
+            pickupPairedTime = 0;
+            transferBnsTime = 0;
+            transferPairedTime = 0;
+            
+            postponedPartialsTime = 0;
+            postponedAssignmentsTime = 0;
+
+            totalTime = 0;
+        }
+
+        int64_t getTotalTime() const {
+            return totalTime;    
+        }
+
+        static constexpr auto LOGGER_NAME = "perf_transf.csv";
+        static constexpr auto LOGGER_COLS =
+                "num_pickup_dropoff_pairs,"
+                "num_stop_pairs,"
+                "num_transfer_points,"
+                "num_partial_assignments_tried,"
+                "num_assignments_tried,"
+                "vehicle_pairup_time,"
+                "transfer_point_calculation_time,"
+                "pickup_bns_time,"
+                "pickup_paired_time,"
+                "transfer_bns_time,"
+                "transfer_paired_time,"
+                "postponed_partials_time,"
+                "postponed_assignments_time,"
+                "total_time\n";
+
+        std::string getLoggerRow() const {
+            std::stringstream ss;
+            ss << numPickupDropoffPairs << ", "
+               << numStopPairs << ", "
+               << numTransferPoints << ", "
+               << numPartialAssignmentsTried << ", "
+               << numAssignmentsTried << ", "
+               << vehiclePairupTime << ", "
+               << transferPointCalculationTime << ", "
+               << pickupBnsTime << ", "
+               << pickupPairedTime << ", "
+               << transferBnsTime << ", "
+               << transferPairedTime << ", "
+               << postponedPartialsTime << ", "
+               << postponedAssignmentsTime << ", "
+               << getTotalTime();
+        
+            return ss.str();
+        }
+
+    };
+
+
+
+
+
     struct PalsAssignmentsPerformanceStats {
 
         int64_t initializationTime;
@@ -559,6 +651,7 @@ namespace karri::stats {
         PalsAssignmentsPerformanceStats palsAssignmentsStats;
         DalsAssignmentsPerformanceStats dalsAssignmentsStats;
         UpdatePerformanceStats updateStats;
+        AssignmentsWithTransferPerformanceStats transferStats;
 
         int64_t getTotalTime() const {
             return initializationStats.getTotalTime() +
@@ -582,6 +675,7 @@ namespace karri::stats {
             palsAssignmentsStats.clear();
             dalsAssignmentsStats.clear();
             updateStats.clear();
+            transferStats.clear();
         }
 
         static constexpr auto LOGGER_NAME = "perf_overall.csv";
@@ -596,6 +690,7 @@ namespace karri::stats {
                 "pals_assignments_time,"
                 "dals_assignments_time,"
                 "update_time,"
+                "transfer_time,"
                 "total_time\n";
 
 
@@ -610,6 +705,7 @@ namespace karri::stats {
                << pbnsAssignmentsStats.getTotalTime() << ", "
                << palsAssignmentsStats.getTotalTime() << ", "
                << dalsAssignmentsStats.getTotalTime() << ", "
+               << transferStats.getTotalTime() << ", "
                << updateStats.getTotalTime() << ", "
                << getTotalTime();
             return ss.str();
