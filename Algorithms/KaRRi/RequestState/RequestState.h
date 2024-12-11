@@ -111,8 +111,26 @@ namespace karri {
             return bestAssignment;
         }
 
+        void tryAssignmentWithTransfer(const AssignmentWithTransfer &asgn) {
+            
+            if (asgn.cost.total >= bestCostWithTransfer) {
+                return;
+            }
+            
+            bestCostWithTransfer = asgn.cost.total;
+            bestAssignmentWithTransfer = asgn;
+        }
+
+        bool improvementThroughTransfer() {
+            return bestCostWithTransfer < bestCost;
+        }
+
         const int &getBestCost() const {
             return bestCost;
+        }
+
+        const int &getBestCostWithTransfer() const {
+            return bestCostWithTransfer;
         }
 
         bool isNotUsingVehicleBest() const {
@@ -140,6 +158,7 @@ namespace karri {
                 notUsingVehicleDist = INFTY;
                 return true;
             }
+            
             return false;
         }
 
@@ -180,8 +199,10 @@ namespace karri {
 
             bestAssignment = Assignment();
             bestCost = INFTY;
+            bestCostWithTransfer = INFTY;
             notUsingVehicleIsBest = false;
             notUsingVehicleDist = INFTY;
+            bestAssignmentWithTransfer = AssignmentWithTransfer();
         }
 
     private:
@@ -194,8 +215,12 @@ namespace karri {
 
         // Information about best known assignment for current request
         Assignment bestAssignment;
+        AssignmentWithTransfer bestAssignmentWithTransfer;
+
         int bestCost;
+        int bestCostWithTransfer;
         bool notUsingVehicleIsBest;
         int notUsingVehicleDist;
+        
     };
 }

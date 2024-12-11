@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "DataStructures/Graph/Attributes/TravelTimeAttribute.h"
 #include "Algorithms/Dijkstra/Dijkstra.h"
 #include "cassert"
 
@@ -33,11 +34,11 @@ namespace karri::TransferPointStrategies {
     class SearchSpaceIntersection {
     
     public:
-        SearchSpaceIntersection(const int numSearches) : numSearches(numSearches), currSearch(0), vertecies(std::map<int, int>{}), distances(std::map<int, int[4]>{}) {}
+        SearchSpaceIntersection(const int numSearches) : numSearches(numSearches), currSearch(0), edges(std::map<int, int>{}), distances(std::map<int, int[4]>{}) {}
         
         void init() {
             currSearch = 0;
-            vertecies = std::map<int, int>{};
+            edges = std::map<int, int>{};
             distances = std::map<int, int[4]>{};
         }
 
@@ -46,42 +47,42 @@ namespace karri::TransferPointStrategies {
             currSearch++;
         }
 
-        void vertexFound(int v, int distance) {
+        void edgeFound(int e, int distance) {
             if (currSearch == 0) {
-                vertecies[v] = 1;
-                distances[v][0] = distance;
+                edges[e] = 1;
+                distances[e][0] = distance;
                 return;
             }
 
-            if (!vertecies.count(v)) {
+            if (!edges.count(e)) {
                 // Vertex would be seen the first time in a search later than the first search
                 return;
             }
 
-            if (vertecies[v] < currSearch) {
+            if (edges[e] < currSearch) {
                 // vertecies.erase(v);
                 return;
             }
 
-            vertecies[v] = (vertecies[v] + 1);
-            distances[v][currSearch] = distance;
+            edges[e] = (edges[e] + 1);
+            distances[e][currSearch] = distance;
         }
 
         std::vector<TransferPoint> getIntersection() {
             auto intersection = std::vector<TransferPoint>{};
 
-            for (auto it = vertecies.begin(); it != vertecies.end(); it++) {
+            for (auto it = edges.begin(); it != edges.end(); it++) {
                 
-                const auto v = it->first;
+                const auto e = it->first;
                 const auto numFound = it->second;
                 
-                const auto foundDistances = distances[v];
+                const auto foundDistances = distances[e];
 
                 if (numFound < numSearches)
                     continue;
                 
                 TransferPoint tp = TransferPoint();
-                tp.loc = v;
+                tp.loc = e;
                 tp.distancePVehToTransfer = foundDistances[0];
                 tp.distancePVehFromTransfer = foundDistances[1];
                 tp.distanceDVehToTransfer = foundDistances[2];
@@ -96,7 +97,7 @@ namespace karri::TransferPointStrategies {
     private:
         const int numSearches;
         int currSearch;
-        std::map<int, int> vertecies;
+        std::map<int, int> edges;
         std::map<int, int[4]> distances;
     };
 
@@ -162,7 +163,39 @@ namespace karri::TransferPointStrategies {
         }
 
         void settleVertex(int v, int distance) {
-            searchSpaceIntersection.vertexFound(v, distance);
+            int firstEdge;
+            int degree;
+
+            if (currSearch % 2 == 0) {
+                // Forward search
+                firstEdge = inputGraph.firstEdge(v);
+                degree = inputGraph.degree(v);
+                
+                for (int i = 0; i < degree; i++) {
+                    const auto e = firstEdge + i;
+                    const auto travelTime = inputGraph.template get<TravelTimeAttribute>(e);
+                    const auto distanceToEdgeHead = distance + travelTime;
+                
+                    if (distanceToEdgeHead < maxDetour) {
+                        searchSpaceIntersection.edgeFound(e, distanceToEdgeHead);
+                    }
+                }
+
+            } else {
+                // Backward search
+                firstEdge = reverseGraph.firstEdge(v);
+                degree = reverseGraph.degree(v);
+                
+                for (int i = 0; i < degree; i++) {
+                    const auto e = firstEdge + i;    
+                    const auto travelTime = reverseGraph.template get<TravelTimeAttribute>(e);
+                    const auto distanceToEdgeHead = distance + travelTime;
+                
+                    if (distanceToEdgeHead < maxDetour) {
+                        searchSpaceIntersection.edgeFound(e, distanceToEdgeHead);
+                    }
+                }
+            }
         }
 
     private:

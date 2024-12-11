@@ -53,8 +53,6 @@ namespace karri {
 
         AssignmentFinder(RequestState &requestState,
                          RequestStateInitializerT &requestStateInitializer,
-                         PickupVehicles &pVehs, // TODO only for test reason
-                         DropoffVehicles &dVehs, // TODO
                          EllipticBCHSearchesT &ellipticBchSearches,
                          PDDistanceSearchesT &pdDistanceSearches,
                          OrdAssignmentsT &ordinaryAssigments,
@@ -67,8 +65,6 @@ namespace karri {
                          )
                 : reqState(requestState),
                   requestStateInitializer(requestStateInitializer),
-                  pVehs(pVehs),
-                  dVehs(dVehs),
                   ellipticBchSearches(ellipticBchSearches),
                   pdDistanceSearches(pdDistanceSearches),
                   ordAssignments(ordinaryAssigments),
@@ -119,9 +115,6 @@ namespace karri {
             // Try PBNS assignments:
             pbnsAssignments.findAssignments();
 
-            // * Get the best know cost without transfer as upper bound
-            const auto bestCostWithoutTransfer = reqState.getBestCost();
-
             // * Find vehicles that are feasible for a ordinary pickup / dropoff
             ordAssignments.findPickupAndDropoffVehicles();
 
@@ -129,10 +122,18 @@ namespace karri {
             pbnsAssignments.findPickupAndDropoffVehicles();
 
             // * Find the best assignment that contains a transfer
-            assignmentsWithTransfer.findBestAssignment(bestCostWithoutTransfer);
+            assignmentsWithTransfer.findBestAssignment();
             
             // * Output the solution with the best costs
-
+            if (reqState.improvementThroughTransfer()) {
+                std::cout << "--------------------------------" << std::endl;
+                std::cout << "Improvement because of transfer!" << std::endl;
+                std::cout << "Request " << reqState.originalRequest.requestId << std::endl;
+                std::cout << "Best Cost: " << reqState.getBestCost() << std::endl;
+                std::cout << "New Best Cost: " << reqState.getBestCostWithTransfer() << std::endl;
+                std::cout << "--------------------------------" << std::endl;
+            }
+                
             return reqState;
         }
 
@@ -154,8 +155,6 @@ namespace karri {
 
         RequestState &reqState;
         RequestStateInitializerT &requestStateInitializer;
-        PickupVehicles &pVehs; // TODO only for test reason
-        DropoffVehicles &dVehs; // TODO
         EllipticBCHSearchesT &ellipticBchSearches; // Elliptic BCH searches that find distances between existing stops and PD-locations (except after last stop).
         PDDistanceSearchesT &pdDistanceSearches; // PD-distance searches that compute distances from pickups to dropoffs.
         OrdAssignmentsT &ordAssignments; // Tries ordinary assignments where pickup and dropoff are inserted between existing stops.

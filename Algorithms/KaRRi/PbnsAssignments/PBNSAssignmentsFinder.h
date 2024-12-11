@@ -33,12 +33,12 @@
 namespace karri {
 
 
-// Finds pickup before next stop assignments, i.e. assignments where the pickup is inserted before the vehicle's next
-// stop, which means the vehicle is rerouted at its current location. Dropoff may be inserted before the next stop or
-// at ordinary locations, i.e. after the next stop but before the last stop.
-// (The case of pickup before next stop and dropoff after last stop is considered by the DALSAssignmentsFinder.)
-//
-// Works based on filtered relevant pickups and dropoffs before next stop as well as relevant ordinary dropoffs.
+    // Finds pickup before next stop assignments, i.e. assignments where the pickup is inserted before the vehicle's next
+    // stop, which means the vehicle is rerouted at its current location. Dropoff may be inserted before the next stop or
+    // at ordinary locations, i.e. after the next stop but before the last stop.
+    // (The case of pickup before next stop and dropoff after last stop is considered by the DALSAssignmentsFinder.)
+    //
+    // Works based on filtered relevant pickups and dropoffs before next stop as well as relevant ordinary dropoffs.
     template<typename PDDistancesT, typename CurVehLocToPickupSearchesT>
     class PBNSAssignmentsFinder {
 

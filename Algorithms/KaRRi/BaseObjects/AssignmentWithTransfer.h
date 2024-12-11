@@ -27,23 +27,25 @@
 
 #include <cassert>
 
-#include "Vehicle.h"
-#include "Request.h"
-#include "PD.h"
 #include "Algorithms/KaRRi/TransferPoints/TransferPoint.h"
+
+#include "Algorithms/KaRRi/BaseObjects/RequestCost.h"
 
 namespace karri {
 
     struct AssignmentWithTransfer {
         
         AssignmentWithTransfer() {}
+        AssignmentWithTransfer(const AssignmentWithTransfer&) = default;
 
         const Vehicle *pVeh = nullptr;
         const Vehicle *dVeh = nullptr;
 
         const PDLoc *pickup = nullptr;
-        const TransferPoint transfer;
+        TransferPoint transfer;
         const PDLoc *dropoff = nullptr;
+
+        RequestCost cost;
 
         int pickupIdx = INVALID_INDEX;
         int transferIdxPVeh = INVALID_INDEX;

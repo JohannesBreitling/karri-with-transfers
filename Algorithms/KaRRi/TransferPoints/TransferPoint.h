@@ -9,6 +9,7 @@ namespace karri {
     struct TransferPoint {
 
         TransferPoint() {}
+        TransferPoint(const TransferPoint&) = default;
 
         Vehicle *pVeh = nullptr;
         Vehicle *dVeh = nullptr;

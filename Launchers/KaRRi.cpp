@@ -586,8 +586,8 @@ int main(int argc, char *argv[]) {
         TransferPointFinderImpl transferPoints = TransferPointFinderImpl(transferPointStrategy, fleet, routeState, pVehs, dVehs, possibleTransferPoints);
 
 
-        using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<TransferPointStrategy, VehicleInputGraph, VehCHEnv>;
-        AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(transferPointStrategy, fleet, routeState, reqState, vehicleInputGraph, *vehChEnv, calc, pVehs, dVehs, transferPoints, possibleTransferPoints);
+        using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<TransferPointStrategy, VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl>;
+        AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(transferPointStrategy, fleet, routeState, reqState, vehicleInputGraph, *vehChEnv, calc, pVehs, dVehs, transferPoints, possibleTransferPoints, locator, curVehLocToPickupSearches);
 
         using InsertionFinderImpl = AssignmentFinder<RequestStateInitializerImpl,
                 EllipticBCHSearchesImpl,
@@ -600,7 +600,7 @@ int main(int argc, char *argv[]) {
                 TransferPointFinderImpl,
                 AssignmentsWithTransferFinderImpl
                 >;
-        InsertionFinderImpl insertionFinder(reqState, requestStateInitializer, pVehs, dVehs, ellipticSearches, pdDistanceQuery,
+        InsertionFinderImpl insertionFinder(reqState, requestStateInitializer, ellipticSearches, pdDistanceQuery,
                                             ordinaryInsertionsFinder, pbnsInsertionsFinder, palsInsertionsFinder,
                                             dalsInsertionsFinder, relevantPdLocsFilter, transferPoints, insertionsWithTransferFinder);
 
