@@ -289,6 +289,62 @@ namespace karri {
             eventSimulationStatsLogger << occTime << ",RequestReceipt," << time << '\n';
         }
 
+        template<typename AssignmentWithTransferT>
+        void applyAssignmentWithTransfer(const AssignmentWithTransferT &asgn, const int reqId, const int occTime) {
+            if (!asgn.dVeh || !asgn.pVeh || !asgn.pickup || !asgn.dropoff) {
+                requestState[reqId] = FINISHED;
+                systemStateUpdater.writePerformanceLogs();
+                return;
+            }
+
+            requestState[reqId] = ASSIGNED_TO_VEH;
+            requestData[reqId].walkingTimeToPickup = asgn.pickup->walkingDist;
+            requestData[reqId].walkingTimeFromDropoff = asgn.dropoff->walkingDist;
+            requestData[reqId].assignmentCost = asgn.cost.total;
+            
+            int pickupStopId, transferStopIdPVeh, transferStopIdDVeh, dropoffStopId; 
+            systemStateUpdater.insertBestAssignmentWithTransfer(asgn, pickupStopId, transferStopIdPVeh, transferStopIdDVeh, dropoffStopId);
+            systemStateUpdater.writePerformanceLogs();
+            
+            assert(pickupStopId >= 0 && dropoffStopId >= 0);
+            assert(transferStopIdPVeh >= 0 && transferStopIdDVeh >= 0);
+
+            const auto pVehId = asgn.pVeh->vehicleId;
+            const auto dVehId = asgn.dVeh->vehicleId;
+
+            switch (vehicleState[pVehId]) {
+                case STOPPING:
+                    // Update event time to departure time at current stop since it may have changed
+                    vehicleEvents.updateKey(pVehId, scheduledStops.getCurrentOrPrevScheduledStop(pVehId).depTime);
+                    break;
+                case IDLING:
+                    vehicleState[vehId] = VehicleState::DRIVING;
+                    [[fallthrough]];
+                case DRIVING:
+                    // Update event time to arrival time at next stop since it may have changed (also for case of idling).
+                    vehicleEvents.updateKey(pVehId, scheduledStops.getNextScheduledStop(pVehId).arrTime);
+                    [[fallthrough]];
+                default:
+                    break;
+            }
+
+            switch (vehicleState[dVehId]) {
+                case STOPPING:
+                    // Update event time to departure time at current stop since it may have changed
+                    vehicleEvents.updateKey(dVehId, scheduledStops.getCurrentOrPrevScheduledStop(dVehId).depTime);
+                    break;
+                case IDLING:
+                    vehicleState[vehId] = VehicleState::DRIVING;
+                    [[fallthrough]];
+                case DRIVING:
+                    // Update event time to arrival time at next stop since it may have changed (also for case of idling).
+                    vehicleEvents.updateKey(dVehId, scheduledStops.getNextScheduledStop(dVehId).arrTime);
+                    [[fallthrough]];
+                default:
+                    break;
+            }
+        }
+
         template<typename AssignmentFinderResponseT>
         void applyAssignment(const AssignmentFinderResponseT &asgnFinderResponse, const int reqId, const int occTime) {
             if (asgnFinderResponse.isNotUsingVehicleBest()) {
@@ -305,6 +361,13 @@ namespace karri {
             int id, key;
             requestEvents.deleteMin(id, key); // event for walking arrival at dest inserted at dropoff
             assert(id == reqId && key == occTime);
+
+            // Now differentiate if the solution with or without transfer is best
+            if (asgnFinderResponse.improvementThroughTransfer()) {
+                const asgn = asgnFinderResponse.getBestAssignmentWithTransfer();
+                applyAssignmentWithTransfer(asgn, reqId, occTime);
+                return;
+            }
 
             const auto &bestAsgn = asgnFinderResponse.getBestAssignment();
             if (!bestAsgn.vehicle || !bestAsgn.pickup || !bestAsgn.dropoff) {

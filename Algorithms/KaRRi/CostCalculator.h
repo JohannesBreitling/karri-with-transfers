@@ -128,15 +128,6 @@ namespace karri {
             const auto actualDepTimeAtTransfer = getActualDepTimeAtTranfer(asgn, context, routeState);
             const auto initialTransferDetour = calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context, routeState);
 
-            /*
-            std::cout << "Arrival at Transfer:" << asgn.arrAtTransferPoint << std::endl;
-            std::cout << "Actual Dep Time at Transfer: " << actualDepTimeAtTransfer << std::endl;
-            std::cout << "Dep at prev Stop: " << routeState.schedDepTimesFor(asgn.dVeh->vehicleId)[asgn.transferIdxDVeh] << std::endl;
-            std::cout << "Prev Stop Idx: " << asgn.transferIdxDVeh << std::endl;
-            std::cout << "Num stops: " << routeState.numStopsOf(asgn.dVeh->vehicleId) << std::endl;
-            std::cout << "Inital Transfer Detour: " << initialTransferDetour << std::endl;
-            */
-
             int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.transferIdxDVeh, asgn.dropoffIdx, initialTransferDetour, routeState);
             const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
 
@@ -149,20 +140,7 @@ namespace karri {
                                                                                         asgn.dropoffIdx,
                                                                                         numStops - 1,
                                                                                         detourRightAfterDropoff,
-                                                                                        routeState);
-
-            /*
-            
-            const int arrAtTransfer, const Vehicle &dVeh, const int transferIdx, const int dropoffIdx,
-            const RequestContext &context, const int initialTransferDetour,
-            const int detourRightAfterDropoff, const int residualDetourAtEnd,
-            const bool dropoffAtExistingStop, const RouteState &routeState
-
-
-            context, initialTransferDetour, detourRightAfterDropoff, residualDetourAtEnd, dropoffAtExistingStop, routeState
-            
-            */
-                        
+                                                                                        routeState);         
 
             if (checkHardConstraints && isAnyHardConstraintViolatedDVeh(asgn, context, initialTransferDetour, detourRightAfterDropoff, residualDetourAtEnd, dropoffAtExistingStop, routeState)) {
                 asgn.cost.total = INFTY;

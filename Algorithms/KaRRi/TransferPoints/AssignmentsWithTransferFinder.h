@@ -98,10 +98,6 @@ namespace karri {
                 auto &pVeh = std::get<0>(pickupDropoffPair);
                 auto &dVeh = std::get<1>(pickupDropoffPair);
 
-                // Get the stop locations of the two vehicles               
-                const auto &stopLocationsPVeh = routeState.stopLocationsFor(pVeh.vehicleId);
-                const auto &stopLocationsDVeh = routeState.stopLocationsFor(dVeh.vehicleId);
-
                 Timer timer;
 
                 // Loop over all possible stop pairs and calculate the possible transfer points between them
@@ -111,7 +107,7 @@ namespace karri {
                         numStopPairs++;
                         
                         // Calculate the transfer points between the two stops
-                        calculateTransferPointsBetweenStopPair(pVeh, dVeh, stopLocationsPVeh, stopLocationsDVeh, pIndex, dIndex);
+                        calculateTransferPointsBetweenStopPair(pVeh, dVeh, pIndex, dIndex);
                     }
                 }
 
@@ -177,10 +173,16 @@ namespace karri {
 
         void calculateTransferPointsBetweenStopPair(
             Vehicle &pVeh, Vehicle &dVeh,
-            const ConstantVectorRange<int> &stopLocationsPVeh, const ConstantVectorRange<int> &stopLocationsDVeh,
             int stopIdxPVeh, int stopIdxDVeh) {
 
+            // Get the stop locations of the two vehicles               
+            const auto &stopLocationsPVeh = routeState.stopLocationsFor(pVeh.vehicleId);
+            const auto &stopLocationsDVeh = routeState.stopLocationsFor(dVeh.vehicleId);
+            
             // Get the start locations for the searches, Caution: These locations are edges
+            assert(stopIdxPVeh + 1 < routeState.numStopsOf(pVeh.vehicleId));
+            assert(stopIdxDVeh + 1 < routeState.numStopsOf(dVeh.vehicleId));
+
             int pickupVehicleStop = stopLocationsPVeh[stopIdxPVeh];
             int pickupVehicleNextStop = stopLocationsPVeh[stopIdxPVeh + 1];
             int dropoffVehicleStop = stopLocationsDVeh[stopIdxDVeh];

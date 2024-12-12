@@ -122,6 +122,62 @@ namespace karri {
                                                                           stats::AssignmentsWithTransferPerformanceStats::LOGGER_COLS))) {}
 
 
+        void insertBestAssignmentWithTransfer(AssignmentWithTransferT &asgn, int &pickupStopId, int &transferStopIdPVeh, int &transferStopIdDVeh, int &dropoffStopId) {
+            Timer timer;
+
+            requestState.chosenPDLocsRoadCategoryStats().incCountForCat(inputGraph.osmRoadCategory(asgn.pickup->loc));
+            requestState.chosenPDLocsRoadCategoryStats().incCountForCat(inputGraph.osmRoadCategory(asgn.dropoff->loc));
+            requestState.chosenPDLocsRoadCategoryStats().incCountForCat(inputGraph.osmRoadCategory(asgn.transfer.loc));
+            assert(asgn.pVeh != nullptr);
+            assert(asgn.dVeh != nullptr);
+
+            
+            const auto pVehId = asgn.pVeh->vehicleId;
+            const auto dVehId = asgn.dVeh->vehicleId;
+            
+            const auto numStopsBeforePVeh = routeState.numStopsOf(pVehId);
+            const auto numStopsBeforeDVeh = routeState.numStopsOf(dVehId);
+
+            const auto depTimeAtLastStopBeforePVeh = routeState.schedDepTimesFor(pVehId)[numStopsBeforePVeh - 1];
+            const auto depTimeAtLastStopBeforeDVeh = routeState.schedDepTimesFor(dVehId)[numStopsBeforeDVeh - 1];
+
+            timer.restart();
+            
+            auto [pIdxPVeh, dIdxPVeh] = routeState.insertPVeh(asgn, requestState); // TODO Route State Methode
+            auto [pIdxDVeh, dIdxDVeh] = routeState.insertDVeh(asgn, requestState); // TODO Route State Methode
+            
+            const auto routeUpdateTime = timer.elapsed<std::chrono::nanoseconds>();
+            requestState.stats().updateStats.updateRoutesTime += routeUpdateTime;
+
+            updateBucketState(asgn, pIdxPVeh, dIdxPVeh, pIdxDVeh, dIdxDVeh, depTimeAtLastStopBeforePVeh, depTimeAtLastStopBeforePVeh); // TODO Methode hier
+
+            // If the vehicle has to be rerouted at its current location for a PBNS assignment, we introduce an
+            // intermediate stop at its current location representing the rerouting.
+            if (asgn.pickupIdx == 0 && numStopsBeforePVeh > 1 && routeState.schedDepTimes(pVehId)[0] < requestState.originalRequest.requestTime) {
+
+                createIntermediateStopStopAtCurrentLocationForReroute(*asgn.pVeh,
+                                                                      requestState.originalRequest.requestTime);
+                ++pIdxPVeh;
+                ++dIdxPVeh;
+            }
+
+            if (asgn.dropoffIdx == 0 && numStopsBeforeDVeh > 1 && routeState.schedDepTimes(dVehId)[0] < asgn.arrAtTransfer) {
+                createIntermediateStopStopAtCurrentLocationForReroute(*asgn.dVeh,
+                                                                      requestState.originalRequest.requestTime);
+                ++pIdxDVeh;
+                ++dIdxDVeh;
+            }
+
+            pickupStopId = routeState.stopIdsFor(pVehId)[pIdxPVeh];
+            transferStopIdPVeh = routeState.stopIdsFor(pVehId)[dIdxPVeh];
+            transferStopIdDVeh = routeState.stopOdsFor(dVehId)[pIdxDVeh];
+            dropoffStopId = routeState.stopIdsFor(dVehId)[dIdxDVeh];
+
+            // Register the inserted pickup and dropoff with the path data
+            pathTracker.registerPdEventsForBestAssignment(pickupStopId, transferStopIdPVeh);
+            pathTracker.registerPdEventsForBestAssignment(transferStopIdDVeh, dropoffStopId);
+        }
+
         void insertBestAssignment(int &pickupStopId, int &dropoffStopId) {
             Timer timer;
 
@@ -273,6 +329,11 @@ namespace karri {
             LIGHT_KASSERT(loc.depTimeAtHead >= now);
             routeState.createIntermediateStopForReroute(veh.vehicleId, loc.location, now, loc.depTimeAtHead);
             ellipticBucketsEnv.generateSourceBucketEntries(veh, 1);
+        }
+
+
+        void updateBucketState(const AssignmentWithTransfer &asgn, const int pickupIdx, const int transferIdxPVeh, const int transferIdxDVeh, const int dropoffIdx) {
+            // TODO
         }
 
 
