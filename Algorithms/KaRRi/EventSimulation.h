@@ -290,7 +290,7 @@ namespace karri {
         }
 
         template<typename AssignmentWithTransferT>
-        void applyAssignmentWithTransfer(const AssignmentWithTransferT &asgn, const int reqId, const int occTime) {
+        void applyAssignmentWithTransfer(const AssignmentWithTransferT &asgn, const int reqId) {
             if (!asgn.dVeh || !asgn.pVeh || !asgn.pickup || !asgn.dropoff) {
                 requestState[reqId] = FINISHED;
                 systemStateUpdater.writePerformanceLogs();
@@ -318,7 +318,7 @@ namespace karri {
                     vehicleEvents.updateKey(pVehId, scheduledStops.getCurrentOrPrevScheduledStop(pVehId).depTime);
                     break;
                 case IDLING:
-                    vehicleState[vehId] = VehicleState::DRIVING;
+                    vehicleState[pVehId] = VehicleState::DRIVING;
                     [[fallthrough]];
                 case DRIVING:
                     // Update event time to arrival time at next stop since it may have changed (also for case of idling).
@@ -334,7 +334,7 @@ namespace karri {
                     vehicleEvents.updateKey(dVehId, scheduledStops.getCurrentOrPrevScheduledStop(dVehId).depTime);
                     break;
                 case IDLING:
-                    vehicleState[vehId] = VehicleState::DRIVING;
+                    vehicleState[dVehId] = VehicleState::DRIVING;
                     [[fallthrough]];
                 case DRIVING:
                     // Update event time to arrival time at next stop since it may have changed (also for case of idling).
@@ -364,8 +364,8 @@ namespace karri {
 
             // Now differentiate if the solution with or without transfer is best
             if (asgnFinderResponse.improvementThroughTransfer()) {
-                const asgn = asgnFinderResponse.getBestAssignmentWithTransfer();
-                applyAssignmentWithTransfer(asgn, reqId, occTime);
+                const auto asgn = asgnFinderResponse.getBestAssignmentWithTransfer();
+                applyAssignmentWithTransfer(asgn, reqId);
                 return;
             }
 

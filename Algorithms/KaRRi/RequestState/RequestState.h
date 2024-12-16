@@ -105,10 +105,20 @@ namespace karri {
             return originalRequest.requestTime + InputConfig::getInstance().maxWaitTime;
         }
 
+        int getMaxDepTimeAtTransfer(const AssignmentWithTransfer &asgn) const {
+            assert(asgn.waitTimeAtPickup <= InputConfig::getInstance().maxWaitTime);
+
+            return asgn.arrAtTransferPoint + InputConfig::getInstance().maxWaitTime - asgn.waitTimeAtPickup;
+        }
+
         // Information about best known assignment for current request
 
         const Assignment &getBestAssignment() const {
             return bestAssignment;
+        }
+
+        const AssignmentWithTransfer &getBestAssignmentWithTransfer() const {
+            return bestAssignmentWithTransfer;
         }
 
         void tryAssignmentWithTransfer(const AssignmentWithTransfer &asgn) {
@@ -121,7 +131,7 @@ namespace karri {
             bestAssignmentWithTransfer = asgn;
         }
 
-        bool improvementThroughTransfer() {
+        bool improvementThroughTransfer() const {
             return bestCostWithTransfer < bestCost;
         }
 

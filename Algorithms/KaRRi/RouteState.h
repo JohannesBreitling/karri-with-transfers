@@ -33,6 +33,7 @@
 
 #include "Algorithms/KaRRi/BaseObjects/Vehicle.h"
 #include "Algorithms/KaRRi/BaseObjects/Assignment.h"
+#include "Algorithms/KaRRi/BaseObjects/AssignmentWithTransfer.h"
 
 namespace karri {
 
@@ -212,6 +213,16 @@ namespace karri {
             return maxLegLength;
         }
 
+        int getMinTripTimeForDVeh(const AssignmentWithTransfer &asgn) const {
+            const auto vehId = asgn.dVeh->vehicleId;
+            const auto &start = pos[vehId].start;
+            const auto &end = pos[vehId].end;
+            assert(start + asgn.dropoffIdx < end);
+            const auto arrAtDropoff = schedArrTimes[start + asgn.dropoffIdx];
+
+            return arrAtDropoff - asgn.arrAtTransferPoint + asgn.distToTransferDVeh + asgn.distFromTransferDVeh + asgn.distToDropoff + asgn.distFromDropoff;
+        }
+
         template<typename RequestStateT>
         std::pair<int, int>
         insert(const Assignment &asgn, const RequestStateT &requestState) {
@@ -369,6 +380,320 @@ namespace karri {
                       rangeOfRequestsDroppedOffAtStop, requestsDroppedOffAtStop);
 
             return {pickupIndex, dropoffIndex};
+        }
+
+        template<typename RequestStateT>
+        std::pair<int, int>
+        insertPVeh(const AssignmentWithTransfer &asgn, const RequestStateT &requestState) {
+            const auto vehId = asgn.pVeh->vehicleId;
+            const auto &pickup = *asgn.pickup;
+            const auto transfer = asgn.transfer;
+            const int now = requestState.originalRequest.requestTime;
+            const int numRiders = requestState.originalRequest.numRiders;
+            
+            const auto &start = pos[vehId].start;
+            const auto &end = pos[vehId].end;
+            auto pickupIdx = asgn.pickupIdx;
+            auto transferIdx = asgn.transferIdxPVeh;
+
+            assert(pickupIdx >= 0);
+            assert(pickupIdx < end - start);
+            assert(transferIdx >= 0);
+            assert(transferIdx < end - start);
+
+            bool pickupInsertedAsNewStop = false;
+            bool transferInsertedAsNewStop = false;
+
+            if ((pickupIdx > 0 || schedDepTimes[start] > now) && pickup.loc == stopLocations[start + pickupIdx]) {
+                assert(start + pickupIdx == end - 1
+                    || pickupIdx == transferIdx
+                    || asgn.distFromPickup == schedArrTimes[start + pickupIdx + 1] - schedDepTimes[start + pickupIdx]);
+
+                // Pickup at existing stop
+                // For pickup at existing stop we don't count another stopTime. The vehicle can depart at the earliest
+                // moment when vehicle and passenger are at the location.
+                schedDepTimes[start + pickupIdx] = std::max(schedDepTimes[start + pickupIdx], requestState.getPassengerArrAtPickup(pickup.id));
+            
+                // If we allow pickupRadius > waitTime, then the passenger may arrive at the pickup location after
+                // the regular max dep time of requestTime + waitTime. In this case, the new latest permissible arrival
+                // time is defined by the passenger arrival time at the pickup, not the maximum wait time.
+                const int psgMaxDepTime = std::max(requestState.getMaxDepTimeAtPickup(), requestState.getPassengerArrAtPickup(pickup.id));
+                maxArrTimes[start + pickupIdx] = std::min(maxArrTimes[start + pickupIdx], psgMaxDepTime - InputConfig::getInstance().stopTime);
+            } else {
+                // If vehicle is currently idle, the vehicle can leave its current stop at the earliest when the
+                // request is made. In that case, we update the arrival time to count the idling as one stopTime.
+                schedDepTimes[end - 1] = std::max(schedDepTimes[end - 1], requestState.originalRequest.requestTime);
+                schedArrTimes[end - 1] = schedDepTimes[end - 1] - InputConfig::getInstance().stopTime;
+                ++pickupIdx;
+                ++transferIdx;
+                
+                stableInsertion(vehId, pickupIdx, getUnusedStopId(), pos, stopIds, stopLocations,
+                                schedArrTimes, schedDepTimes, vehWaitTimesPrefixSum, maxArrTimes, occupancies,
+                                numDropoffsPrefixSum, vehWaitTimesUntilDropoffsPrefixSum);
+
+                stopLocations[start + pickupIdx] = pickup.loc;
+                schedArrTimes[start + pickupIdx] = schedDepTimes[start + pickupIdx - 1] + asgn.distToPickup;
+                schedDepTimes[start + pickupIdx] = std::max(schedArrTimes[start + pickupIdx] + InputConfig::getInstance().stopTime,
+                                                              requestState.getPassengerArrAtPickup(pickup.id));
+                maxArrTimes[start + pickupIdx] = requestState.getMaxDepTimeAtPickup() - InputConfig::getInstance().stopTime;
+                occupancies[start + pickupIdx] = occupancies[start + pickupIdx - 1];
+
+                numDropoffsPrefixSum[start + pickupIdx] = numDropoffsPrefixSum[start + pickupIdx - 1];
+                pickupInsertedAsNewStop = true;
+            }
+
+            if (pickupIdx != transferIdx) {
+                // Propagate changes to minArrTime/minDepTime forward from inserted pickup stop until dropoff stop
+                assert(asgn.distFromPickup > 0);
+                propagateSchedArrAndDepForward(start + pickupIdx + 1, start + transferIdx, asgn.distFromPickup);
+            }
+
+            if (pickup.loc != transfer.loc && transfer.loc == stopLocations[start + transferIdx]) {
+                maxArrTimes[start + transferIdx] = std::min(maxArrTimes[start + transferIdx], requestState.getMaxArrTimeAtDropoff(pickup.id, asgn.dropoff->id) - getMinTripTimeForDVeh(asgn));
+            } else {
+                ++transferIdx;
+                stableInsertion(vehId, transferIdx, getUnusedStopId(),
+                                pos, stopIds, stopLocations, schedArrTimes, schedDepTimes, vehWaitTimesPrefixSum,
+                                maxArrTimes, occupancies, numDropoffsPrefixSum, vehWaitTimesUntilDropoffsPrefixSum);
+                stopLocations[start + transferIdx] = transfer.loc;
+                schedArrTimes[start + transferIdx] = schedDepTimes[start + transferIdx - 1] + asgn.distToTransferPVeh;
+                schedDepTimes[start + transferIdx] = schedArrTimes[start + transferIdx] + InputConfig::getInstance().stopTime;
+                // compare maxVehArrTime to next stop later
+                maxArrTimes[start + transferIdx] = requestState.getMaxArrTimeAtDropoff(pickup.id, asgn.dropoff->id) - getMinTripTimeForDVeh(asgn);
+                occupancies[start + transferIdx] = occupancies[start + transferIdx - 1];
+                numDropoffsPrefixSum[start + transferIdx] = numDropoffsPrefixSum[start + transferIdx - 1];
+                transferInsertedAsNewStop = true;
+            }
+
+            // Propagate updated scheduled arrival and departure times as well as latest permissible arrival times.
+            if (start + transferIdx < end - 1) {
+                // At this point minDepTimes[start + dropoffIndex] is correct. If dropoff has been inserted not as the last
+                // stop, propagate the changes to minDep and minArr times forward until the last stop.
+                propagateSchedArrAndDepForward(start + transferIdx + 1, end - 1, asgn.distFromTransferPVeh);
+
+                // If there are stops after the dropoff, consider them for propagating changes to the maxArrTimes
+                propagateMaxArrTimeBackward(start + transferIdx, start + pickupIdx);
+            } else {
+                // If there are no stops after the dropoff, propagate maxArrTimes backwards not including dropoff
+                propagateMaxArrTimeBackward(start + transferIdx - 1, start + pickupIdx);
+            }
+            propagateMaxArrTimeBackward(start + pickupIdx - 1, start);
+
+            // Update occupancies and prefix sums
+            for (int idx = start + pickupIdx; idx < start + transferIdx; ++idx) {
+                occupancies[idx] += numRiders;
+                assert(occupancies[idx] <= asgn.pVeh->capacity);
+            }
+
+            for (int idx = start + transferIdx; idx < end; ++idx) {
+                ++numDropoffsPrefixSum[idx];
+            }
+
+            const int lastUnchangedPrefixSum = pickupIdx > 0 ? vehWaitTimesPrefixSum[start + pickupIdx - 1] : 0;
+            recalculateVehWaitTimesPrefixSum(start + pickupIdx, end - 1, lastUnchangedPrefixSum);
+            const int lastUnchangedAtDropoffsPrefixSum =
+                    pickupIdx > 0 ? vehWaitTimesUntilDropoffsPrefixSum[start + pickupIdx - 1] : 0;
+            recalculateVehWaitTimesAtDropoffsPrefixSum(start + pickupIdx, end - 1, lastUnchangedAtDropoffsPrefixSum);
+
+            // Update mappings from the stop ids to ids of previous stop, to position in the route, to the leeway and
+            // to the vehicle id.
+            const auto newMinSize = std::max(stopIds[start + pickupIdx], stopIds[start + transferIdx]) + 1;
+            if (stopIdToIdOfPrevStop.size() < newMinSize) {
+                stopIdToIdOfPrevStop.resize(newMinSize, INVALID_ID);
+                stopIdToPosition.resize(newMinSize, INVALID_INDEX);
+                stopIdToLeeway.resize(newMinSize, 0);
+                stopIdToVehicleId.resize(newMinSize, INVALID_ID);
+                rangeOfRequestsPickedUpAtStop.resize(newMinSize);
+                rangeOfRequestsDroppedOffAtStop.resize(newMinSize);
+            }
+            assert(start == pos[vehId].start && end == pos[vehId].end);
+            if (pickupInsertedAsNewStop) {
+                assert(pickupIdx >= 1 && start + pickupIdx < end - 1);
+                stopIdToVehicleId[stopIds[start + pickupIdx]] = vehId;
+                stopIdToIdOfPrevStop[stopIds[start + pickupIdx]] = stopIds[start + pickupIdx - 1];
+                stopIdToIdOfPrevStop[stopIds[start + pickupIdx + 1]] = stopIds[start + pickupIdx];
+            }
+            if (transferInsertedAsNewStop) {
+                assert(transferIdx > pickupIdx && start + transferIdx < end);
+                stopIdToVehicleId[stopIds[start + transferIdx]] = vehId;
+                stopIdToIdOfPrevStop[stopIds[start + transferIdx]] = stopIds[start + transferIdx - 1];
+                if (start + transferIdx != end - 1)
+                    stopIdToIdOfPrevStop[stopIds[start + transferIdx + 1]] = stopIds[start + transferIdx];
+            }
+
+            if (pickupInsertedAsNewStop || transferInsertedAsNewStop) {
+                for (int i = start + pickupIdx; i < end; ++i) {
+                    stopIdToPosition[stopIds[i]] = i - start;
+                }
+            }
+
+            updateLeeways(vehId);
+            updateMaxLegLength(vehId, pickupIdx, transferIdx);
+
+            // Remember that request is picked up and dropped of at respective stops:
+            insertion(stopIds[start + pickupIdx], requestState.originalRequest.requestId,
+                      rangeOfRequestsPickedUpAtStop, requestsPickedUpAtStop);
+            insertion(stopIds[start + transferIdx], requestState.originalRequest.requestId,
+                      rangeOfRequestsDroppedOffAtStop, requestsDroppedOffAtStop);
+
+            return {pickupIdx, transferIdx};
+        }
+
+        template<typename RequestStateT>
+        std::pair<int, int>
+        insertDVeh(const AssignmentWithTransfer &asgn, const RequestStateT &requestState) {
+            const auto vehId = asgn.dVeh->vehicleId;
+            const auto transfer = asgn.transfer;
+            const auto &dropoff = *asgn.dropoff;
+            const int now = requestState.originalRequest.requestTime;
+            const int numRiders = requestState.originalRequest.numRiders;
+            const auto &start = pos[vehId].start;
+            const auto &end = pos[vehId].end;
+            auto transferIdx = asgn.transferIdxDVeh;
+            auto dropoffIdx = asgn.dropoffIdx;
+
+            assert(transferIdx >= 0);
+            assert(transferIdx < end - start);
+            assert(dropoffIdx >= 0);
+            assert(dropoffIdx < end - start);
+
+            bool transferInsertedAsNewStop = false;
+            bool dropoffInsertedAsNewStop = false;
+
+            if ((transferIdx > 0 || schedDepTimes[start] > now) && transfer.loc == stopLocations[start + transferIdx]) {
+                assert(start + transferIdx == end - 1 || transferIdx == dropoffIdx ||
+                       asgn.distFromTransferDVeh == schedArrTimes[start + transferIdx + 1] - schedDepTimes[start + transferIdx]);
+
+                // Pickup at existing stop
+                // For pickup at existing stop we don't count another stopTime. The vehicle can depart at the earliest
+                // moment when vehicle and passenger are at the location.
+                schedDepTimes[start + transferIdx] = std::max(schedDepTimes[start + transferIdx],
+                                                              asgn.arrAtTransferPoint);
+
+                // If we allow pickupRadius > waitTime, then the passenger may arrive at the pickup location after
+                // the regular max dep time of requestTime + waitTime. In this case, the new latest permissible arrival
+                // time is defined by the passenger arrival time at the pickup, not the maximum wait time.
+                const int psgMaxDepTime = requestState.getMaxDepTimeAtTransfer(asgn);
+                maxArrTimes[start + transferIdx] = std::min(maxArrTimes[start + transferIdx], psgMaxDepTime - InputConfig::getInstance().stopTime);
+            } else {
+                // If vehicle is currently idle, the vehicle can leave its current stop at the earliest when the
+                // request is made. In that case, we update the arrival time to count the idling as one stopTime.
+                schedDepTimes[end - 1] = std::max(schedDepTimes[end - 1], asgn.arrAtTransferPoint);
+                schedArrTimes[end - 1] = schedDepTimes[end - 1] - InputConfig::getInstance().stopTime;
+                ++transferIdx;
+                ++dropoffIdx;
+                stableInsertion(vehId, transferIdx, getUnusedStopId(), pos, stopIds, stopLocations,
+                                schedArrTimes, schedDepTimes, vehWaitTimesPrefixSum, maxArrTimes, occupancies,
+                                numDropoffsPrefixSum, vehWaitTimesUntilDropoffsPrefixSum);
+                stopLocations[start + transferIdx] = transfer.loc;
+                schedArrTimes[start + transferIdx] = schedDepTimes[start + transferIdx - 1] + asgn.distToTransferDVeh;
+                schedDepTimes[start + transferIdx] = std::max(schedArrTimes[start + transferIdx] + InputConfig::getInstance().stopTime,
+                                                              asgn.arrAtTransferPoint);
+                maxArrTimes[start + transferIdx] = requestState.getMaxDepTimeAtTransfer(asgn) - InputConfig::getInstance().stopTime;
+                occupancies[start + transferIdx] = occupancies[start + transferIdx - 1];
+                numDropoffsPrefixSum[start + transferIdx] = numDropoffsPrefixSum[start + transferIdx - 1];
+                transferInsertedAsNewStop = true;
+            }
+
+            if (transferIdx != dropoffIdx) {
+                // Propagate changes to minArrTime/minDepTime forward from inserted pickup stop until dropoff stop
+                assert(asgn.distFromTransferDVeh > 0);
+                propagateSchedArrAndDepForward(start + transferIdx + 1, start + dropoffIdx, asgn.distFromTransferDVeh);
+            }
+
+            if (transfer.loc != dropoff.loc && dropoff.loc == stopLocations[start + dropoffIdx]) {
+                maxArrTimes[start + dropoffIdx] = std::min(maxArrTimes[start + dropoffIdx],
+                                                             requestState.getMaxArrTimeAtDropoff(asgn.pickup->id,
+                                                                                                 dropoff.id));
+            } else {
+                ++dropoffIdx;
+                stableInsertion(vehId, dropoffIdx, getUnusedStopId(),
+                                pos, stopIds, stopLocations, schedArrTimes, schedDepTimes, vehWaitTimesPrefixSum,
+                                maxArrTimes, occupancies, numDropoffsPrefixSum, vehWaitTimesUntilDropoffsPrefixSum);
+                stopLocations[start + dropoffIdx] = dropoff.loc;
+                schedArrTimes[start + dropoffIdx] =
+                        schedDepTimes[start + dropoffIdx - 1] + asgn.distToDropoff;
+                schedDepTimes[start + dropoffIdx] = schedArrTimes[start + dropoffIdx] + InputConfig::getInstance().stopTime;
+                // compare maxVehArrTime to next stop later
+                maxArrTimes[start + dropoffIdx] = requestState.getMaxArrTimeAtDropoff(asgn.pickup->id, dropoff.id);
+                occupancies[start + dropoffIdx] = occupancies[start + dropoffIdx - 1];
+                numDropoffsPrefixSum[start + dropoffIdx] = numDropoffsPrefixSum[start + dropoffIdx - 1];
+                dropoffInsertedAsNewStop = true;
+            }
+
+            // Propagate updated scheduled arrival and departure times as well as latest permissible arrival times.
+            if (start + dropoffIdx < end - 1) {
+                // At this point minDepTimes[start + dropoffIndex] is correct. If dropoff has been inserted not as the last
+                // stop, propagate the changes to minDep and minArr times forward until the last stop.
+                propagateSchedArrAndDepForward(start + dropoffIdx + 1, end - 1, asgn.distFromDropoff);
+
+                // If there are stops after the dropoff, consider them for propagating changes to the maxArrTimes
+                propagateMaxArrTimeBackward(start + dropoffIdx, start + transferIdx);
+            } else {
+                // If there are no stops after the dropoff, propagate maxArrTimes backwards not including dropoff
+                propagateMaxArrTimeBackward(start + dropoffIdx - 1, start + transferIdx);
+            }
+            propagateMaxArrTimeBackward(start + transferIdx - 1, start);
+
+            // Update occupancies and prefix sums
+            for (int idx = start + transferIdx; idx < start + dropoffIdx; ++idx) {
+                occupancies[idx] += numRiders;
+                assert(occupancies[idx] <= asgn.dVeh->capacity);
+            }
+
+            for (int idx = start + dropoffIdx; idx < end; ++idx) {
+                ++numDropoffsPrefixSum[idx];
+            }
+
+            const int lastUnchangedPrefixSum = transferIdx > 0 ? vehWaitTimesPrefixSum[start + transferIdx - 1] : 0;
+            recalculateVehWaitTimesPrefixSum(start + transferIdx, end - 1, lastUnchangedPrefixSum);
+            const int lastUnchangedAtDropoffsPrefixSum =
+                    transferIdx > 0 ? vehWaitTimesUntilDropoffsPrefixSum[start + transferIdx - 1] : 0;
+            recalculateVehWaitTimesAtDropoffsPrefixSum(start + transferIdx, end - 1, lastUnchangedAtDropoffsPrefixSum);
+
+            // Update mappings from the stop ids to ids of previous stop, to position in the route, to the leeway and
+            // to the vehicle id.
+            const auto newMinSize = std::max(stopIds[start + transferIdx], stopIds[start + dropoffIdx]) + 1;
+            if (stopIdToIdOfPrevStop.size() < newMinSize) {
+                stopIdToIdOfPrevStop.resize(newMinSize, INVALID_ID);
+                stopIdToPosition.resize(newMinSize, INVALID_INDEX);
+                stopIdToLeeway.resize(newMinSize, 0);
+                stopIdToVehicleId.resize(newMinSize, INVALID_ID);
+                rangeOfRequestsPickedUpAtStop.resize(newMinSize);
+                rangeOfRequestsDroppedOffAtStop.resize(newMinSize);
+            }
+            assert(start == pos[vehId].start && end == pos[vehId].end);
+            if (transferInsertedAsNewStop) {
+                assert(transferIdx >= 1 && start + transferIdx < end - 1);
+                stopIdToVehicleId[stopIds[start + transferIdx]] = vehId;
+                stopIdToIdOfPrevStop[stopIds[start + transferIdx]] = stopIds[start + transferIdx - 1];
+                stopIdToIdOfPrevStop[stopIds[start + transferIdx + 1]] = stopIds[start + transferIdx];
+            }
+            if (dropoffInsertedAsNewStop) {
+                assert(dropoffIdx > transferIdx && start + dropoffIdx < end);
+                stopIdToVehicleId[stopIds[start + dropoffIdx]] = vehId;
+                stopIdToIdOfPrevStop[stopIds[start + dropoffIdx]] = stopIds[start + dropoffIdx - 1];
+                if (start + dropoffIdx != end - 1)
+                    stopIdToIdOfPrevStop[stopIds[start + dropoffIdx + 1]] = stopIds[start + dropoffIdx];
+            }
+
+            if (transferInsertedAsNewStop || dropoffInsertedAsNewStop) {
+                for (int i = start + transferIdx; i < end; ++i) {
+                    stopIdToPosition[stopIds[i]] = i - start;
+                }
+            }
+
+            updateLeeways(vehId);
+            updateMaxLegLength(vehId, transferIdx, dropoffIdx);
+
+
+            // Remember that request is picked up and dropped of at respective stops:
+            insertion(stopIds[start + transferIdx], requestState.originalRequest.requestId,
+                      rangeOfRequestsPickedUpAtStop, requestsPickedUpAtStop);
+            insertion(stopIds[start + dropoffIdx], requestState.originalRequest.requestId,
+                      rangeOfRequestsDroppedOffAtStop, requestsDroppedOffAtStop);
+
+            return {transferIdx, dropoffIdx};
         }
 
         void removeStartOfCurrentLeg(const int vehId) {
