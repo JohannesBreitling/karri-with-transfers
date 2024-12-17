@@ -613,6 +613,8 @@ namespace karri {
         std::vector<AssignmentWithTransfer> assignmentsWithUnknownPickupDistance;
         std::vector<AssignmentWithTransfer> assignmentsWithUnknownTransferDistance;
 
+        // std::vector<AssignmentWithTransfer> promisingPartialAssignmentsWithUnknownPickupDistance;
+
         std::map<std::tuple<int, int>, int> calculatedDirectDistances;
 
         int64_t numAssignmentsTried = 0;

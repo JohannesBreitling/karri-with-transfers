@@ -80,17 +80,6 @@ namespace karri {
             // Initialize finder for this request:
             initializeForRequest(req);
 
-            // * Output information about the request that is currently dispatched
-            // ! ------------------------------
-            //std::cout << "Dispatching Request<id: " << req.requestId
-            //                                         << ", orig: "
-            //                                         << req.origin
-            //                                         << ", dest: "
-            //                                         << req.destination
-            //                                         << ">"
-            //                                         << std::endl;
-            
-
             // Compute PD distances:
             pdDistanceSearches.run();
 

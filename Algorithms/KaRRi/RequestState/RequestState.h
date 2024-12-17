@@ -113,6 +113,12 @@ namespace karri {
 
         // Information about best known assignment for current request
 
+        // TODO Just for testing purpose (s. t. AssignmentWithTransfer is the best assignment and will be inserted)
+        void clearAssignment() {
+            bestCost = INFTY;
+            bestAssignment = Assignment();           
+        }
+
         const Assignment &getBestAssignment() const {
             return bestAssignment;
         }

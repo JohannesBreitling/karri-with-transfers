@@ -49,7 +49,8 @@ namespace karri {
 
         enum RequestState {
             NOT_RECEIVED,
-            ASSIGNED_TO_VEH,
+            ASSIGNED_TO_PVEH, // Assignment with transfer, request is assigned to the pickup vehicle
+            ASSIGNED_TO_VEH, // Assigned to vehicle or assigned to dropoff vehicle if the request will be satisfied including a transfer
             WALKING_TO_DEST,
             FINISHED
         };
@@ -57,6 +58,7 @@ namespace karri {
         // Stores information about assignment and departure time of a request needed for logging on arrival of the
         // request.
         struct RequestData {
+            // TODO Erweitern für den Fall, dass ein AssignmentWithTransfer vorliegt
             int depTime;
             int walkingTimeToPickup;
             int walkingTimeFromDropoff;
@@ -163,8 +165,13 @@ namespace karri {
                 case NOT_RECEIVED:
                     handleRequestReceipt(reqId, occTime);
                     break;
+                
+                case ASSIGNED_TO_PVEH:
+                    
+                    break;
+                
                 case ASSIGNED_TO_VEH:
-                    // When assigned to a vehicle, there should be no request event until the dropoff.
+                    // When assigned to a vehicle, there should be no request event until the dropoff. // TODO Achtung weil hier jetzt ja ein transfer am start ist....
                     // At that point the request state becomes WALKING_TO_DEST.
                     assert(false);
                     break;
@@ -236,10 +243,15 @@ namespace karri {
             // destination. Thus, all requests are logged in the order of the arrival at their destination.
             for (const auto &reqId: reachedStop.requestsDroppedOffHere) {
                 const auto &reqData = requestData[reqId];
-                requestState[reqId] = WALKING_TO_DEST;
-                requestEvents.insert(reqId, occTime + reqData.walkingTimeFromDropoff);
-            }
 
+                if (requestState[reqId] == ASSIGNED_TO_PVEH) {
+                    requestState[reqId] = ASSIGNED_TO_VEH;
+                    // TODO Brauchen wir hier das einfügen von einem request event ?                    
+                } else {
+                    requestState[reqId] = WALKING_TO_DEST;
+                    requestEvents.insert(reqId, occTime + reqData.walkingTimeFromDropoff);
+                }                
+            }
 
             // Next event for this vehicle is the departure at this stop:
             vehicleEvents.increaseKey(vehId, reachedStop.depTime);
@@ -281,9 +293,14 @@ namespace karri {
 
             const auto &request = requests[reqId];
             const auto &asgnFinderResponse = assignmentFinder.findBestAssignment(request);
-            systemStateUpdater.writeBestAssignmentToLogger();
+            systemStateUpdater.writeBestAssignmentToLogger(); // TODO Achtung, wir müssen hier noch das Ergebnis anpassen, falls es ein besseres AssignmentWithTransfer vorhanden ist
 
-            applyAssignment(asgnFinderResponse, reqId, occTime);
+            if (asgnFinderResponse.improvementThroughTransfer()) {
+                applyAssignmentWithTransfer(asgnFinderResponse.getBestAssignmentWithTransfer(), reqId);
+
+            } else {
+                applyAssignment(asgnFinderResponse, reqId, occTime);
+            }
 
             const auto time = timer.elapsed<std::chrono::nanoseconds>();
             eventSimulationStatsLogger << occTime << ",RequestReceipt," << time << '\n';
@@ -297,7 +314,7 @@ namespace karri {
                 return;
             }
 
-            requestState[reqId] = ASSIGNED_TO_VEH;
+            requestState[reqId] = ASSIGNED_TO_PVEH;
             requestData[reqId].walkingTimeToPickup = asgn.pickup->walkingDist;
             requestData[reqId].walkingTimeFromDropoff = asgn.dropoff->walkingDist;
             requestData[reqId].assignmentCost = asgn.cost.total;
@@ -365,6 +382,9 @@ namespace karri {
             // Now differentiate if the solution with or without transfer is best
             if (asgnFinderResponse.improvementThroughTransfer()) {
                 const auto asgn = asgnFinderResponse.getBestAssignmentWithTransfer();
+                
+                std::cout << "EVENT SIMULATION : applyAssignmentWithTransfer !" << std::endl;
+                
                 applyAssignmentWithTransfer(asgn, reqId);
                 return;
             }

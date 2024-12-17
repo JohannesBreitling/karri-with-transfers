@@ -142,9 +142,18 @@ namespace karri {
             const auto depTimeAtLastStopBeforeDVeh = routeState.schedDepTimesFor(dVehId)[numStopsBeforeDVeh - 1];
 
             timer.restart();
-            
-            auto [pIdxPVeh, dIdxPVeh] = routeState.insertPVeh(asgn, requestState); // TODO Route State Methode
-            auto [pIdxDVeh, dIdxDVeh] = routeState.insertDVeh(asgn, requestState); // TODO Route State Methode
+
+            std::cout << "Num Stops Before PVeh : " << numStopsBeforePVeh << std::endl; 
+            std::cout << "Num Stops Before DVeh : " << numStopsBeforeDVeh << std::endl;
+
+            auto [pIdxPVeh, dIdxPVeh] = routeState.insertPVeh(asgn, requestState);
+            auto [pIdxDVeh, dIdxDVeh] = routeState.insertDVeh(asgn, requestState);
+
+            const auto numStopsAfterPVeh = routeState.numStopsOf(pVehId);
+            const auto numStopsAfterDVeh = routeState.numStopsOf(dVehId);
+
+            std::cout << "Num Stops After PVeh : " << numStopsAfterPVeh << std::endl; 
+            std::cout << "Num Stops After DVeh : " << numStopsAfterDVeh << std::endl;
             
             const auto routeUpdateTime = timer.elapsed<std::chrono::nanoseconds>();
             requestState.stats().updateStats.updateRoutesTime += routeUpdateTime;
@@ -415,17 +424,19 @@ namespace karri {
             const bool dropoffAtExistingStop = dropoffIdx == asgn.dropoffIdx;
 
             if (!pickupAtExistingStop) {
+                assert(pickupIdx > 0  && "generateBucketStateForNewStops");
                 ellipticBucketsEnv.generateTargetBucketEntries(*asgn.pVeh, pickupIdx);
                 ellipticBucketsEnv.generateSourceBucketEntries(*asgn.pVeh, pickupIdx);
             }
 
             if (!transferAtExistingStopDVeh) {
+                assert(transferIdxDVeh > 0 && "generateBucketStateForNewStops");
                 ellipticBucketsEnv.generateTargetBucketEntries(*asgn.dVeh, transferIdxDVeh);
                 ellipticBucketsEnv.generateSourceBucketEntries(*asgn.dVeh, transferIdxDVeh);
             }
 
             if (!transferAtExistingStopPVeh) {
-                ellipticBucketsEnv.generateTargetBucketEntries(*asgn.pVeh, transferAtExistingStopPVeh);
+                ellipticBucketsEnv.generateTargetBucketEntries(*asgn.pVeh, transferIdxPVeh);
 
                 // If dropoff is not the new last stop, we generate elliptic source buckets for it.
                 if (transferIdxPVeh < numStopsPVeh - 1) {
