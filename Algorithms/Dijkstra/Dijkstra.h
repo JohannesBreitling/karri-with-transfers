@@ -177,6 +177,23 @@ public:
         }
     }
 
+    int runAnyShortestPath(const std::vector<int> &sources, const std::vector<int> &targets) {
+        init(sources);
+
+        while (!queue.empty()) {
+            const auto id = queue.minId();
+
+            for (const auto target : targets) {
+                if (target == id)
+                    return distanceLabels[target][0];
+            }
+
+            settleNextVertex();
+        }
+
+        return INFTY;
+    }
+
     // Runs a Dijkstra search from multiple sources s, with the distances of the sources initialized to the given
     // offsets.
     void runWithOffset(const std::array<int, K> &sources, const std::array<int, K> &offsets) {
@@ -281,6 +298,27 @@ private:
                 queue.insert(s, distanceLabels[s].getKey());
         }
     }
+
+    void init(const std::vector<int> sources) {
+        numEdgeRelaxations = 0;
+        numVerticesSettled = 0;
+        distanceLabels.init();
+        queue.clear();
+
+        for (int i = 0; i < sources.size(); i++) {
+            const auto s = sources[i];
+            parent.setVertex(s, s, true);
+            parent.setEdge(s, INVALID_EDGE, true);
+
+            for (int k = 0; k < K; k++) {
+                distanceLabels[s][k] = 0;
+            }
+
+            if (!queue.contains(s))
+                queue.insert(s, distanceLabels[s].getKey());
+        }
+    } 
+
 
     // Removes the next vertex from the queue, relaxes its outgoing edges, and returns its ID.
     int settleNextVertex() {

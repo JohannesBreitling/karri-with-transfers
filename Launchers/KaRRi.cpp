@@ -580,14 +580,14 @@ int main(int argc, char *argv[]) {
         // using PALSStrategy = PickupAfterLastStopStrategies::DijkstraStrategy<VehicleInputGraph, PDDistancesImpl, PALSLabelSet>;
         // PALSStrategy palsStrategy(vehicleInputGraph, revVehicleGraph, fleet, routeState, lastStopsAtVertices, calc, pdDistances, reqState);
         
-        std::vector<TransferPoint> possibleTransferPoints = std::vector<TransferPoint>{};
-        TransferPointStrategy transferPointStrategy = TransferPointStrategy(routeState, vehicleInputGraph, revVehicleGraph, possibleTransferPoints);
+        std::map<std::tuple<int, int>, std::vector<TransferPoint>> transferPoints = std::map<std::tuple<int, int>, std::vector<TransferPoint>>{};
+        TransferPointStrategy transferPointStrategy = TransferPointStrategy(routeState, vehicleInputGraph, revVehicleGraph, transferPoints);
         using TransferPointFinderImpl = TransferPointFinder<TransferPointStrategy>;
-        TransferPointFinderImpl transferPoints = TransferPointFinderImpl(transferPointStrategy, fleet, routeState, pVehs, dVehs, possibleTransferPoints);
+        TransferPointFinderImpl transferPointFinder = TransferPointFinderImpl(transferPointStrategy, routeState, transferPoints);
 
-
-        using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<TransferPointStrategy, VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl>;
-        AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(transferPointStrategy, fleet, routeState, reqState, vehicleInputGraph, *vehChEnv, calc, pVehs, dVehs, transferPoints, possibleTransferPoints, locator, curVehLocToPickupSearches);
+        using LowerBoundPairedLabelSet = BasicLabelSet<1, ParentInfo::NO_PARENT_INFO>;
+        using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<TransferPointStrategy, VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, LowerBoundPairedLabelSet>;
+        AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(transferPointStrategy, fleet, routeState, reqState, vehicleInputGraph, *vehChEnv, calc, pVehs, dVehs, transferPointFinder, transferPoints, locator, curVehLocToPickupSearches);
 
         using InsertionFinderImpl = AssignmentFinder<RequestStateInitializerImpl,
                 EllipticBCHSearchesImpl,
@@ -602,7 +602,7 @@ int main(int argc, char *argv[]) {
                 >;
         InsertionFinderImpl insertionFinder(reqState, requestStateInitializer, ellipticSearches, pdDistanceQuery,
                                             ordinaryInsertionsFinder, pbnsInsertionsFinder, palsInsertionsFinder,
-                                            dalsInsertionsFinder, relevantPdLocsFilter, transferPoints, insertionsWithTransferFinder);
+                                            dalsInsertionsFinder, relevantPdLocsFilter, transferPointFinder, insertionsWithTransferFinder);
 
 
 #if KARRI_OUTPUT_VEHICLE_PATHS

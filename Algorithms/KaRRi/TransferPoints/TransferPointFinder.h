@@ -38,49 +38,88 @@ namespace karri {
     public:
         TransferPointFinder(
             StrategyT &strategy,
-            const Fleet &fleet,
             const RouteState &routeState,
-            PickupVehicles &pVehs,
-            DropoffVehicles &dVehs,
-            std::vector<TransferPoint> &possibleTransferPoints
+            std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints
         ) : strategy(strategy),
-            fleet(fleet), routeState(routeState),
-            pVehs(pVehs), dVehs(dVehs),
-            possibleTransferPoints(possibleTransferPoints) {}
+            routeState(routeState),
+            transferPoints(transferPoints) {}
 
         void init() {
-            pVehs.init();
-            dVehs.init();
-            possibleTransferPoints = std::vector<TransferPoint>{};
-            pickupDropoffPairs = std::vector<std::tuple<Vehicle, Vehicle>>{};         
+            transferPoints.clear();
         }
 
-        void findTransferPoints(int maxDetourPickup, int maxDetourDropoff, int pickupVehicleStop, int pickupVehicleNextStop, int dropoffVehicleStop, int dropoffVehicleNextStop) {
+        void findTransferPoints(Vehicle &pVeh, Vehicle &dVeh) {
+
+            // Get the stop locations of the two vehicles               
+            const auto &stopLocationsPVeh = routeState.stopLocationsFor(pVeh.vehicleId);
+            const auto &stopLocationsDVeh = routeState.stopLocationsFor(dVeh.vehicleId);
+
+            const auto &stopIdsPVeh = routeState.stopIdsFor(pVeh.vehicleId);
+            const auto &stopIdsDVeh = routeState.stopIdsFor(dVeh.vehicleId);
+
+            const int numStopsPVeh = routeState.numStopsOf(pVeh.vehicleId);
+            const int numStopsDVeh = routeState.numStopsOf(dVeh.vehicleId);
+            
+            strategy.findTransferPoints(pVeh, dVeh, numStopsPVeh, numStopsDVeh, stopLocationsPVeh, stopLocationsDVeh, stopIdsPVeh, stopIdsDVeh);
+
+            
+
+
+
+            // int maxDetourPickup, int maxDetourDropoff, int pickupVehicleStop, int pickupVehicleNextStop, int dropoffVehicleStop, int dropoffVehicleNextStop
+
+
+
+            
+            /*
+            // Get the start locations for the searches, Caution: These locations are edges
+            assert(stopIdxPVeh + 1 < routeState.numStopsOf(pVeh.vehicleId));
+            assert(stopIdxDVeh + 1 < routeState.numStopsOf(dVeh.vehicleId));
+
+            int pickupVehicleStop = stopLocationsPVeh[stopIdxPVeh];
+            int pickupVehicleNextStop = stopLocationsPVeh[stopIdxPVeh + 1];
+            int dropoffVehicleStop = stopLocationsDVeh[stopIdxDVeh];
+            int dropoffVehicleNextStop = stopLocationsDVeh[stopIdxDVeh + 1];
+
+            // Get the stop ids of the stops
+            int stopIdPickup = routeState.stopIdsFor(pVeh.vehicleId)[stopIdxPVeh];
+            int stopIdDropoff = routeState.stopIdsFor(dVeh.vehicleId)[stopIdxDVeh];
+
+            // Get the hard constraints for stopping criterions for the dijkstra searches
+            int maxDetourPickup = routeState.leewayOfLegStartingAt(stopIdPickup);
+            int maxDetourDropoff = routeState.leewayOfLegStartingAt(stopIdDropoff);
+
+            if (maxDetourPickup < 0 || maxDetourDropoff < 0)
+                return;
+            
+            // Use the transfer point finder to find the possible transfer points
+            tpFinder.findTransferPoints(maxDetourPickup, maxDetourDropoff, pickupVehicleStop, pickupVehicleNextStop, dropoffVehicleStop, dropoffVehicleNextStop);
+
+            // Build the possible transfer points
+            std::vector<TransferPoint> tpsForStopPair = std::vector<TransferPoint>{};
+            for (auto &tp : possibleTransferPoints) {
+                tp.pVeh = &pVeh;
+                tp.dVeh = &dVeh;
+                tp.dropoffAtTransferStopIdx = stopIdxPVeh;
+                tp.pickupFromTransferStopIdx = stopIdxDVeh;
+            
+                tpsForStopPair.push_back(tp);
+            }
+
+            transferPoints[{stopIdxPVeh, stopIdxDVeh}] = tpsForStopPair;
+
+            
+
             // Use the strategy to find the points for a possible transfer
             strategy.setMaxDetours(maxDetourPickup, maxDetourDropoff);                    
             strategy.findTransferPoints(pickupVehicleStop, pickupVehicleNextStop, dropoffVehicleStop, dropoffVehicleNextStop);
+            */
         }
 
     private:
-        void pairUpVehicles() {
-            for (const auto &pVeh : *pVehs.getVehicles()) {
-                for (const auto &dVeh : *dVehs.getVehicles()) {
-                    // If the pickup is the same as the dropoff vehicle, we already tested the assignment without a transfer
-                    if (pVeh->vehicleId == dVeh->vehicleId)
-                        continue;
-
-                    pickupDropoffPairs.push_back(std::make_tuple(*pVeh, *dVeh));
-                }
-            }
-        }
-
         StrategyT &strategy;
-        const Fleet &fleet;
         const RouteState &routeState;
-        PickupVehicles &pVehs;
-        DropoffVehicles &dVehs;
-        std::vector<std::tuple<Vehicle, Vehicle>> pickupDropoffPairs;
-        std::vector<TransferPoint> &possibleTransferPoints;
+        std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints;
     };
 
 }

@@ -1,6 +1,6 @@
 {
     "files.associations": {
-        "ostream": "cpp",
+        "tuple": "cpp",
         "any": "cpp",
         "array": "cpp",
         "atomic": "cpp",
@@ -52,7 +52,6 @@
         "source_location": "cpp",
         "string_view": "cpp",
         "system_error": "cpp",
-        "tuple": "cpp",
         "type_traits": "cpp",
         "utility": "cpp",
         "slist": "cpp",
@@ -68,6 +67,7 @@
         "mutex": "cpp",
         "new": "cpp",
         "numbers": "cpp",
+        "ostream": "cpp",
         "ranges": "cpp",
         "semaphore": "cpp",
         "shared_mutex": "cpp",
@@ -83,7 +83,6 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "valarray": "cpp",
-        "variant": "cpp",
-        "*.ipp": "cpp"
+        "variant": "cpp"
     }
 }
