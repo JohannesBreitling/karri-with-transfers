@@ -93,6 +93,54 @@ class CHQuery {
     search.run(sources, targets);
   }
 
+  int runAnyShortestPath(const std::vector<int> sources, const std::vector<int> targets) {
+    return search.runAnyShortestPath(sources, targets);
+  }
+
+  // Used for dropoff als / transfer als
+  std::vector<int> runOneToMany(const int source, const std::vector<int> targets, const std::vector<int> offsets) {
+    std::vector<int> distances = std::vector<int>{};
+
+    for (int i = 0; i < targets.size(); i+= K) {
+      // Construct sources / target arrays for the search of K simultaneous searches
+      std::array<int, K> sourcesSearch;
+      std::array<int, K> targetsSearch;
+
+      const int elementsLeft = targets.size() - i * K;
+
+      if (elementsLeft < K) {
+        for (int j = 0; j < elementsLeft; j++) {
+          sourcesSearch[j] = source;
+          targetsSearch[j] = targets[i + j];
+        }
+
+        for (int j = elementsLeft; j < K; j++) {
+          sourcesSearch[j] = source;
+          targetsSearch[j] = targets[0]; 
+        }
+
+
+      } else {
+        for (int j = 0; j < K; j++) {
+          sourcesSearch[j] = source;
+          targetsSearch[j] = targets[i + j];
+        }
+      }
+      
+      // Run the search
+      run(sourcesSearch, targetsSearch);
+      const auto distancesSearch = getAllDistances();
+
+      for (int j = 0; j < K; j++) {
+        distances.push_back(distancesSearch[j] + offsets[i + j]);
+      }
+    }
+
+    return distances;
+  }
+
+  // void runManyToOne(const std::vector<int> sources, const int target) {}
+
   // Returns the length of the i-th shortest path.
   int getDistance(const int i = 0) {
     return search.getDistance(i);

@@ -144,6 +144,26 @@ public:
         }
     }
 
+    int runAnyShortestPath(const std::vector<int> sources, const std::vector<int> targets) {
+        forwardSearch.init(sources);
+        reverseSearch.init(targets);        
+        
+        tentativeDistances = INFTY;
+        maxTentativeDistance = INFTY;
+        bool advanceForward = false;
+        
+        while (!stoppingCriterion.stopForwardSearch() || !stoppingCriterion.stopReverseSearch()) {
+            advanceForward = !advanceForward; // Alternate between the forward and reverse search.
+            if ((advanceForward && !stoppingCriterion.stopForwardSearch()) ||
+                stoppingCriterion.stopReverseSearch())
+                updateTentativeDistances(forwardSearch.settleNextVertex());
+            else
+                updateTentativeDistances(reverseSearch.settleNextVertex());
+        }
+
+        return tentativeDistances[0];
+    }
+
     // Returns the length of the i-th shortest path.
     int getDistance(const int i = 0) {
         return tentativeDistances[i];

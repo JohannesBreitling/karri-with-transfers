@@ -51,6 +51,11 @@ namespace karri {
         int transferIdxPVeh = INVALID_INDEX;
         int transferIdxDVeh = INVALID_INDEX;
         int dropoffIdx = INVALID_INDEX;
+
+        bool pickupBNSLowerBoundUsed = false;
+        bool pickupPairedLowerBoundUsed = false;
+        bool dropoffBNSLowerBoundUsed = false;
+        bool dropoffPairedLowerBoundUsed = false;
         
         int distToPickup; // distance from previous stop to pickup
         int distFromPickup; // distance from pickup to next stop (or 0 if pickupIdx == transferIdxPVeh)

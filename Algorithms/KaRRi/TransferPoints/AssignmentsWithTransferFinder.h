@@ -23,6 +23,9 @@
 /// SOFTWARE.
 /// ******************************************************************************
 
+// TODO #1 Dropoff ALS - searches from last stop of dVeh to dropoff
+// TODO #2 Transfer ALS - searches from last stop of pVeh to stop location of the dVeh to use as transfer point
+// TODO #3 Pickup ALS - search from last stop of pVeh to pickup, then use transfer als
 
 #pragma once
 
@@ -94,9 +97,8 @@ namespace karri {
             for (auto &pickupDropoffPair : pickupDropoffPairs) {
                 numPickupDropoffPairs++;
 
-                promisingPartialAsssignments = std::vector<AssignmentWithTransfer>{};
-                promisingPartialAssignmentsWithUnknownPairedDistance = std::map<std::tuple<int, int>, AssignmentWithTransfer>{};
-
+                promisingPartials = std::vector<AssignmentWithTransfer>{};
+                
                 auto &pVeh = std::get<0>(pickupDropoffPair);
                 auto &dVeh = std::get<1>(pickupDropoffPair);
 
@@ -118,23 +120,23 @@ namespace karri {
                 ordDropoffs = dVehs.getOrdPDsForVehicle(dVeh.vehicleId);
                 bnsPickups = pVehs.getBnsPDsForVehicle(pVeh.vehicleId);
                 bnsDropoffs = dVehs.getBnsPDsForVehicle(dVeh.vehicleId);
-                alsPickups = pVehs.getAlsPDsForVehicle(pVeh.vehicleId); // TODO Use the als pickups / dropoffs
-                alsDropoffs = dVehs.getAlsPDsForVehicle(dVeh.vehicleId);
 
                 // Calculate lower bounds for paired distances for pickup-transfer and transfer-dropoff
                 pairedLowerBoundPT = calculateLowerBoundPairedPT();
                 pairedLowerBoundTD = calculateLowerBoundPairedTD();
 
-                std::cout << "LB PT : " << pairedLowerBoundPT << std::endl;
-                std::cout << "LB TD : " << pairedLowerBoundTD << std::endl;
-
-                return;
+                // std::cout << "LB PT : " << pairedLowerBoundPT << std::endl;
+                // std::cout << "LB TD : " << pairedLowerBoundTD << std::endl;
 
 
                 // * ORDINARY TRANSFER (also includes transfer before next stop)
-                // findAssignmentsWithOrdinaryTransfer(pVeh, dVeh);
+                findAssignmentsWithOrdinaryTransfer(pVeh, dVeh);
 
-                promisingPartialAssignmentsWithUnknownPairedDistance.clear();
+                // * TRANSFER AFTER LAST STOP
+                // First approach for transfer als is, that the pickup vehicle drives to a stop position of the dropoff vehicle and uses this position as the transfer point
+                // findAssignmentsWithTransferAtStop(pVeh, dVeh); // TODO Das muss logischerweise dann außerhalb der festgelegten Indizes sein
+
+                promisingPartials.clear();
             
                 // TODO findAssignmentsWithTransferAfterLastStop(); -> Ziel: Nach Weihnachten sollte hier die ersten Ansätze laufen
                 // TODO Eigentlich sollten damit dann signifikant mehr AssignmentsWithTransfer gefunden werden als bisher (Ziel: 10-20%)
@@ -222,8 +224,16 @@ namespace karri {
                     targets.push_back(tail);
                 }                
             }
+
+            const auto sourceRanks = vehCh.allRanks(sources);
+            const auto targetRanks = vehCh.allRanks(targets);
+
+            const int lb = vehChQuery.runAnyShortestPath(sourceRanks, targetRanks);
+
+            // const int lbDij = dijSearchLowerBound.runAnyShortestPath(sources, targets);
+            //std::cout << "LB DIJ : " << lbDij << " =? LB CH : " << lb << std::endl;
             
-            return dijSearchLowerBound.runAnyShortestPath(sources, targets);
+            return lb; 
         }
 
         int calculateLowerBoundPairedTD() {
@@ -251,42 +261,34 @@ namespace karri {
                     sources.push_back(head);
                 }                
             }
+
+            const auto sourceRanks = vehCh.allRanks(sources);
+            const auto targetRanks = vehCh.allRanks(targets);
+
+            const int lb = vehChQuery.runAnyShortestPath(sourceRanks, targetRanks);
             
-            return dijSearchLowerBound.runAnyShortestPath(sources, targets);
+            return lb;
         }
 
         void tryOrdinaryDropoffs() {
-            for (auto &asgn : promisingPartialAsssignments) {
+            for (const auto &asgn : promisingPartials) {
                 const auto relOrdDropoffs = getOrdDropoffsAfter(asgn.transferIdxDVeh);
 
                 for (const auto &dropoff : relOrdDropoffs) {
-                    asgn.dropoffIdx = dropoff.pdIdx;
-                    asgn.dropoff = &(requestState.dropoffs[dropoff.pdLocId]);
-                    asgn.distToDropoff = dropoff.detourToPD;
-                    asgn.distFromDropoff = dropoff.detourFromPD;
-                
-                    tryAssignment(asgn);
-                }
-            }
+                    auto newAsgn = AssignmentWithTransfer(asgn); 
 
-            for (auto &it : promisingPartialAssignmentsWithUnknownPairedDistance) {
-                auto &asgn = it.second;
+                    newAsgn.dropoffIdx = dropoff.pdIdx;
+                    newAsgn.dropoff = &(requestState.dropoffs[dropoff.pdLocId]);
+                    newAsgn.distToDropoff = dropoff.detourToPD;
+                    newAsgn.distFromDropoff = dropoff.detourFromPD;
                 
-                const auto relOrdDropoffs = getOrdDropoffsAfter(asgn.transferIdxDVeh);
-
-                for (const auto &dropoff : relOrdDropoffs) {
-                    asgn.dropoffIdx = dropoff.pdIdx;
-                    asgn.dropoff = &(requestState.dropoffs[dropoff.pdLocId]);
-                    asgn.distToDropoff = dropoff.detourToPD;
-                    asgn.distFromDropoff = dropoff.detourFromPD;
-                
-                    tryAssignmentWithUnkownPairedDistance(asgn);
+                    tryAssignment(newAsgn);
                 }
             }
         }
             
         void tryDropoffsBNS() {
-            for (auto &asgn : promisingPartialAsssignments) {
+            for (const auto &asgn : promisingPartials) {
                 if (asgn.transferIdxDVeh != 0)
                     continue;
 
@@ -294,31 +296,57 @@ namespace karri {
                     assert(dropoff.pdIdx == 0);
                     assert(asgn.transferIdxDVeh == 0);
 
-                    asgn.dropoffIdx = 0;
-                    asgn.dropoff = &(requestState.dropoffs[dropoff.pdLocId]);
-                    asgn.distToDropoff = dropoff.detourToPD;
-                    asgn.distFromDropoff = dropoff.detourFromPD;
+                    auto newAsgn = AssignmentWithTransfer(asgn);
+
+                    newAsgn.dropoffIdx = 0;
+                    newAsgn.dropoff = &(requestState.dropoffs[dropoff.pdLocId]);
+                    newAsgn.distToDropoff = dropoff.detourToPD;
+                    newAsgn.distFromDropoff = dropoff.detourFromPD;
                 
-                    tryAssignment(asgn);
+                    tryAssignment(newAsgn);
                 }
             }
+        }
 
-            for (auto &it : promisingPartialAssignmentsWithUnknownPairedDistance) {
-                auto &asgn = it.second;
+        void tryDropoffALS(const Vehicle &dVeh) {
+            // The start location of the search is the last stop of the dropoff vehicle
+            const auto numStops = routeState.numStopsOf(dVeh.vehicleId);
+            const auto lastStopLoc = routeState.stopIdsFor(dVeh.vehicleId)[numStops - 1];
+            const auto lastStopVertex = inputGraph.edgeHead(lastStopLoc);
+            std::vector<int> travelTimesDropoffs = std::vector<int>{};
+
+            // Calculate the distances to the possible dropoffs
+            // Use a individual ch search approach
+            const auto source = vehCh.rank(lastStopVertex);
+
+            // We need to consider the dropoffs for the request
+            std::vector<int> dropoffVertecies = std::vector<int>{};
+            for (const auto &dropoff : requestState.dropoffs) {
+                dropoffVertecies.push_back(inputGraph.edgeTail(dropoff.loc));
+                travelTimesDropoffs.push_back(inputGraph.travelTime(dropoff.loc));
+            }
+
+            const auto targets = vehCh.allRanks(dropoffVertecies);
+            
+            // Run the searches for all the dropoffs
+            std::vector<int> distances = vehChQuery.runOneToMany(source, targets, travelTimesDropoffs);
+            assert(distances.size() == requestState.dropoffs.size());
+
+            for (int distance : distances) {
+                std::cout << "distance : " << distance << std::endl;
+            }
+
+            for (const auto &asgn : promisingPartials) {
+                for (int i = 0; i < requestState.dropoffs.size(); i++) {
+                    auto newAsgn = AssignmentWithTransfer(asgn);
+
+                    newAsgn.dropoffIdx = numStops - 1;
+                    newAsgn.dropoff = &requestState.dropoffs[i];
+                    newAsgn.distToDropoff = distances[i];
+                    newAsgn.distFromDropoff = 0;
                 
-                if (asgn.transferIdxDVeh != 0)
-                    continue;
-
-                for (const auto &dropoff : bnsDropoffs) {
-                    assert(dropoff.pdIdx == 0);
-                    assert(asgn.transferIdxDVeh == 0);
-
-                    asgn.dropoffIdx = 0;
-                    asgn.dropoff = &(requestState.dropoffs[dropoff.pdLocId]);
-                    asgn.distToDropoff = dropoff.detourToPD;
-                    asgn.distFromDropoff = dropoff.detourFromPD;
-                
-                    tryAssignmentWithUnkownPairedDistance(asgn);
+                    std::cout << "TRY DROPOFF ALS" << std::endl;
+                    tryAssignment(newAsgn);
                 }
             }
         }
@@ -380,10 +408,14 @@ namespace karri {
                             tryPartialAssignment(asgn);
                         }
                     }
+
+                    // Pickup als also implies transfer als, so this case is treated separately
                 }
             }
 
             Timer timer;
+
+            /*
 
             if (assignmentsWithUnknownPickupDistance.size() > 0) {
                 // Finish the calculation of the unknown pickup distances
@@ -404,14 +436,19 @@ namespace karri {
                 
                 const auto postponedPickupTime = timer.elapsed<std::chrono::nanoseconds>();
                 requestState.stats().transferStats.postponedPartialsTime += postponedPickupTime;
-            }
+            } */
 
-            if (promisingPartialAsssignments.size() == 0 && promisingPartialAssignmentsWithUnknownPairedDistance.size() == 0)
+            if (promisingPartials.size() == 0)
                 return;
 
             tryOrdinaryDropoffs();
             tryDropoffsBNS();
+            tryDropoffALS(dVeh);
 
+            if (unfinishedAssignments.size() > 0)
+                finishAssignments();
+
+            /*
             // Clear the assignments with unknown paired distance, as they have been treated in the tryDropoff part
             promisingPartialAssignmentsWithUnknownPairedDistance.clear();
 
@@ -435,39 +472,29 @@ namespace karri {
                 const auto postponedTransferTime = timer.elapsed<std::chrono::nanoseconds>();
                 requestState.stats().transferStats.postponedAssignmentsTime += postponedTransferTime;
             }
+            */
         }
 
 
         void tryPartialAssignment(AssignmentWithTransfer &asgn) {
             numPartialsTried++;
 
-            bool postponed = false;
             if (asgn.pickupIdx == asgn.transferIdxPVeh) {
                 // Paired Assignment (pVeh)
-
                 Timer timer;
                 
                 asgn.distFromPickup = 0;
-                // TODO Use better lower bound
-                asgn.distToTransferPVeh = 0;
+                asgn.distToTransferPVeh = pairedLowerBoundPT;
+                asgn.pickupPairedLowerBoundUsed = true;
                 
                 const int pLoc = asgn.pickup->loc;
                 const int tLoc = asgn.transfer.loc;
                 
                 const bool distanceKnown = calculatedDirectDistances.count({pLoc, tLoc});
                 
-                if (distanceKnown)
+                if (distanceKnown) {
                     asgn.distToTransferPVeh = calculatedDirectDistances[{pLoc, tLoc}];
-
-                const auto partialCost = calc.calcPartialCostForPVeh<true>(asgn, requestState);
-
-                if (partialCost.total > requestState.getBestCost())
-                    return;
-
-                
-                if (!distanceKnown) {
-                    promisingPartialAssignmentsWithUnknownPairedDistance[{asgn.pickup->id, tLoc}] = asgn;
-                    postponed = true;
+                    asgn.pickupPairedLowerBoundUsed = false;
                 }
 
                 const auto pickupPairedTime = timer.elapsed<std::chrono::nanoseconds>();
@@ -477,37 +504,26 @@ namespace karri {
             if (asgn.pickupIdx == 0) {
                 Timer timer;
 
-                // Assignment with pickup bns, try lower bound
-                const RequestCost lowerBoundBNS = calc.calcPartialCostForPVeh<true>(asgn, requestState);
-
-                if (lowerBoundBNS.total > requestState.getBestCost())
-                    return;
-
-                // Get the exact distances from the last stop to the pickup via the current location
-                // Check if exact distances are known
                 if (searches.knowsDistance(asgn.pVeh->vehicleId, asgn.pickup->id)) {
                     asgn.distToPickup = searches.getDistance(asgn.pVeh->vehicleId, asgn.pickup->id);
                 } else {
-                    // Postpone the calculation of the missing exact distance
-                    assignmentsWithUnknownPickupDistance.push_back(asgn);
-                    return;
+                    asgn.pickupBNSLowerBoundUsed = true;
                 }
 
                 const auto pickupBnsTime = timer.elapsed<std::chrono::nanoseconds>();
                 requestState.stats().transferStats.pickupBnsTime += pickupBnsTime;               
             }
 
-            if (postponed)
-                return;
-
-            // Check the cost of the partial assignment with transfer where pickup vehicle, dropoff vehicle, pickup and transfer point (therefore also both transfer stop indices) is set
+            // Check the cost of the partial assignment with transfer where pickup vehicle, dropoff vehicle, pickup and transfer point (therefore also both transfer stop indices) are set
             const RequestCost pickupVehCost = calc.calcPartialCostForPVeh<true>(asgn, requestState);
 
-            if (pickupVehCost.total < requestState.getBestCost()) {
-                promisingPartialAsssignments.push_back(asgn);
-            }
+            if (pickupVehCost.total > requestState.getBestCost())
+                return;
+
+            promisingPartials.push_back(asgn);
         }
 
+        /*
         void tryPostponedPartialAssignment(AssignmentWithTransfer &asgn) {
             assert(asgn.pickupIdx == 0);
         
@@ -574,69 +590,42 @@ namespace karri {
             // Now we know, that the partial costs are okay, we can continue normally for the rest of the assignment
             tryAssignment(asgn);
         }
+        */
 
         void tryAssignment(AssignmentWithTransfer &asgn) {
-
             numAssignmentsTried++;
 
             if (asgn.dropoffIdx == asgn.transferIdxDVeh) {
-
+                // Paired assignment (dVeh)
                 Timer timer;
-
-                // Paired Assignment (dVeh)
 
                 // Try lower bound for paired assignment
                 asgn.distFromTransferDVeh = 0;
-                asgn.distToDropoff = 0;
-                const auto lowerBoundPaired = calc.calcBase<true>(asgn, requestState);
-
-                if (lowerBoundPaired.total > requestState.getBestCost())
-                    return;
+                asgn.distToDropoff = pairedLowerBoundTD;
+                asgn.dropoffPairedLowerBoundUsed = true;
 
                 const int tLoc = asgn.transfer.loc;
                 const int dLoc = asgn.dropoff->loc;
 
-                int distance;
-
-                if (!calculatedDirectDistances.count({tLoc, dLoc})){
-                    // Paired assignment, calculate the direct distance between origin and transfer point
-                    const auto source = vehCh.rank(inputGraph.edgeHead(tLoc));
-                    const auto target = vehCh.rank(inputGraph.edgeTail(dLoc));
-
-                    vehChQuery.run(source, target);
-                    
-                    distance = vehChQuery.getDistance() + inputGraph.travelTime(asgn.dropoff->loc);
-                    calculatedDirectDistances[{tLoc, dLoc}] = distance;
-                } else {
-                    distance = calculatedDirectDistances[{tLoc, dLoc}];
+                if (calculatedDirectDistances.count({tLoc, dLoc})) {
+                    asgn.distToDropoff = calculatedDirectDistances[{tLoc, dLoc}];
+                    asgn.dropoffPairedLowerBoundUsed = false;
                 }
-
-                asgn.distFromTransferDVeh = 0;
-                asgn.distToDropoff = distance;
 
                 const auto transferPairedTime = timer.elapsed<std::chrono::nanoseconds>();
                 requestState.stats().transferStats.transferPairedTime += transferPairedTime;
             }
 
             if (asgn.transferIdxDVeh == 0) {
-
+                // Transfer BNS
                 Timer timer;
 
-                // Transfer BNS
-                // Try lower bound
-                const RequestCost lowerBoundBNS = calc.calcBase<true>(asgn, requestState);
-
-                if (lowerBoundBNS.total > requestState.getBestCost())
-                    return;
-
                 if (!searches.knowsDistanceTransfer(asgn.dVeh->vehicleId, asgn.transfer.loc)) {
-                    // Postpone the computation of the distance of the dropoff
-                    assignmentsWithUnknownTransferDistance.push_back(asgn);
-                    return;
+                    asgn.dropoffBNSLowerBoundUsed = true;
+                } else {
+                    asgn.distToTransferDVeh = searches.getDistanceTransfer(asgn.dVeh->vehicleId, asgn.transfer.loc);
                 }
                 
-                asgn.distToTransferDVeh = searches.getDistanceTransfer(asgn.dVeh->vehicleId, asgn.transfer.loc);
-
                 const auto transferBnsTime = timer.elapsed<std::chrono::nanoseconds>();
                 requestState.stats().transferStats.transferBnsTime += transferBnsTime;
             }
@@ -644,9 +633,38 @@ namespace karri {
             // Check the cost of the partial assignment with transfer where pickup vehicle, dropoff vehicle, pickup and transfer point (therefore also both transfer stop indices) is set
             const RequestCost assignmentCost = calc.calcBase<true>(asgn, requestState);
 
-            if (assignmentCost.total < INFTY) {
-                requestState.tryAssignmentWithTransfer(asgn);
+            if (assignmentCost.total > requestState.getBestCost())
+                return;
+            
+            if (asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed || asgn.dropoffBNSLowerBoundUsed || asgn.dropoffPairedLowerBoundUsed) {
+                unfinishedAssignments.push_back(asgn);
+                return;
             }
+
+            requestState.tryAssignmentWithTransfer(asgn);
+        }
+
+        void finishAssignments() {
+            // Method to finish the assignments that have lower bounds used
+            std::vector<AssignmentWithTransfer> toCalculate;
+
+            // Start with the pickups with postponed bns distance
+            std::cout << "FINISH ASSIGNMENTS..." << std::endl;
+
+            // Calculate the exact paired distance between pickup and transfer
+
+
+            // Calculate the dropoffs with postponed bns distance
+            
+
+            // Calculate the exact paired distance between transfer and dropoff
+            
+
+
+
+        
+        
+        
         }
 
         void tryPostponedAssignment(AssignmentWithTransfer &asgn) {
@@ -723,15 +741,13 @@ namespace karri {
         std::vector<Pickup> alsPickups;
         std::vector<Dropoff> alsDropoffs;
 
-        std::vector<AssignmentWithTransfer> promisingPartialAsssignments;
+        std::vector<AssignmentWithTransfer> promisingPartials;
+        std::vector<AssignmentWithTransfer> unfinishedAssignments;
 
         const VehicleLocator<InputGraphT, VehCHEnvT> &locator;
         CurVehLocToPickupSearchesT &searches;
         std::vector<AssignmentWithTransfer> assignmentsWithUnknownPickupDistance;
         std::vector<AssignmentWithTransfer> assignmentsWithUnknownTransferDistance;
-
-        // Map for the assignments without known direct distance from pickup to transfer, the keys are triples of (pickup id, transfer loc)
-        std::map<std::tuple<int, int>, AssignmentWithTransfer> promisingPartialAssignmentsWithUnknownPairedDistance;
 
         std::map<std::tuple<int, int>, int> calculatedDirectDistances;
 
