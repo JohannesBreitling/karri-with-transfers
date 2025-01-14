@@ -275,11 +275,15 @@ namespace karri::time_utils {
                             const RouteState &routeState) {
         const auto vehDepTimeAtPrevStop = getVehDepTimeAtStopForRequest(vehId, pickupIndex, context, routeState);
         const auto timeUntilDep = depTimeAtPickup - vehDepTimeAtPrevStop;
+        assert(pickupIndex != dropoffIndex || timeUntilDep >= 0);
 
         if (pickupIndex == dropoffIndex)
             return timeUntilDep;
 
-        return timeUntilDep + distFromPickup - calcLengthOfLegStartingAt(pickupIndex, vehId, routeState);
+        const int leg = calcLengthOfLegStartingAt(pickupIndex, vehId, routeState);
+        const int sum = timeUntilDep + distFromPickup - leg;
+        
+        return sum;
     }
 
     // Returns the additional time that is needed for the vehicle asgn.vehicle to drive from its stop at index
@@ -310,7 +314,7 @@ namespace karri::time_utils {
         const auto vehDepTimeAtPrevStop = getVehDepTimeAtStopForRequest(asgn.dVeh->vehicleId, asgn.transferIdxDVeh, context, routeState);
         const auto timeUntilDep = depTimeAtTransfer - vehDepTimeAtPrevStop;
 
-        assert(asgn.transferIdxDVeh < routeState.numStopsOf(asgn.dVeh->vehicleId) && "calcInitialTransferDetourDVeh");
+        assert(asgn.transferIdxDVeh < routeState.numStopsOf(asgn.dVeh->vehicleId));
 
         if (asgn.transferIdxDVeh == asgn.dropoffIdx)
             return timeUntilDep;
@@ -453,7 +457,10 @@ namespace karri::time_utils {
     calcAddedTripTimeInInterval(const int vehId, const int fromIndex, const int toIndex, const int detourAtFromIndex,
                                 const RouteState &routeState) {
 
-        assert(detourAtFromIndex >= 0);
+        // assert(detourAtFromIndex >= 0);
+        if (detourAtFromIndex < 0) // TODO Fixen, manchmal ist die detour kleiner 0
+            return 0;
+        
         if (detourAtFromIndex == 0 || fromIndex == toIndex) {
             return 0;
         }

@@ -134,7 +134,7 @@ namespace karri {
             }
             
             bestCostWithTransfer = asgn.cost.total;
-            bestAssignmentWithTransfer = asgn;
+            bestAssignmentWithTransfer = AssignmentWithTransfer(asgn);
         }
 
         bool improvementThroughTransfer() const {

@@ -108,6 +108,21 @@ namespace karri {
 
         template<bool checkHardConstraints, typename RequestContext>
         RequestCost calcBase(AssignmentWithTransfer &asgn, const RequestContext &context) {
+            return calcBase<checkHardConstraints, false>(asgn, context);
+        }
+        
+        template<bool checkHardConstraints, bool recomputePVeh, typename RequestContext>
+        RequestCost calcBase(AssignmentWithTransfer &asgn, const RequestContext &context) {
+            bool unfinishedPVeh = asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed;
+
+            if (recomputePVeh && unfinishedPVeh) {
+                calcPartialCostForPVehLowerBound<checkHardConstraints>(asgn, context);
+            }
+
+            if (recomputePVeh && !unfinishedPVeh) {
+                calcPartialCostForPVeh<checkHardConstraints>(asgn, context);
+            }
+
             assert(asgn.dropoff);
 
             if (!asgn.dropoff) {
@@ -127,20 +142,85 @@ namespace karri {
 
             const auto actualDepTimeAtTransfer = getActualDepTimeAtTranfer(asgn, context, routeState);
             const auto initialTransferDetour = calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context, routeState);
+            //assert(initialTransferDetour >= 0);
 
             int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.transferIdxDVeh, asgn.dropoffIdx, initialTransferDetour, routeState);
             const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
 
             const auto initialDropoffDetour = calcInitialDropoffDetour(asgn, dropoffAtExistingStop, routeState);
+            //assert(initialDropoffDetour >= 0);
 
             const auto detourRightAfterDropoff = calcDetourRightAfterDropoff(asgn, initialTransferDetour,
                                                                              initialDropoffDetour, routeState);
+            //assert(detourRightAfterDropoff >= 0);
 
             const auto residualDetourAtEnd = calcResidualTotalDetourForStopAfterDropoff(asgn.dVeh->vehicleId,
                                                                                         asgn.dropoffIdx,
                                                                                         numStops - 1,
                                                                                         detourRightAfterDropoff,
                                                                                         routeState);         
+            //assert(residualDetourAtEnd >= 0);
+
+            if (checkHardConstraints && isAnyHardConstraintViolatedDVeh(asgn, context, initialTransferDetour, detourRightAfterDropoff, residualDetourAtEnd, dropoffAtExistingStop, routeState)) {
+                asgn.cost.total = INFTY;
+                return asgn.cost;
+            }
+ 
+            addedTripTime += calcAddedTripTimeAffectedByTransferAndDropoff(asgn, detourRightAfterDropoff, routeState);
+
+            return calcFinalCost(asgn, context, initialTransferDetour, residualDetourAtEnd, actualDepTimeAtTransfer, dropoffAtExistingStop, addedTripTime);
+        }
+
+        template<bool checkHardConstraints, typename RequestContext>
+        RequestCost calcBaseLowerBound(AssignmentWithTransfer &asgn, const RequestContext &context) {
+            return calcBaseLowerBound<checkHardConstraints, false>(asgn, context);
+        }
+
+        template<bool checkHardConstraints, bool recomputePVeh, typename RequestContext>
+        RequestCost calcBaseLowerBound(AssignmentWithTransfer &asgn, const RequestContext &context) {
+            bool unfinishedPVeh = asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed;
+
+            if (recomputePVeh && unfinishedPVeh) {
+                calcPartialCostForPVehLowerBound<checkHardConstraints>(asgn, context);
+            }
+
+            if (recomputePVeh && !unfinishedPVeh) {
+                calcPartialCostForPVeh<checkHardConstraints>(asgn, context);
+            }
+            
+            assert(asgn.dropoff);
+
+            if (!asgn.dropoff) {
+                asgn.cost.total = INFTY;
+                return asgn.cost;
+            }
+
+            if (asgn.distToDropoff == INFTY || asgn.distFromDropoff == INFTY)  {
+                asgn.cost.total = INFTY;
+                return asgn.cost;
+            }
+
+            using namespace time_utils;
+
+            const int vehId = asgn.dVeh->vehicleId;
+            const auto numStops = routeState.numStopsOf(vehId);
+
+            const auto actualDepTimeAtTransfer = getActualDepTimeAtTranfer(asgn, context, routeState);
+            const auto initialTransferDetour = std::max(calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context, routeState), 0);
+
+            int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.transferIdxDVeh, asgn.dropoffIdx, initialTransferDetour, routeState);
+            const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
+
+            const auto initialDropoffDetour = std::max(calcInitialDropoffDetour(asgn, dropoffAtExistingStop, routeState), 0);
+
+            const auto detourRightAfterDropoff = std::max(calcDetourRightAfterDropoff(asgn, initialTransferDetour,
+                                                                             initialDropoffDetour, routeState), 0);
+
+            const auto residualDetourAtEnd = std::max(calcResidualTotalDetourForStopAfterDropoff(asgn.dVeh->vehicleId,
+                                                                                        asgn.dropoffIdx,
+                                                                                        numStops - 1,
+                                                                                        detourRightAfterDropoff,
+                                                                                        routeState), 0); 
 
             if (checkHardConstraints && isAnyHardConstraintViolatedDVeh(asgn, context, initialTransferDetour, detourRightAfterDropoff, residualDetourAtEnd, dropoffAtExistingStop, routeState)) {
                 asgn.cost.total = INFTY;
@@ -184,13 +264,69 @@ namespace karri {
             }
 
             const auto initalTransferDetour = calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState);
+            assert(initalTransferDetour >= 0);
 
             const auto detourRightAfterTransfer = calcDetourRightAfterTransferPVeh(asgn, initialPickupDetour, initalTransferDetour, routeState);
+            assert(detourRightAfterTransfer >= 0);
+            
             const auto residualDetourAtEnd = calcResidualTotalDetourForStopAfterDropoff(asgn.pVeh->vehicleId,
                                                                                         asgn.transferIdxPVeh,
                                                                                         numStops - 1,
                                                                                         detourRightAfterTransfer,
                                                                                         routeState);
+            assert(residualDetourAtEnd >= 0);
+
+            if (checkHardConstraints && isAnyHardConstraintViolatedPVeh(asgn, context, initialPickupDetour,
+                                                                    detourRightAfterTransfer, residualDetourAtEnd,
+                                                                    transferAtExistingStop, routeState)) {
+                asgn.cost.total = INFTY;
+                return asgn.cost;
+            }
+            
+            addedTripTime += calcAddedTripTimeAffectedByPickupAndTransfer(asgn, detourRightAfterTransfer, routeState);
+
+            return calcCostPVeh(asgn, context, initialPickupDetour, residualDetourAtEnd, actualDepTimeAtPickup, transferAtExistingStop, addedTripTime);
+        }
+
+        template<bool checkHardConstraints, typename RequestContext>
+        RequestCost calcPartialCostForPVehLowerBound(AssignmentWithTransfer &asgn, const RequestContext &context) const {
+            using namespace time_utils;
+            
+            assert(asgn.pVeh && asgn.pickup);
+            if (!asgn.pVeh || !asgn.pickup) {
+                asgn.cost.total = INFTY;
+                return asgn.cost;
+            }
+
+            if (asgn.distToPickup == INFTY || asgn.distFromPickup == INFTY ||
+                asgn.distToTransferPVeh == INFTY || asgn.distFromTransferPVeh == INFTY) {
+                asgn.cost.total = INFTY;
+                return asgn.cost;
+            } 
+            
+            const int vehId = asgn.pVeh->vehicleId;
+            const auto numStops = routeState.numStopsOf(vehId);
+            const auto actualDepTimeAtPickup = getActualDepTimeAtPickup(asgn, context, routeState);
+            const auto initialPickupDetour = std::max(calcInitialPickupDetour(asgn, actualDepTimeAtPickup, context, routeState), 0);
+            int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.pickupIdx, asgn.transferIdxPVeh, initialPickupDetour, routeState);
+
+            bool transferAtExistingStop = false;
+
+            for (int i = 0; i < numStops; i++) {
+                int stopLocation = routeState.stopLocationsFor(vehId)[i];
+                if (stopLocation == asgn.transfer.loc) {
+                    transferAtExistingStop = true;
+                }
+            }
+
+            const auto initalTransferDetour = std::max(calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState), 0);
+
+            const auto detourRightAfterTransfer = std::max(calcDetourRightAfterTransferPVeh(asgn, initialPickupDetour, initalTransferDetour, routeState), 0);
+            const auto residualDetourAtEnd = std::max(calcResidualTotalDetourForStopAfterDropoff(asgn.pVeh->vehicleId,
+                                                                                        asgn.transferIdxPVeh,
+                                                                                        numStops - 1,
+                                                                                        detourRightAfterTransfer,
+                                                                                        routeState), 0);
 
             // std::cout << "Actual Departure : " << actualDepTimeAtPickup << std::endl;
             // std::cout << "Initial Pickup Detour : " << initialPickupDetour << std::endl;

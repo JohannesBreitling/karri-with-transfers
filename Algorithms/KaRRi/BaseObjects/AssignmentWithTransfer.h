@@ -36,7 +36,43 @@ namespace karri {
     struct AssignmentWithTransfer {
         
         AssignmentWithTransfer() {}
-        AssignmentWithTransfer(const AssignmentWithTransfer&) = default;
+        // AssignmentWithTransfer(const AssignmentWithTransfer&) = default;
+
+        /*
+        AssignmentWithTransfer(const AssignmentWithTransfer &asgn) {
+            pVeh = asgn.pVeh;
+            pickup = asgn.pickup;
+            transfer = asgn.transfer;
+            pickupBNSLowerBoundUsed = asgn.pickupBNSLowerBoundUsed;
+            pickupPairedLowerBoundUsed = asgn.pickupPairedLowerBoundUsed;
+            pickupIdx = asgn.pickupIdx;
+            transferIdxPVeh = asgn.transferIdxPVeh;
+            transferIdxDVeh = asgn.transferIdxDVeh;
+
+            distToPickup = asgn.distToPickup;
+            distFromPickup = asgn.distFromPickup;
+            distToTransferPVeh = asgn.distToTransferPVeh;
+            distFromTransferPVeh = asgn.distFromTransferPVeh;
+            
+            distToTransferDVeh = asgn.distToTransferDVeh;
+            distFromTransferDVeh = asgn.distFromTransferDVeh;
+
+            costPVeh = asgn.costPVeh;
+            waitTimeAtPickup = asgn.waitTimeAtPickup;
+            arrAtTransferPoint = asgn.arrAtTransferPoint;
+
+            dVeh = asgn.dVeh;
+            dropoff = asgn.dropoff;
+            cost = asgn.cost;
+            dropoffIdx = asgn.dropoffIdx;
+
+            dropoffBNSLowerBoundUsed = asgn.dropoffBNSLowerBoundUsed;
+            dropoffPairedLowerBoundUsed = asgn.dropoffPairedLowerBoundUsed;
+
+            distToDropoff = asgn.distToDropoff;
+            distFromDropoff = asgn.distFromDropoff;
+        }
+        */
 
         const Vehicle *pVeh = nullptr;
         const Vehicle *dVeh = nullptr;
