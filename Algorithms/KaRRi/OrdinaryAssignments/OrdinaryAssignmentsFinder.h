@@ -77,8 +77,6 @@ namespace karri {
 
     private:
 
-        // TODO Frage: Was bedeutet dass ein Spot in den Relevant Dropoff liegt?
-
         void findVehiclesForOrdinaryPickup() {
             // Loop over all relavant vehicles
             for (const auto &vehId : relPickups.getVehiclesWithRelevantPDLocs()) {

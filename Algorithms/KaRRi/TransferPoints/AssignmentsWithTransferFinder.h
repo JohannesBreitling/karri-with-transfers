@@ -2,7 +2,7 @@
 /// MIT License
 ///
 /// Copyright (c) 2023 Moritz Laupichler <moritz.laupichler@kit.edu>
-/// Copyright (c) 2024 Johannes Breitling <johannes.breitling@student.kit.edu>
+/// Copyright (c) 2025 Johannes Breitling <johannes.breitling@student.kit.edu>
 ///
 /// Permission is hereby granted, free of charge, to any person obtaining a copy
 /// of this software and associated documentation files (the "Software"), to deal
@@ -23,15 +23,13 @@
 /// SOFTWARE.
 /// ******************************************************************************
 
-
-// ! All the ALS Options we want to treat
-
-
-
-
 #pragma once
 
 #include "Algorithms/KaRRi/TransferPoints/TransferPointFinder.h"
+#include "Algorithms/KaRRi/TransferPoints/OrdinaryTransfers/OrdinaryTransferFinder.h"
+#include "Algorithms/KaRRi/TransferPoints/TransfersALS/TransfersALSPVeh/TransferALSPVehFinder.h"
+#include "Algorithms/KaRRi/TransferPoints/TransfersALS/TransfersALSDVeh/TransferALSDVehFinder.h"
+
 #include "Algorithms/KaRRi/TimeUtils.h"
 #include "Algorithms/KaRRi/BaseObjects/AssignmentWithTransfer.h"
 #include "Algorithms/KaRRi/PbnsAssignments/VehicleLocator.h"
@@ -40,11 +38,14 @@
 
 namespace karri {
 
-    template <typename StrategyT, typename InputGraphT, typename VehCHEnvT, typename CurVehLocToPickupSearchesT, typename DijLabelSet>
+    template <typename StrategyT, typename InputGraphT, typename VehCHEnvT, typename CurVehLocToPickupSearchesT, typename DijLabelSet, typename TransferALSPVehFinderT>
     class AssignmentsWithTransferFinder {
 
     public:
         AssignmentsWithTransferFinder(
+            OrdinaryTransferFinder &ordinaryTransfers,
+            TransferALSPVehFinderT &transfersALSPVeh,
+            TransferALSDVehFinder &transfersALSDVeh,
             StrategyT strategy,
             const Fleet &fleet, const RouteState &routeState,
             RequestState &requestState,
@@ -57,7 +58,10 @@ namespace karri {
             std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints,
             const VehicleLocator<InputGraphT, VehCHEnvT> &locator,
             CurVehLocToPickupSearchesT &searches)
-                            : strategy(strategy),
+                            : ordinaryTransfers(ordinaryTransfers),
+                              transfersALSPVeh(transfersALSPVeh),
+                              transfersALSDVeh(transfersALSDVeh),
+                              strategy(strategy),
                               fleet(fleet),
                               routeState(routeState),
                               requestState(requestState),
@@ -85,12 +89,21 @@ namespace karri {
         void findBestAssignment() {
             Timer totalTimer;
 
+            // std::cout << "// - - - - - - - - - - - - - - - - - - - -" << std::endl;
+            // std::cout << "REQUEST START" << std::endl;
+
             auto &stats = requestState.stats().transferStats;
             numPartialsTried = 0;
             numAssignmentsTried = 0;
             numAssignmentsWithUnkownPairedDistanceTried = 0;
             int64_t numPickupDropoffPairs = 0;
             int64_t numStopPairs = 0;
+
+            transfersALSPVeh.findAssignments();
+            ordinaryTransfers.findAssignments();
+            transfersALSDVeh.findAssignments();
+
+            return; // TODO
 
             // Pair up the vehicles
             pairUpVehicles();
@@ -132,21 +145,130 @@ namespace karri {
                 // * ORDINARY TRANSFER (also includes transfer before next stop)
                 findAssignmentsWithOrdinaryTransfer(pVeh, dVeh);
 
+                promisingPartials.clear();
+
                 // * TRANSFER AFTER LAST STOP (PVeh)
                 // The pickup vehicle picks up the user either bns, ord or als
                 // Then the pickup vehicle drives to one of the stops of the dropoff vehicle, where the transfer is done
                 findAssignmentsWithTransferALSPVeh(pVeh, dVeh);
-
                 
                 // First approach for transfer als is, that the pickup vehicle drives to a stop position of the dropoff vehicle and uses this position as the transfer point
-                // findAssignmentsWithTransferAtStop(pVeh, dVeh); // TODO Das muss logischerweise dann außerhalb der festgelegten Indizes sein
-
-                promisingPartials.clear();
             
                 // Try bns / odrinary pickup and transfer als on route of dropoff vehicle
             }
 
+            promisingPartials.clear();
+
+            // * PICKUP ALS AND TRANSFER ALS
+            // Calculate the distance from every last stop of the vehicles to every possible pickup
+            std::map<int, std::vector<int>> lastStopDistances = std::map<int, std::vector<int>>{};
+            for (auto &pVeh : fleet) {
+                const int numStops = routeState.numStopsOf(pVeh.vehicleId);
+                const int lastStopLocation = routeState.stopLocationsFor(pVeh.vehicleId)[numStops - 1];
+                
+                const int source = vehCh.rank(inputGraph.edgeHead(lastStopLocation));
+                auto targets = std::vector<int>{};
+                auto offsets = std::vector<int>{};
+
+                for (const auto pickup : requestState.pickups) {
+                    const int pickupVertex = inputGraph.edgeTail(pickup.loc);
+                    targets.push_back(vehCh.rank(pickupVertex));    
+                    offsets.push_back(inputGraph.travelTime(pickup.loc));
+                }
+
+                const auto distances = vehChQuery.runOneToMany(source, targets, offsets);
+                lastStopDistances[pVeh.vehicleId] = distances;
+            }
+
+            std::vector<const Vehicle*> *dropoffVehicles = dVehs.getVehicles();
             
+            for (auto &dVehConst : *dropoffVehicles) {
+                Vehicle* dVeh = const_cast<Vehicle*>(dVehConst);
+
+                // Calculate the distances between the pickups and the stops for the dropoff vehicle
+                std::map<int, std::vector<int>> pickupDistancesToStop = std::map<int, std::vector<int>>{};
+                const int numStopsDVeh = routeState.numStopsOf(dVeh->vehicleId);
+                const auto stopLocationsDVeh = routeState.stopLocationsFor(dVeh->vehicleId);
+                auto targets = std::vector<int>{};
+                auto offsets = std::vector<int>{};
+
+                for (const auto stopLocation : stopLocationsDVeh) {
+                    targets.push_back(vehCh.rank(inputGraph.edgeTail(stopLocation)));
+                    offsets.push_back(inputGraph.travelTime(stopLocation));
+                }
+
+                for (const auto &pickup: requestState.pickups) {
+                    const int source = vehCh.rank(inputGraph.edgeHead(pickup.loc));
+                    
+                    // Distances from the given pickup to the stops of the dVeh
+                    const auto distances = vehChQuery.runOneToMany(source, targets, offsets);
+                    pickupDistancesToStop[pickup.loc] = distances;
+                }
+
+                // Build the resulting assignments
+                for (auto &pVehConst : fleet) {
+                    Vehicle* pVeh = const_cast<Vehicle*>(&pVehConst);
+                    
+                    // Distances from the last stop of the pickup vehicle to every pickup location
+                    const auto lastStopDistancesPVeh = lastStopDistances[pVeh->vehicleId];
+                    // assert(lastStopDistances.size() == requestState.pickups.size());
+
+
+                    // INFO: Das dropoff ist hier schon bekannt
+                    for (int i = 0; i < requestState.pickups.size(); i++) {
+                        const auto pickupLoc = requestState.pickups[i];
+                        const auto distanceLastStopToPickup = lastStopDistancesPVeh[i];
+                        const auto distancesPickupToStopDVeh = pickupDistancesToStop[pickupLoc.loc];
+
+                        for (int j = 0; j < numStopsDVeh; j++) { // TODO Hier nochmal Gedanken machen, welche Indizes in Frage kommen
+                            const int distancePickupStopDVeh = distancesPickupToStopDVeh[j];
+                            const int numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
+
+                            TransferPoint tp;
+                            tp.pVeh = pVeh;
+                            tp.dVeh = dVeh;
+                            tp.loc = stopLocationsDVeh[j];
+                            
+                            tp.distancePVehToTransfer = distancePickupStopDVeh;
+                            tp.distancePVehFromTransfer = 0;
+                            tp.distanceDVehToTransfer = 0;
+                            tp.distanceDVehFromTransfer = 0;
+
+                            const int tIdxPVeh = numStopsPVeh - 1;
+                            const int tIdxDVeh = j;
+
+                            tp.dropoffAtTransferStopIdx = tIdxPVeh;
+                            tp.pickupFromTransferStopIdx = j;
+
+                            Pickup pickup = Pickup(pVeh);
+                            pickup.type = PDType::ALS;
+                            
+                            pickup.detourToPD = distanceLastStopToPickup;
+                            pickup.detourFromPD = 0;
+                            pickup.pdIdx = numStopsPVeh - 1;
+                            pickup.pdLocId = pickupLoc.id;
+                            pickup.walkingDistance = pickupLoc.walkingDist;
+
+                            // Build the (partial) assignemnt
+                            auto asgn = AssignmentWithTransfer(*pVeh, *dVeh, tp, pickup, pickupLoc, tIdxPVeh, tIdxDVeh);
+
+                            tryPartialAssignment(asgn);
+                        }
+                    }
+
+                    std::cout << "Promising Partials for Pickup & Transfer ALS in PVeh : " << promisingPartials.size() << std::endl;
+
+                    // TODO Find matching dropoffs
+
+                    promisingPartials.clear();
+                }
+            }
+
+
+
+            
+            std::cout << "REQUEST END" << std::endl;
+            std::cout << "- - - - - - - - - - - - - - - - - - - - //" << std::endl;
 
             const auto totalTime = totalTimer.elapsed<std::chrono::nanoseconds>();
 
@@ -234,9 +356,6 @@ namespace karri {
             const auto targetRanks = vehCh.allRanks(targets);
 
             const int lb = vehChQuery.runAnyShortestPath(sourceRanks, targetRanks);
-
-            // const int lbDij = dijSearchLowerBound.runAnyShortestPath(sources, targets);
-            //std::cout << "LB DIJ : " << lbDij << " =? LB CH : " << lb << std::endl;
             
             return lb; 
         }
@@ -439,8 +558,11 @@ namespace karri {
             auto ranks = std::vector<int>{};
 
             for (const auto stopLocation : stopLocationsDVeh) {
-                targets.push_back(inputGraph.edgeTail(stopLocation));
+                const int stopLocationVertex = inputGraph.edgeTail(stopLocation);
+                
+                targets.push_back(stopLocationVertex);
                 offsets.push_back(inputGraph.travelTime(stopLocation));
+                ranks.push_back(vehCh.rank(stopLocationVertex));
             }
 
             const auto sourceRank = vehCh.rank(sourceVertex);
@@ -463,7 +585,37 @@ namespace karri {
                 transferPointsALS.push_back(tp);
             }
             
-            // TODO Build partial assignments with the pickups and then try to find dropoffs
+            for (auto pickup : ordPickups) {
+                // Every ordinary pickups is possible, because the transfer is als
+                assert(numStopsPVeh > pickup.pdIdx);
+
+                for (const auto tp : transferPointsALS) {
+                    AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp, pickup, requestState.pickups[pickup.pdLocId], numStopsPVeh - 1, tp.pickupFromTransferStopIdx);
+                    
+                    std::cout << "Try this partial assignment" << std::endl;
+                    tryPartialAssignment(asgn);
+                    std::cout << "PP Size : " <<  promisingPartials.size() << std::endl;
+                }
+            }
+
+            for (auto pickup : bnsPickups) {
+                // Every ordinary pickups is possible, because the transfer is als
+                assert(numStopsPVeh > pickup.pdIdx);
+                for (const auto tp : transferPointsALS) {
+                    AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp, pickup, requestState.pickups[pickup.pdLocId], numStopsPVeh - 1, tp.pickupFromTransferStopIdx);
+
+                    std::cout << "Try this partial assignment" << std::endl;
+                    tryPartialAssignment(asgn);
+                    std::cout << "PP Size : " <<  promisingPartials.size() << std::endl;
+                }
+            }
+
+            std::cout << "Promising Partials for Transfer ALS in PVeh : " << promisingPartials.size() << std::endl;
+
+            tryOrdinaryDropoffs();
+            tryDropoffsBNS();
+            
+            // TODO Try to find dropoffs
         }
 
         void tryPartialAssignment(AssignmentWithTransfer &asgn) {
@@ -563,10 +715,8 @@ namespace karri {
 
             RequestCost assignmentCost;
             if (unfinished) {
-                // std::cout << "CALC BASE LOWER BOUND" << std::endl;
                 assignmentCost = calc.calcBaseLowerBound<true>(asgn, requestState);    
             } else {
-                std::cout << "CALC BASE" << std::endl;
                 assignmentCost = calc.calcBase<true>(asgn, requestState);
             }
 
@@ -835,6 +985,10 @@ namespace karri {
         }
 
         using VehCHQuery = typename VehCHEnvT::template FullCHQuery<>;
+
+        OrdinaryTransferFinder &ordinaryTransfers;
+        TransferALSPVehFinderT &transfersALSPVeh;
+        TransferALSDVehFinder &transfersALSDVeh;
 
         StrategyT &strategy;
         const Fleet &fleet;

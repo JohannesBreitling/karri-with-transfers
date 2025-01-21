@@ -61,59 +61,6 @@ namespace karri {
             const int numStopsDVeh = routeState.numStopsOf(dVeh.vehicleId);
             
             strategy.findTransferPoints(pVeh, dVeh, numStopsPVeh, numStopsDVeh, stopLocationsPVeh, stopLocationsDVeh, stopIdsPVeh, stopIdsDVeh);
-
-            
-
-
-
-            // int maxDetourPickup, int maxDetourDropoff, int pickupVehicleStop, int pickupVehicleNextStop, int dropoffVehicleStop, int dropoffVehicleNextStop
-
-
-
-            
-            /*
-            // Get the start locations for the searches, Caution: These locations are edges
-            assert(stopIdxPVeh + 1 < routeState.numStopsOf(pVeh.vehicleId));
-            assert(stopIdxDVeh + 1 < routeState.numStopsOf(dVeh.vehicleId));
-
-            int pickupVehicleStop = stopLocationsPVeh[stopIdxPVeh];
-            int pickupVehicleNextStop = stopLocationsPVeh[stopIdxPVeh + 1];
-            int dropoffVehicleStop = stopLocationsDVeh[stopIdxDVeh];
-            int dropoffVehicleNextStop = stopLocationsDVeh[stopIdxDVeh + 1];
-
-            // Get the stop ids of the stops
-            int stopIdPickup = routeState.stopIdsFor(pVeh.vehicleId)[stopIdxPVeh];
-            int stopIdDropoff = routeState.stopIdsFor(dVeh.vehicleId)[stopIdxDVeh];
-
-            // Get the hard constraints for stopping criterions for the dijkstra searches
-            int maxDetourPickup = routeState.leewayOfLegStartingAt(stopIdPickup);
-            int maxDetourDropoff = routeState.leewayOfLegStartingAt(stopIdDropoff);
-
-            if (maxDetourPickup < 0 || maxDetourDropoff < 0)
-                return;
-            
-            // Use the transfer point finder to find the possible transfer points
-            tpFinder.findTransferPoints(maxDetourPickup, maxDetourDropoff, pickupVehicleStop, pickupVehicleNextStop, dropoffVehicleStop, dropoffVehicleNextStop);
-
-            // Build the possible transfer points
-            std::vector<TransferPoint> tpsForStopPair = std::vector<TransferPoint>{};
-            for (auto &tp : possibleTransferPoints) {
-                tp.pVeh = &pVeh;
-                tp.dVeh = &dVeh;
-                tp.dropoffAtTransferStopIdx = stopIdxPVeh;
-                tp.pickupFromTransferStopIdx = stopIdxDVeh;
-            
-                tpsForStopPair.push_back(tp);
-            }
-
-            transferPoints[{stopIdxPVeh, stopIdxDVeh}] = tpsForStopPair;
-
-            
-
-            // Use the strategy to find the points for a possible transfer
-            strategy.setMaxDetours(maxDetourPickup, maxDetourDropoff);                    
-            strategy.findTransferPoints(pickupVehicleStop, pickupVehicleNextStop, dropoffVehicleStop, dropoffVehicleNextStop);
-            */
         }
 
     private:

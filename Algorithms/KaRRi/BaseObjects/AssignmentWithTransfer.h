@@ -28,51 +28,38 @@
 #include <cassert>
 
 #include "Algorithms/KaRRi/TransferPoints/TransferPoint.h"
-
+#include "Algorithms/KaRRi/BaseObjects/Vehicle.h"
 #include "Algorithms/KaRRi/BaseObjects/RequestCost.h"
+#include "Algorithms/KaRRi/BaseObjects/PD.h"
 
 namespace karri {
 
     struct AssignmentWithTransfer {
-        
+
         AssignmentWithTransfer() {}
-        // AssignmentWithTransfer(const AssignmentWithTransfer&) = default;
 
-        /*
-        AssignmentWithTransfer(const AssignmentWithTransfer &asgn) {
-            pVeh = asgn.pVeh;
-            pickup = asgn.pickup;
-            transfer = asgn.transfer;
-            pickupBNSLowerBoundUsed = asgn.pickupBNSLowerBoundUsed;
-            pickupPairedLowerBoundUsed = asgn.pickupPairedLowerBoundUsed;
-            pickupIdx = asgn.pickupIdx;
-            transferIdxPVeh = asgn.transferIdxPVeh;
-            transferIdxDVeh = asgn.transferIdxDVeh;
-
-            distToPickup = asgn.distToPickup;
-            distFromPickup = asgn.distFromPickup;
-            distToTransferPVeh = asgn.distToTransferPVeh;
-            distFromTransferPVeh = asgn.distFromTransferPVeh;
-            
-            distToTransferDVeh = asgn.distToTransferDVeh;
-            distFromTransferDVeh = asgn.distFromTransferDVeh;
-
-            costPVeh = asgn.costPVeh;
-            waitTimeAtPickup = asgn.waitTimeAtPickup;
-            arrAtTransferPoint = asgn.arrAtTransferPoint;
-
-            dVeh = asgn.dVeh;
-            dropoff = asgn.dropoff;
-            cost = asgn.cost;
-            dropoffIdx = asgn.dropoffIdx;
-
-            dropoffBNSLowerBoundUsed = asgn.dropoffBNSLowerBoundUsed;
-            dropoffPairedLowerBoundUsed = asgn.dropoffPairedLowerBoundUsed;
-
-            distToDropoff = asgn.distToDropoff;
-            distFromDropoff = asgn.distFromDropoff;
+        AssignmentWithTransfer(const Vehicle &pVehArg, const Vehicle &dVehArg, const TransferPoint tpArg) {
+            pVeh = &pVehArg;
+            dVeh = &dVehArg;
+            transfer = tpArg;
         }
-        */
+        
+        AssignmentWithTransfer(const Vehicle &pVehArg, const Vehicle &dVehArg, const TransferPoint tpArg, const PD pickupRelPDLoc, const PDLoc &pickupPDLoc, const int tIdxPVeh, const int tIdxDVeh) {
+            pVeh = &pVehArg;
+            dVeh = &dVehArg;
+            transfer = tpArg;
+            pickupIdx = pickupRelPDLoc.pdIdx;
+            transferIdxPVeh = tIdxPVeh;
+            transferIdxDVeh = tIdxDVeh;
+
+            pickup = &pickupPDLoc;
+            distToPickup = pickupRelPDLoc.detourToPD;
+            distFromPickup = pickupRelPDLoc.detourFromPD;
+            distToTransferPVeh = tpArg.distancePVehToTransfer;
+            distFromTransferPVeh = tpArg.distancePVehFromTransfer;
+            distToTransferDVeh = tpArg.distanceDVehToTransfer;
+            distFromTransferDVeh = tpArg.distanceDVehFromTransfer;
+        }
 
         const Vehicle *pVeh = nullptr;
         const Vehicle *dVeh = nullptr;

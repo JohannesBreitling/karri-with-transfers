@@ -45,8 +45,6 @@ namespace karri {
                 containedKeys = std::map<int, int>{};
                 vehicles = std::vector<const Vehicle*>{};
 
-                // TODO WARUM?????
-
                 ordPDs = std::map<int, std::vector<PD>>{};
                 bnsPDs = std::map<int, std::vector<PD>>{};
                 alsPDs = std::map<int, std::vector<PD>>{};

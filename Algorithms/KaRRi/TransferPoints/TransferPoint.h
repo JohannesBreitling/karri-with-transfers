@@ -7,12 +7,12 @@
 namespace karri {
 
     struct TransferPoint {
-
         TransferPoint() {}
+        TransferPoint(const Vehicle *pVeh, const Vehicle *dVeh) : pVeh(pVeh), dVeh(dVeh) {}
         TransferPoint(const TransferPoint&) = default;
 
-        Vehicle *pVeh = nullptr;
-        Vehicle *dVeh = nullptr;
+        const Vehicle *pVeh = nullptr;
+        const Vehicle *dVeh = nullptr;
 
         int dropoffAtTransferStopIdx = INVALID_INDEX;
         int pickupFromTransferStopIdx = INVALID_INDEX;
