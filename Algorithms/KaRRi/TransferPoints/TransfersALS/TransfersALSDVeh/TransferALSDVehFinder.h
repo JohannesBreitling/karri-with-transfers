@@ -3,7 +3,7 @@
 
 namespace karri {
 
-template<typename TransferALSStrategyT /*, typename InputGraphT, typename VehCHEnvT*/>
+template<typename TransferALSStrategyT, typename TransfersDropoffALSStrategyT>
 class TransferALSDVehFinder {
     
     // The dVeh drives the detour to the transfer point
@@ -13,9 +13,9 @@ class TransferALSDVehFinder {
     public:
         TransferALSDVehFinder(
             TransferALSStrategyT &strategy,
+            TransfersDropoffALSStrategyT &dropoffALSStrategy,
             const RelevantPDLocs &relORDPickups,
             const RelevantPDLocs &relBNSPickups,
-            const RelevantPDLocs &relORDDropoffs,
             const Fleet &fleet,
             const RouteState &routeState,
             RequestState &requestState,
@@ -23,6 +23,7 @@ class TransferALSDVehFinder {
             const VehCHEnvT &vehChEnv,*/
             CostCalculator &calc
         ) : strategy(strategy),
+            dropoffALSStrategy(dropoffALSStrategy),
             relORDPickups(relORDPickups),
             relBNSPickups(relBNSPickups),
             fleet(fleet),
@@ -34,6 +35,8 @@ class TransferALSDVehFinder {
             calc(calc) {}
 
     void findAssignments() {
+        std::cout << "Find Assignments with Transfer ALS DVeh\n";
+
         findAssignmentsWithDropoffALS();
     }
 
@@ -47,7 +50,44 @@ class TransferALSDVehFinder {
 
             // The vehicle set for the dropoff is the set of vehicles for the ALS dropoff
             // The distance from the last stop to the dropoff is a lower bound for the distance from the last stop to the dropoff via the transfer point
-            // TODO Implement the IndividiualBCHStrategy DALS
+            
+            // TODO Hier muss man zuerst noch andere Sachen berechnen....
+            
+            const auto dVehIds = dropoffALSStrategy.findDropoffsAfterLastStop();
+
+            for (const auto &dVehId : dVehIds) {
+                for (const auto dropoff : requestState.dropoffs) {
+                    const auto &dVeh = &fleet[dVehId];
+                    // Get the distance from the last stop of the dVeh to the dropoff
+                    int distanceLastStopToDropoff = dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
+
+                    (void) dVeh;
+                    (void) distanceLastStopToDropoff;
+
+
+                    /*
+                    for (const pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
+                        const auto &pVeh = &fleet[pVehId];
+                        
+                        for (const auto &pickup : relBNSPickups.relevantSpotsFor(pVehId)) {
+                            // Build the resulting assignment
+                        }
+                    }
+
+                    for (const pVehId : relORDPickups.getVehiclesWithRelevantPDLocs()) {
+                        const auto &pVeh = &fleet[pVehId];
+                        
+                        for (const auto &pickup : relORDPickups.relevantSpotsFor(pVehId)) {
+                            // Build the resulting assignment
+
+                        }
+                    }*/
+                
+                    
+                }
+            }
+
+
             // TODO Implement the ALS strategy to find the distances
 
 
@@ -55,12 +95,18 @@ class TransferALSDVehFinder {
             for (const auto &pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
                 auto *pVeh = &fleet[pVehId];
                 const auto numStopsPVeh = routeState.numStopsOf(pVehId);
+
+                (void) pVeh;
+                (void) numStopsPVeh;
             }
             
             // Loop over all possible vehicle pairs
             for (const auto &pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
                 auto *pVeh = &fleet[pVehId];
                 const auto numStopsPVeh = routeState.numStopsOf(pVehId);
+
+                (void) pVeh;
+                (void) numStopsPVeh;
             }
                 /*
                 // Try ORD dropoff
@@ -131,6 +177,7 @@ class TransferALSDVehFinder {
         }
 
         TransferALSStrategyT &strategy;
+        TransfersDropoffALSStrategyT &dropoffALSStrategy;
 
         const RelevantPDLocs &relORDPickups;
         const RelevantPDLocs &relBNSPickups;
@@ -138,9 +185,6 @@ class TransferALSDVehFinder {
         const Fleet &fleet;
         const RouteState &routeState;
         RequestState &requestState;
-        /* const InputGraphT &inputGraph;
-        const CH &vehCh;
-        VehCHQuery vehChQuery; */
 
         CostCalculator &calc;
 

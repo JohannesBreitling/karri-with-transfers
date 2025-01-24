@@ -5,7 +5,7 @@
 
 namespace karri {
 
-    template<typename TransferALSStrategyT, typename InputGraphT, typename VehCHEnvT>
+    template<typename TransferALSStrategyT, typename TransfersPickupALSStrategyT, typename TransfersDropoffALSStrategyT>
     class TransferALSPVehFinder {
         
     // The pVeh drives the detour to the transfer point
@@ -14,43 +14,51 @@ namespace karri {
     // The pickup could be BNS, ORD or ALS
     public:
 
+        using RelevantPDLoc = RelevantPDLocs::RelevantPDLoc;
+
         TransferALSPVehFinder(
             TransferALSStrategyT &strategy,
+            TransfersPickupALSStrategyT &pickupALSStrategy,
+            TransfersDropoffALSStrategyT &dropoffALSStrategy,
             const RelevantPDLocs &relORDPickups,
             const RelevantPDLocs &relBNSPickups,
             const RelevantPDLocs &relORDDropoffs,
             const Fleet &fleet,
             const RouteState &routeState,
             RequestState &requestState,
-            /*const InputGraphT &inputGraph,
-            const VehCHEnvT &vehChEnv,*/
             CostCalculator &calc
         ) : strategy(strategy),
+            pickupALSStrategy(pickupALSStrategy),
+            dropoffALSStrategy(dropoffALSStrategy),
             relORDPickups(relORDPickups),
             relBNSPickups(relBNSPickups),
             relORDDropoffs(relORDDropoffs),
             fleet(fleet),
             routeState(routeState),
             requestState(requestState),
-            /*inputGraph(inputGraph),
-            vehCh(vehChEnv.getCH()),
-            vehChQuery(vehChEnv.template getFullCHQuery<>()),*/
             calc(calc) {}
 
         void findAssignments() {
+            std::cout << "Find Assignments with Transfer ALS PVeh\n";
+
             // Reset the last stop distances
             lastStopDistances = std::map<int, std::map<int, std::vector<int>>>{};
 
-            if ((relORDPickups.getVehiclesWithRelevantPDLocs().size() == 0 && relBNSPickups.getVehiclesWithRelevantPDLocs().size() == 0) || relORDDropoffs.getVehiclesWithRelevantPDLocs().size() == 0) {
-                // No assignment can be found when no vehicle pairs can be built
-                return;
-            }
-
-            //* Calculate the distances from the last stop of the pickup vehicles to all possible stops of the dropoff vehicles
-            for (const auto &pVehId : relORDPickups.getVehiclesWithRelevantPDLocs()) {
+            //* Calculate the distances from the last stop of the pickup vehicles to all possible stops of the dropoff vehicles (for the case that the pickup is ORD or BNS)
+            
+            const auto dVehALSIds = dropoffALSStrategy.findDropoffsAfterLastStop();
+            for (const auto pVehId : relORDPickups.getVehiclesWithRelevantPDLocs()) {
                 const auto &pVeh = &fleet[pVehId];
                 
-                for (const auto &dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
+                for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
+                    const auto &dVeh = &fleet[dVehId];
+                    const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
+
+                    // Save the distances for building the assignments later
+                    lastStopDistances[pVehId][dVehId] = distances;
+                }
+
+                for (const auto dVehId : dVehALSIds) {
                     const auto &dVeh = &fleet[dVehId];
                     const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
 
@@ -59,15 +67,23 @@ namespace karri {
                 }
             }
 
-            for (const auto &pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
+            for (const auto pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
                 const auto &pVeh = &fleet[pVehId];
                 
-                for (const auto &dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
+                for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
                     const auto &dVeh = &fleet[dVehId];
                     const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
 
                     // Save the distances for building the assignments later
                     lastStopDistances[pVehId][dVehId] = distances;   
+                }
+
+                for (const auto dVehId : dVehALSIds) {
+                    const auto &dVeh = &fleet[dVehId];
+                    const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
+
+                    // Save the distances for building the assignments later
+                    lastStopDistances[pVehId][dVehId] = distances;
                 }
             }
             
@@ -84,71 +100,14 @@ namespace karri {
                 return;
             }
 
-            // Loop over all possible vehicle pairs
-            for (const auto &pVehId : relORDPickups.getVehiclesWithRelevantPDLocs()) {
+            // Loop over all possible vehicles and pickups
+            for (const auto pVehId : relORDPickups.getVehiclesWithRelevantPDLocs()) {
                 auto *pVeh = &fleet[pVehId];
-                const auto numStopsPVeh = routeState.numStopsOf(pVehId);
 
-                // Try ORD dropoff
-                for (const auto &dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
-                    auto *dVeh = &fleet[dVehId];
-                    const auto numStopsDVeh = routeState.numStopsOf(dVehId);
-                    const auto stopLocations = routeState.stopLocationsFor(dVehId);
-
-                    const auto distances = lastStopDistances[pVehId][dVehId];
-
-                    // Loop over the possible pickup dropoff combinations
-                    for (const auto &pickup : relORDPickups.relevantSpotsFor(pVehId)) {
-                        for (const auto &dropoff : relORDDropoffs.relevantSpotsFor(dVehId)) {
-                            assert(dropoff.stopIndex < numStopsDVeh);
-
-                            // Try all possible transfer points
-                            for (int i = 0; i < dropoff.stopIndex; i++) {
-                                // Build the resulting assignment
-                                TransferPoint tp;
-                                tp.pVeh = pVeh;
-                                tp.dVeh = dVeh;
-                                tp.loc = stopLocations[i];
-                                tp.distancePVehToTransfer = distances[i];
-                                tp.distancePVehFromTransfer = 0; 
-                                tp.distanceDVehToTransfer = 0;
-                                tp.distanceDVehFromTransfer = 0;
-
-                                AssignmentWithTransfer asgn = AssignmentWithTransfer(*pVeh, *dVeh, tp);
-                                asgn.pickup = &requestState.pickups[pickup.pdId];
-                                asgn.dropoff = &requestState.dropoffs[dropoff.pdId];
-                                
-                                
-                                asgn.distToPickup = pickup.distToPDLoc;
-                                asgn.distFromPickup = pickup.distFromPDLocToNextStop;
-                                
-                                asgn.distToTransferPVeh = distances[i];
-                                asgn.distFromTransferPVeh = 0;
-                                asgn.distToTransferDVeh = 0; // We perform a transfer at stop
-                                asgn.distFromTransferDVeh = 0;
-                                
-                                asgn.distToDropoff = dropoff.distToPDLoc;
-                                asgn.distFromDropoff = dropoff.distFromPDLocToNextStop;
-                                
-                                asgn.pickupIdx = pickup.stopIndex;
-                                asgn.transferIdxPVeh = numStopsPVeh - 1;
-                                asgn.transferIdxDVeh = i;
-                                asgn.dropoffIdx = dropoff.stopIndex;
-
-                                (void) asgn;
-
-                                // Assignemnt built, in this case we dont use any lower bounds, so we can directly try the assignment
-                                std::cout << "Try Assignment with Pickup ORD, Transfer ALS\n";
-                                
-                                // TODO  requestState.tryAssignment(asgn);
-                            }
-                        }
-                    }
+                for (const auto &pickup : relORDPickups.relevantSpotsFor(pVehId)) {
+                    tryDropoffORD(pVeh, pickup);
+                    tryDropoffALS(pVeh, pickup);
                 }
-
-                // Try dropoff ALS
-                // TODO Implement IndividiualBCHStrategy DALS
-
             }
         }
 
@@ -157,91 +116,256 @@ namespace karri {
             if (relBNSPickups.getVehiclesWithRelevantPDLocs().size() == 0) {
                 return;
             }
-            
-            // Loop over all possible vehicle pairs
-            for (const auto &pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
+
+            // Loop over all possible vehicles and pickups
+            for (const auto pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
                 auto *pVeh = &fleet[pVehId];
-                const auto numStopsPVeh = routeState.numStopsOf(pVehId);
 
-                // Try ORD dropoff
-                for (const auto &dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
-                    auto *dVeh = &fleet[dVehId];
-                    const auto numStopsDVeh = routeState.numStopsOf(dVehId);
-                    const auto stopLocations = routeState.stopLocationsFor(dVehId);
-
-                    const auto distances = lastStopDistances[pVehId][dVehId];
-
-                    // Loop over the possible pickup dropoff combinations
-                    for (const auto &pickup : relBNSPickups.relevantSpotsFor(pVehId)) {
-                        assert(pickup.stopIndex == 0);
-                        for (const auto &dropoff : relORDDropoffs.relevantSpotsFor(dVehId)) {
-                            assert(dropoff.stopIndex < numStopsDVeh);
-
-                            // Try all possible transfer points
-                            for (int i = 0; i < dropoff.stopIndex; i++) {
-                                // Build the resulting assignment
-                                TransferPoint tp;
-                                tp.pVeh = pVeh;
-                                tp.dVeh = dVeh;
-                                tp.loc = stopLocations[i];
-                                tp.distancePVehToTransfer = distances[i];
-                                tp.distancePVehFromTransfer = 0; 
-                                tp.distanceDVehToTransfer = 0;
-                                tp.distanceDVehFromTransfer = 0;
-
-                                AssignmentWithTransfer asgn = AssignmentWithTransfer(*pVeh, *dVeh, tp);
-                                asgn.pickup = &requestState.pickups[pickup.pdId];
-                                asgn.dropoff = &requestState.dropoffs[dropoff.pdId];
-                                
-                                
-                                asgn.distToPickup = pickup.distToPDLoc;
-                                asgn.distFromPickup = pickup.distFromPDLocToNextStop;
-                                
-                                asgn.distToTransferPVeh = distances[i];
-                                asgn.distFromTransferPVeh = 0;
-                                asgn.distToTransferDVeh = 0; // We perform a transfer at stop
-                                asgn.distFromTransferDVeh = 0;
-                                
-                                asgn.distToDropoff = dropoff.distToPDLoc;
-                                asgn.distFromDropoff = dropoff.distFromPDLocToNextStop;
-                                
-                                asgn.pickupIdx = pickup.stopIndex;
-                                asgn.transferIdxPVeh = numStopsPVeh - 1;
-                                asgn.transferIdxDVeh = i;
-                                asgn.dropoffIdx = dropoff.stopIndex;
-
-                                (void) asgn;
-
-                                // Assignemnt built, in this case we dont use any lower bounds, so we can directly try the assignment
-                                std::cout << "Try Assignment with Pickup BNS, Transfer ALS\n";
-                                
-                                // TODO  requestState.tryAssignment(asgn);
-                            }
-                        }
-                    }
+                for (const auto &pickup : relORDPickups.relevantSpotsFor(pVehId)) {
+                    tryDropoffORD(pVeh, pickup);
+                    tryDropoffALS(pVeh, pickup);
                 }
-
-                // Try dropoff ALS
-                // TODO Implement IndividiualBCHStrategy DALS
-
             }
         }
-        
 
 
         void findAssignmentsWithPickupALS() {
-            // In this case we consider the pickup to be ALS
-            // TODO Implement IndividiualBCHStrategy PALS
+            //* In this case we consider all vehicles that are able to perform the pickup ALS
+            const auto pVehIds = pickupALSStrategy.findPickupsAfterLastStop();
 
-            //* Calculate the distances from the pickup to the stops of the dropoff vehicle
-            // TODO Use the ALS strategy to find the distances
+            if (pVehIds.size() == 0)
+                return;
 
-        
+            for (const auto pVehId : pVehIds) {
+                const auto &pVeh = fleet[pVehId]; 
+
+                for (const auto pickup : requestState.pickups) {
+                    // Get the distance from the last stop of the pVeh to the pickup
+                    const auto distanceToPickup = pickupALSStrategy.getDistanceToPickup(pVehId, pickup.id);
+                    tryDropoffORDForPickupALS(pVeh, pickup, distanceToPickup);
+                    tryDropoffALSForPickupALS(pVeh, pickup, distanceToPickup);
+                }
+            }
         }
 
-        // using VehCHQuery = typename VehCHEnvT::template FullCHQuery<>;
+
+        void tryDropoffORDForPickupALS(const Vehicle &pVeh, const PDLoc pickup, const int distanceToPickup) {
+            const auto numStopsPVeh = routeState.numStopsOf(pVeh.vehicleId);
+            
+            // Loop over all the possible dropoff vehicles and dropoffs
+            for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
+                const auto &dVeh = fleet[dVehId];
+                const auto numStopsDVeh = routeState.numStopsOf(dVehId);
+                const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
+                
+                // Calculate the distances from the pickup to the stops of the dropoff vehicle
+                const auto distancesToTransfer = strategy.calculateDistancesFromPickupToAllStops(pickup.loc, dVeh);
+                
+                for (const auto &dropoff : relORDDropoffs.relevantSpotsFor(dVehId)) {
+                    // Try all possible transfer points
+                    for (int i = dropoff.stopIndex; i > 0; i--) {
+                        assert(numStopsDVeh - 1 == distancesToTransfer.size());
+                        
+                        // Build the transfer point
+                        const int transferLoc = stopLocationsDVeh[i];
+                        const int distancePVehToTransfer = distancesToTransfer[i - 1];
+                        
+                        TransferPoint tp = TransferPoint(transferLoc, &pVeh, &dVeh, numStopsPVeh, i, distancePVehToTransfer, 0, 0, 0);
+
+                        // Build the assignment
+                        AssignmentWithTransfer asgn = AssignmentWithTransfer(&pVeh, &dVeh, tp);
+
+                        const auto *dropoffPDLoc = &requestState.dropoffs[dropoff.pdId];
+                        asgn.pickup = &pickup;
+                        asgn.dropoff = dropoffPDLoc;
+                        asgn.distToPickup = distanceToPickup;
+                        asgn.distFromPickup = 0;
+                        asgn.distToDropoff = dropoff.distToPDLoc;
+                        asgn.distFromDropoff = dropoff.distFromPDLocToNextStop;
+
+                        asgn.distToTransferPVeh = distancePVehToTransfer;
+                        asgn.distFromTransferPVeh = 0;
+                        asgn.distToTransferDVeh = 0;
+                        asgn.distFromTransferDVeh = 0;
+
+                        asgn.pickupIdx = numStopsPVeh - 1;
+                        asgn.dropoffIdx = dropoff.stopIndex;
+                        asgn.transferIdxPVeh = numStopsPVeh - 1;
+                        asgn.transferIdxDVeh = i;
+
+                        // Try the finished assignment with ORD dropoff
+                        requestState.tryAssignment(asgn);
+                    }
+                }
+            }
+        }
+
+        void tryDropoffALSForPickupALS(const Vehicle &pVeh, const PDLoc pickup, const int distanceToPickup) {
+            // In this case we consider all the vehicles that are able to perform the dropoff ALS
+            const auto dVehIds = dropoffALSStrategy.findDropoffsAfterLastStop();
+            const auto numStopsPVeh = routeState.numStopsOf(pVeh.vehicleId);
+
+            if (dVehIds.size() == 0)
+                return;
+
+            // Loop over all the possible dropoff vehicles and dropoffs
+            for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
+                const auto &dVeh = fleet[dVehId];
+                const auto numStopsDVeh = routeState.numStopsOf(dVehId);
+                const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
+                
+                // Calculate the distances from the pickup to the stops of the dropoff vehicle
+                const auto distancesToTransfer = strategy.calculateDistancesFromPickupToAllStops(pickup.loc, dVeh);
+
+                for (const auto &dropoff : requestState.dropoffs) {
+                    assert(numStopsDVeh - 1 == distancesToTransfer.size());
+
+                    // Try all possible transfer points
+                    for (int i = 1; i < numStopsDVeh; i++) {
+                        // Build the transfer point
+                        const int transferLoc = stopLocationsDVeh[i];
+                        const int distancePVehToTransfer = distancesToTransfer[i - 1];
+
+                        TransferPoint tp = TransferPoint(transferLoc, &pVeh, &dVeh, numStopsPVeh, i, distancePVehToTransfer, 0, 0, 0);
+
+                        // Build the assignment
+                        AssignmentWithTransfer asgn = AssignmentWithTransfer(&pVeh, &dVeh, tp);
+                        
+                        asgn.pickup = &pickup;
+                        asgn.dropoff = &dropoff;
+
+                        asgn.distToPickup = distanceToPickup;
+                        asgn.distFromPickup = 0;
+
+                        asgn.distToTransferPVeh = distancePVehToTransfer;
+                        asgn.distFromTransferPVeh = 0;
+                        asgn.distToTransferDVeh = 0;
+                        asgn.distFromTransferDVeh = 0;
+
+                        asgn.distToDropoff = dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
+                        asgn.distFromDropoff = 0;
+
+                        asgn.pickupIdx = numStopsPVeh - 1;
+                        asgn.dropoffIdx = numStopsDVeh - 1;
+                        asgn.transferIdxPVeh = numStopsPVeh - 1;
+                        asgn.transferIdxDVeh = i;
+
+                        // Try the finished assignment with ORD dropoff
+                        requestState.tryAssignment(asgn);
+                    }
+                }
+            }
+        }
+
+        void tryDropoffORD(const Vehicle *pVeh, const RelevantPDLoc &pickup) {
+            const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
+            const auto *pickupPDLoc = &requestState.pickups[pickup.pdId];
+
+            // Loop over all the possible dropoff vehicles and dropoffs
+            for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
+                const auto &dVeh = fleet[dVehId];
+                const auto numStopsDVeh = routeState.numStopsOf(dVehId);
+                const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
+                
+                for (const auto &dropoff : relORDDropoffs.relevantSpotsFor(dVehId)) {
+                    const auto *dropoffPDLoc = &requestState.dropoffs[dropoff.pdId];
+
+                    // Try all possible transfer points
+                    for (int i = dropoff.stopIndex; i > 0; i--) {
+                        assert(numStopsDVeh - 1 == lastStopDistances[pVeh->vehicleId][dVeh.vehicleId].size());
+                        
+                        // Build the transfer point
+                        const int transferLoc = stopLocationsDVeh[i];
+                        const int distancePVehToTransfer = lastStopDistances[pVeh->vehicleId][dVeh.vehicleId][i - 1];
+                        
+                        TransferPoint tp = TransferPoint(transferLoc, pVeh, &dVeh, numStopsPVeh, i, distancePVehToTransfer, 0, 0, 0);
+
+                        // Build the assignment
+                        AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, &dVeh, tp);
+
+                        asgn.pickup = pickupPDLoc;
+                        asgn.dropoff = dropoffPDLoc;
+                        asgn.distToPickup = pickup.distToPDLoc;
+                        asgn.distFromPickup = pickup.distFromPDLocToNextStop;
+                        asgn.distToDropoff = dropoff.distToPDLoc;
+                        asgn.distFromDropoff = dropoff.distFromPDLocToNextStop;
+
+                        asgn.distToTransferPVeh = distancePVehToTransfer;
+                        asgn.distFromTransferPVeh = 0;
+                        asgn.distToTransferDVeh = 0;
+                        asgn.distFromTransferDVeh = 0;
+
+                        asgn.pickupIdx = pickup.stopIndex;
+                        asgn.dropoffIdx = dropoff.stopIndex;
+                        asgn.transferIdxPVeh = numStopsPVeh - 1;
+                        asgn.transferIdxDVeh = i;
+
+                        // Try the finished assignment with ORD dropoff
+                        requestState.tryAssignment(asgn);
+                    }
+                }
+            }
+        }
+
+        void tryDropoffALS(const Vehicle *pVeh, const RelevantPDLoc &pickup) {
+            // In this case we consider all the vehicles that are able to perform the dropoff ALS
+            const auto dVehIds = dropoffALSStrategy.findDropoffsAfterLastStop();
+            
+            if (dVehIds.size() == 0)
+                return; 
+
+            const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
+
+            // Loop over all the possible dropoff vehicles and dropoffs
+            for (const auto dVehId : dVehIds) {
+                const auto &dVeh = fleet[dVehId];
+                const auto numStopsDVeh = routeState.numStopsOf(dVehId);
+                const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
+                
+                for (const auto dropoff : requestState.dropoffs) {
+                    assert(numStopsDVeh - 1 == lastStopDistances[pVeh->vehicleId][dVeh.vehicleId].size());
+
+                    // Try all possible transfer points
+                    for (int i = 1; i < numStopsDVeh; i++) {
+                        // Build the transfer point
+                        const int transferLoc = stopLocationsDVeh[i];
+                        const int distancePVehToTransfer = lastStopDistances[pVeh->vehicleId][dVeh.vehicleId][i - 1];
+
+                        TransferPoint tp = TransferPoint(transferLoc, pVeh, &dVeh, numStopsPVeh, i, distancePVehToTransfer, 0, 0, 0);
+
+                        // Build the assignment
+                        AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, &dVeh, tp);
+                        const auto *pickupPDLoc = &requestState.pickups[pickup.pdId];
+                        asgn.pickup = pickupPDLoc;
+                        asgn.dropoff = &dropoff;
+
+                        asgn.distToPickup = pickup.distToPDLoc;
+                        asgn.distFromPickup = pickup.distFromPDLocToNextStop;
+
+                        asgn.distToTransferPVeh = distancePVehToTransfer;
+                        asgn.distFromTransferPVeh = 0;
+                        asgn.distToTransferDVeh = 0;
+                        asgn.distFromTransferDVeh = 0;
+
+                        asgn.distToDropoff = dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
+                        asgn.distFromDropoff = 0;
+
+                        asgn.pickupIdx = pickup.stopIndex;
+                        asgn.dropoffIdx = numStopsDVeh - 1;
+                        asgn.transferIdxPVeh = numStopsPVeh - 1;
+                        asgn.transferIdxDVeh = i;
+
+                        // Try the finished assignment with ORD dropoff
+                        requestState.tryAssignment(asgn);
+                    }
+                }
+            }
+        }
+
 
         TransferALSStrategyT &strategy;
+        TransfersPickupALSStrategyT &pickupALSStrategy;
+        TransfersDropoffALSStrategyT &dropoffALSStrategy;
 
         const RelevantPDLocs &relORDPickups;
         const RelevantPDLocs &relBNSPickups;

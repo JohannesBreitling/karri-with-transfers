@@ -111,14 +111,6 @@ namespace karri {
             return asgn.arrAtTransferPoint + InputConfig::getInstance().maxWaitTime - asgn.waitTimeAtPickup;
         }
 
-        // Information about best known assignment for current request
-
-        // TODO Just for testing purpose (s. t. AssignmentWithTransfer is the best assignment and will be inserted)
-        void clearAssignment() {
-            bestCost = INFTY;
-            bestAssignment = Assignment();           
-        }
-
         const Assignment &getBestAssignment() const {
             return bestAssignment;
         }
@@ -127,15 +119,25 @@ namespace karri {
             return bestAssignmentWithTransfer;
         }
 
-        void tryAssignmentWithTransfer(const AssignmentWithTransfer &asgn) {
+        void tryAssignment(AssignmentWithTransfer &asgn) {
             
-            if (asgn.cost.total >= bestCostWithTransfer) {
-                return;
+            RequestCost cost;
+            if (!asgn.isFinished()) {
+                cost = calculator.calcLowerBound(asgn, *this);
+            } else {
+                cost = calculator.calc(asgn, *this);
             }
-            
-            bestCostWithTransfer = asgn.cost.total;
-            bestAssignmentWithTransfer = AssignmentWithTransfer(asgn);
+
+            if (cost.total >= INFTY /* || cost.total >= bestCost */)
+                return;
+
+            std::cout << "There are possible assignments, that have a cost of less then INFTY: " << cost.total << "\n";
+            // TODO Check if the the assignment is finished, and if not, then add it to the potential unfinished assignments
         }
+        
+        
+        
+        
 
         bool improvementThroughTransfer() const {
             return bestCostWithTransfer < bestCost;

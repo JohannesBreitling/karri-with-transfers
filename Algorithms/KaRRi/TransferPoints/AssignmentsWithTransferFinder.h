@@ -38,14 +38,14 @@
 
 namespace karri {
 
-    template <typename StrategyT, typename InputGraphT, typename VehCHEnvT, typename CurVehLocToPickupSearchesT, typename DijLabelSet, typename TransferALSPVehFinderT>
+    template <typename StrategyT, typename InputGraphT, typename VehCHEnvT, typename CurVehLocToPickupSearchesT, typename DijLabelSet, typename TransferALSPVehFinderT, typename TransferALSDVehFinderT>
     class AssignmentsWithTransferFinder {
 
     public:
         AssignmentsWithTransferFinder(
             OrdinaryTransferFinder &ordinaryTransfers,
             TransferALSPVehFinderT &transfersALSPVeh,
-            TransferALSDVehFinder &transfersALSDVeh,
+            TransferALSDVehFinderT &transfersALSDVeh,
             StrategyT strategy,
             const Fleet &fleet, const RouteState &routeState,
             RequestState &requestState,
@@ -728,7 +728,7 @@ namespace karri {
                 return;
             }
 
-            requestState.tryAssignmentWithTransfer(asgn);
+            // requestState.tryAssignmentWithTransfer(asgn);
         }
 
         void finishAssignments(Vehicle &pVeh, Vehicle &dVeh) {
@@ -777,7 +777,7 @@ namespace karri {
 
                 if (!unfinished) {
                     std::cout << "VERBESSERUNG!!!!" << std::endl;
-                    requestState.tryAssignmentWithTransfer(asgn);
+                    // requestState.tryAssignmentWithTransfer(asgn);
                     continue;
                 }
 
@@ -837,7 +837,7 @@ namespace karri {
 
                 if (!unfinished) {
                     std::cout << "VERBESSERUNG!!!!" << std::endl;
-                    requestState.tryAssignmentWithTransfer(asgn);
+                    // requestState.tryAssignmentWithTransfer(asgn);
                     continue;
                 }
 
@@ -888,7 +888,7 @@ namespace karri {
 
                 if (!unfinished) {
                     std::cout << "VERBESSERUNG!!!!" << std::endl;
-                    requestState.tryAssignmentWithTransfer(asgn);
+                    // requestState.tryAssignmentWithTransfer(asgn);
                     continue;
                 }
 
@@ -941,7 +941,7 @@ namespace karri {
 
                 
                 std::cout << "VERBESSERUNG!!!!" << std::endl;
-                requestState.tryAssignmentWithTransfer(asgn);
+                // requestState.tryAssignmentWithTransfer(asgn);
                 continue;
             }
 
@@ -988,7 +988,7 @@ namespace karri {
 
         OrdinaryTransferFinder &ordinaryTransfers;
         TransferALSPVehFinderT &transfersALSPVeh;
-        TransferALSDVehFinder &transfersALSDVeh;
+        TransferALSDVehFinderT &transfersALSDVeh;
 
         StrategyT &strategy;
         const Fleet &fleet;

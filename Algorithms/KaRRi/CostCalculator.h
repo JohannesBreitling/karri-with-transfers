@@ -106,13 +106,24 @@ namespace karri {
                             actualDepTimeAtPickup, dropoffAtExistingStop, addedTripTime);
         }
 
+        template<typename RequestContext>
+        RequestCost calc(AssignmentWithTransfer &asgn, RequestContext &context) const {
+            return calcBase<true, true>(asgn, context);
+        }
+        
+        template<typename RequestContext>
+        RequestCost calcLowerBound(AssignmentWithTransfer &asgn, RequestContext &context) const {
+            return calcBaseLowerBound<true, true>(asgn, context);
+        }
+
+
         template<bool checkHardConstraints, typename RequestContext>
-        RequestCost calcBase(AssignmentWithTransfer &asgn, const RequestContext &context) {
+        RequestCost calcBase(AssignmentWithTransfer &asgn, const RequestContext &context) const {
             return calcBase<checkHardConstraints, false>(asgn, context);
         }
         
         template<bool checkHardConstraints, bool recomputePVeh, typename RequestContext>
-        RequestCost calcBase(AssignmentWithTransfer &asgn, const RequestContext &context) {
+        RequestCost calcBase(AssignmentWithTransfer &asgn, const RequestContext &context) const {
             bool unfinishedPVeh = asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed;
 
             if (recomputePVeh && unfinishedPVeh) {
@@ -172,12 +183,12 @@ namespace karri {
         }
 
         template<bool checkHardConstraints, typename RequestContext>
-        RequestCost calcBaseLowerBound(AssignmentWithTransfer &asgn, const RequestContext &context) {
+        RequestCost calcBaseLowerBound(AssignmentWithTransfer &asgn, const RequestContext &context) const {
             return calcBaseLowerBound<checkHardConstraints, false>(asgn, context);
         }
 
         template<bool checkHardConstraints, bool recomputePVeh, typename RequestContext>
-        RequestCost calcBaseLowerBound(AssignmentWithTransfer &asgn, const RequestContext &context) {
+        RequestCost calcBaseLowerBound(AssignmentWithTransfer &asgn, const RequestContext &context) const {
             bool unfinishedPVeh = asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed;
 
             if (recomputePVeh && unfinishedPVeh) {
@@ -903,7 +914,7 @@ namespace karri {
         }
 
         template<typename RequestContext>
-        RequestCost calcFinalCost(AssignmentWithTransfer &asgn, const RequestContext &context, const int initialTransferDetour, const int residualDetourAtEnd, const int actualDepTimeAtTransfer, const bool dropoffAtExistingStop, const int addedTripTime) {
+        RequestCost calcFinalCost(AssignmentWithTransfer &asgn, const RequestContext &context, const int initialTransferDetour, const int residualDetourAtEnd, const int actualDepTimeAtTransfer, const bool dropoffAtExistingStop, const int addedTripTime) const {
             if (!asgn.dVeh || !asgn.pVeh || !asgn.pickup || !asgn.dropoff) {
                 asgn.cost.total = INFTY;
                 

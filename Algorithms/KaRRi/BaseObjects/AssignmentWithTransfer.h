@@ -38,6 +38,12 @@ namespace karri {
 
         AssignmentWithTransfer() {}
 
+        AssignmentWithTransfer(const Vehicle *pVehArg, const Vehicle *dVehArg, const TransferPoint tpArg) {
+            pVeh = pVehArg;
+            dVeh = dVehArg;
+            transfer = tpArg;
+        }
+
         AssignmentWithTransfer(const Vehicle &pVehArg, const Vehicle &dVehArg, const TransferPoint tpArg) {
             pVeh = &pVehArg;
             dVeh = &dVehArg;
@@ -59,6 +65,10 @@ namespace karri {
             distFromTransferPVeh = tpArg.distancePVehFromTransfer;
             distToTransferDVeh = tpArg.distanceDVehToTransfer;
             distFromTransferDVeh = tpArg.distanceDVehFromTransfer;
+        }
+
+        bool isFinished() const {
+            return !pickupBNSLowerBoundUsed && !pickupPairedLowerBoundUsed && !dropoffBNSLowerBoundUsed && !!dropoffPairedLowerBoundUsed;
         }
 
         const Vehicle *pVeh = nullptr;
