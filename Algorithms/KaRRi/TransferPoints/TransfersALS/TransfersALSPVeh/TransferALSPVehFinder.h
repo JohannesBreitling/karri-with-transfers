@@ -374,10 +374,6 @@ namespace karri {
         const Fleet &fleet;
         const RouteState &routeState;
         RequestState &requestState;
-        /* const InputGraphT &inputGraph;
-        const CH &vehCh;
-        VehCHQuery vehChQuery; */
-
         CostCalculator &calc;
         
 

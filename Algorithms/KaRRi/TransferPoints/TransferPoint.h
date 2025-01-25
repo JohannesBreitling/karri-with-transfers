@@ -8,6 +8,7 @@ namespace karri {
 
     struct TransferPoint {
         TransferPoint() {}
+        TransferPoint(const int loc, const Vehicle *pVeh, const Vehicle *dVeh) : loc(loc), pVeh(pVeh), dVeh(dVeh) {}
         TransferPoint(const Vehicle *pVeh, const Vehicle *dVeh) : pVeh(pVeh), dVeh(dVeh) {}
         TransferPoint(const TransferPoint&) = default;
 

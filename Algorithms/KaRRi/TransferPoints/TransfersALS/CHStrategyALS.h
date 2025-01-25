@@ -28,6 +28,20 @@ namespace karri {
             const auto sourceRank = vehCh.rank(inputGraph.edgeHead(pickupLoc));
             return runFromSourceToAllStops(sourceRank, dVeh);
         }
+
+        std::vector<int> calculateDistancesFromAllStopsToLocation(const Vehicle &pVeh, const int location) {
+            std::vector<int> sources = std::vector<int>{};
+            const int numStopsPVeh = routeState.numStopsOf(pVeh.vehicleId);
+
+            for (int i = 1; i < numStopsPVeh; i++) {
+                sources.push_back(vehCh.rank(inputGraph.edgeHead(routeState.stopLocationsFor(pVeh.vehicleId)[i])));
+            }
+
+            const int targetRank = vehCh.rank(inputGraph.edgeTail(location));
+            const int offset = inputGraph.travelTime(location);
+
+            return vehChQuery.runManyToOne(sources, targetRank, offset);
+        }
             
 
     private:
