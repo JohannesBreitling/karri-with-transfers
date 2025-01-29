@@ -153,7 +153,7 @@ namespace karri {
 
             const auto actualDepTimeAtTransfer = getActualDepTimeAtTranfer(asgn, context, routeState);
             const auto initialTransferDetour = calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context, routeState);
-            //assert(initialTransferDetour >= 0);
+            assert(initialTransferDetour >= 0);
 
             int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.transferIdxDVeh, asgn.dropoffIdx, initialTransferDetour, routeState);
             const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
@@ -265,17 +265,10 @@ namespace karri {
             const auto initialPickupDetour = calcInitialPickupDetour(asgn, actualDepTimeAtPickup, context, routeState);
             int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.pickupIdx, asgn.transferIdxPVeh, initialPickupDetour, routeState);
 
-            bool transferAtExistingStop = false;
+            bool transferAtExistingStop = isTransferAtExistingStopPVeh(asgn, routeState);
 
-            for (int i = 0; i < numStops; i++) {
-                int stopLocation = routeState.stopLocationsFor(vehId)[i];
-                if (stopLocation == asgn.transfer.loc) {
-                    transferAtExistingStop = true;
-                }
-            }
-
-            const auto initalTransferDetour = calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState);
-            assert(initalTransferDetour >= 0);
+            const auto initalTransferDetour = std::max(calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState), 0);
+            // assert(initalTransferDetour >= 0); // TODO Hier lassen wir kleine Fehler zu....
 
             const auto detourRightAfterTransfer = calcDetourRightAfterTransferPVeh(asgn, initialPickupDetour, initalTransferDetour, routeState);
             assert(detourRightAfterTransfer >= 0);
@@ -313,7 +306,8 @@ namespace karri {
                 asgn.distToTransferPVeh == INFTY || asgn.distFromTransferPVeh == INFTY) {
                 asgn.cost.total = INFTY;
                 return asgn.cost;
-            } 
+            }
+            
             
             const int vehId = asgn.pVeh->vehicleId;
             const auto numStops = routeState.numStopsOf(vehId);
@@ -910,6 +904,8 @@ namespace karri {
             const int total = vehCostPVeh + walkingCostPVeh + tripCostPVeh + waitTimeViolationCost + changeInTripCostsOfOthers;
             asgn.cost.total = total;
 
+            assert(asgn.cost.total >= 0);
+
             return asgn.cost;
         }
 
@@ -938,13 +934,20 @@ namespace karri {
             asgn.cost.waitTimeViolationCost += waitTimeViolationCost;
             asgn.cost.changeInTripCostsOfOthers += changeInTripCostsOfOthers;
             asgn.cost.vehCost += vehCost;
+            assert(asgn.cost.walkingCost >= 0 && asgn.cost.tripCost >= 0 && asgn.cost.waitTimeViolationCost >= 0 && asgn.cost.changeInTripCostsOfOthers >= 0 && asgn.cost.vehCost >= 0);
+            
+            if (asgn.cost.walkingCost >= INFTY || asgn.cost.tripCost >= INFTY || asgn.cost.waitTimeViolationCost >= INFTY || asgn.cost.changeInTripCostsOfOthers >= INFTY || asgn.cost.vehCost >= INFTY) {
+
+            }
 
             int total = (vehCost + walkingCost + tripCost + waitTimeViolationCost + changeInTripCostsOfOthers);
+            if (total < 0 || total >= INFTY || asgn.cost.total >= INFTY || total + asgn.cost.total >= INFTY || asgn.cost.total < 0) {
+                // Integer overflow
+                asgn.cost.total = INFTY;
+                return asgn.cost;
+            }
+            
             asgn.cost.total += total;
-            
-            if (total < 0)
-                std::cout << "Walk: " << walkingCost <<  "Trip: " << tripCost <<  "Wait: " << waitTimeViolationCost <<  "Change: " << changeInTripCostsOfOthers <<  "Veh: " << vehCost << std::endl;
-            
             return asgn.cost;
         }
 

@@ -131,7 +131,6 @@ namespace karri {
             assert(asgn.pVeh != nullptr);
             assert(asgn.dVeh != nullptr);
 
-            
             const auto pVehId = asgn.pVeh->vehicleId;
             const auto dVehId = asgn.dVeh->vehicleId;
             

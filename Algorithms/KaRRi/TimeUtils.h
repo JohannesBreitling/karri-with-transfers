@@ -55,8 +55,8 @@ namespace karri::time_utils {
         const auto numStops = routeState.numStopsOf(vehId);
         const auto &minDepTimes = routeState.schedDepTimesFor(vehId);
 
-        assert(stopIdx < numStops  && "getVehDepTimeAtStopForTransfer");
-        return (numStops == 1 ? std::max(minDepTimes[0], arrAtTransfer) : minDepTimes[stopIdx]);
+        assert(stopIdx < numStops);
+        return (numStops == 1 ? std::max(minDepTimes[0], arrAtTransfer) : minDepTimes[stopIdx]); // TODO Es ist möglich, dass das hier falsch ist weil das Auto ja auch fahren kann aber erst zu einem späteren Zeitpunkt dann am TP ankommt
     }
 
     static INLINE bool isMakingStop(const int vehId, const int now, const RouteState &routeState) {
@@ -69,14 +69,51 @@ namespace karri::time_utils {
                pickup.loc == routeState.stopLocationsFor(vehId)[stopIndex];
     }
 
+    static INLINE bool isTransferAtExistingStop(const AssignmentWithTransfer asgn, const RouteState &routeState) {
+        const auto numStopsDVeh = routeState.numStopsOf(asgn.dVeh->vehicleId);
+        const auto numStopsPVeh = routeState.numStopsOf(asgn.pVeh->vehicleId);
+
+        // Transfer ALS PVeh
+        if (asgn.transferIdxPVeh == (numStopsPVeh - 1) && (asgn.distToTransferDVeh == 0 && asgn.distFromTransferDVeh == 0)) { // TODO Das ist ein bisschen hacky...
+            return true;
+        }
+
+        // Transfer ALS DVeh
+        if (asgn.transferIdxDVeh == (numStopsDVeh - 1))
+            return false;
+
+        assert(asgn.transferIdxDVeh >= 0 && asgn.transferIdxDVeh < (numStopsDVeh - 1));
+        
+        // Ordinary transfer
+        return asgn.transfer.loc == routeState.stopLocationsFor(asgn.dVeh->vehicleId)[asgn.transferIdxDVeh];
+    }
+
+    static INLINE bool isTransferAtExistingStopPVeh(const AssignmentWithTransfer asgn, const RouteState &routeState) {
+        const auto numStopsDVeh = routeState.numStopsOf(asgn.dVeh->vehicleId);
+        const auto numStopsPVeh = routeState.numStopsOf(asgn.pVeh->vehicleId);
+
+        // Transfer ALS DVeh
+        if (asgn.transferIdxDVeh == (numStopsDVeh - 1) && (asgn.distToTransferPVeh == 0 && asgn.distFromTransferPVeh == 0)) { // TODO Das ist ein bisschen hacky...
+            return true;
+        }
+
+        // Transfer ALS PVeh
+        if (asgn.transferIdxPVeh == (numStopsPVeh - 1))
+            return false;
+
+        assert(asgn.transferIdxPVeh >= 0 && asgn.transferIdxPVeh < (numStopsPVeh - 1));
+        
+        // Ordinary transfer
+        return asgn.transfer.loc == routeState.stopLocationsFor(asgn.pVeh->vehicleId)[asgn.transferIdxPVeh];
+    }
+
+    /*
     static INLINE bool isTransferAtExistingStop(const int transferLoc, const int vehId, const int now, const int stopIndex,
                                               const RouteState &routeState) {
         
-        assert(stopIndex < routeState.numStopsOf(vehId) && "isTransferAtExistingStop");
-        
         return (stopIndex > 0 || isMakingStop(vehId, now, routeState)) &&
                transferLoc == routeState.stopLocationsFor(vehId)[stopIndex];
-    }
+    }*/
 
     template<typename LabelSet>
     static INLINE typename LabelSet::LabelMask
@@ -115,8 +152,11 @@ namespace karri::time_utils {
 
     template<typename RequestContext>
     static INLINE int getActualDepTimeAtTranfer(const AssignmentWithTransfer &asgn, const RequestContext &context, const RouteState &routeState) {
-        const bool atStop = isTransferAtExistingStop(asgn.transfer.loc, asgn.dVeh->vehicleId, context.now(), asgn.transferIdxDVeh, routeState);
-        const auto minVehicleDepTimeAtTransfer = getVehDepTimeAtStopForTransfer(asgn.dVeh->vehicleId, asgn.transferIdxDVeh, asgn.arrAtTransferPoint, routeState) + !atStop * (asgn.distToTransferDVeh + InputConfig::getInstance().stopTime);
+        // const bool atStop = isTransferAtExistingStop(asgn.transfer.loc, asgn.dVeh->vehicleId, context.now(), asgn.transferIdxDVeh, routeState);
+        const bool atStop = isTransferAtExistingStop(asgn, routeState);
+        
+        // const auto minVehicleDepTimeAtTransfer = getVehDepTimeAtStopForTransfer(asgn.dVeh->vehicleId, asgn.transferIdxDVeh, asgn.arrAtTransferPoint, routeState) + !atStop * (asgn.distToTransferDVeh + InputConfig::getInstance().stopTime); // TODO Nochmal schauen
+        const auto minVehicleDepTimeAtTransfer = getVehDepTimeAtStopForRequest(asgn.dVeh->vehicleId, asgn.transferIdxDVeh, context, routeState) + !atStop * (asgn.distToTransferDVeh + InputConfig::getInstance().stopTime);
 
         return std::max(minVehicleDepTimeAtTransfer, asgn.arrAtTransferPoint);
     }
@@ -314,13 +354,23 @@ namespace karri::time_utils {
         const auto vehDepTimeAtPrevStop = getVehDepTimeAtStopForRequest(asgn.dVeh->vehicleId, asgn.transferIdxDVeh, context, routeState);
         const auto timeUntilDep = depTimeAtTransfer - vehDepTimeAtPrevStop;
 
+        const auto atStop = isTransferAtExistingStop(asgn, routeState);
+        (void) atStop;
+        assert(depTimeAtTransfer >= vehDepTimeAtPrevStop + asgn.distToTransferDVeh);
+
         assert(asgn.transferIdxDVeh < routeState.numStopsOf(asgn.dVeh->vehicleId));
 
         if (asgn.transferIdxDVeh == asgn.dropoffIdx)
             return timeUntilDep;
 
-        const auto legLength = calcLengthOfLegStartingAt(asgn.transferIdxDVeh, asgn.dVeh->vehicleId, routeState);
+        // TODO Check this: Assignment does pickup up the customer at existing stop
+        if (asgn.distToTransferDVeh == 0 && asgn.distFromTransferDVeh == 0)
+            return timeUntilDep;
 
+        const auto legLength = calcLengthOfLegStartingAt(asgn.transferIdxDVeh, asgn.dVeh->vehicleId, routeState);
+        // TODO assert(asgn.distToTransferDVeh + asgn.distFromTransferDVeh >= legLength);
+
+        // TODO assert(timeUntilDep + asgn.distFromTransferDVeh - legLength >= 0);
         return timeUntilDep + asgn.distFromTransferDVeh - legLength;
     }
 
@@ -392,6 +442,9 @@ namespace karri::time_utils {
         if (transferAtExistingStop) return 0;
 
         const auto lengthOfReplacedLeg = calcLengthOfLegStartingAt(asgn.transferIdxPVeh, asgn.pVeh->vehicleId, routeState);
+
+        // assert(asgn.pickupPairedLowerBoundUsed || asgn.distToTransferPVeh + InputConfig::getInstance().stopTime + asgn.distFromTransferPVeh >= lengthOfReplacedLeg); // TODO Some very slight mistakes
+
         return asgn.distToTransferPVeh + InputConfig::getInstance().stopTime + asgn.distFromTransferPVeh - lengthOfReplacedLeg;
     }
 
@@ -457,7 +510,7 @@ namespace karri::time_utils {
     calcAddedTripTimeInInterval(const int vehId, const int fromIndex, const int toIndex, const int detourAtFromIndex,
                                 const RouteState &routeState) {
 
-        // assert(detourAtFromIndex >= 0);
+        assert(detourAtFromIndex >= 0);
         if (detourAtFromIndex < 0) // TODO Fixen, manchmal ist die detour kleiner 0
             return 0;
         

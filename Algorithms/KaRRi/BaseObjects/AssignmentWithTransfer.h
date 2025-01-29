@@ -36,6 +36,8 @@ namespace karri {
 
     struct AssignmentWithTransfer {
 
+        // using RelevantPDLoc = RelevantPDLocs::RelevantPDLoc;
+
         AssignmentWithTransfer() {}
 
         AssignmentWithTransfer(const Vehicle *pVehArg, const Vehicle *dVehArg, const TransferPoint tpArg) {
@@ -50,17 +52,17 @@ namespace karri {
             transfer = tpArg;
         }
         
-        AssignmentWithTransfer(const Vehicle &pVehArg, const Vehicle &dVehArg, const TransferPoint tpArg, const PD pickupRelPDLoc, const PDLoc &pickupPDLoc, const int tIdxPVeh, const int tIdxDVeh) {
+        AssignmentWithTransfer(const Vehicle &pVehArg, const Vehicle &dVehArg, const TransferPoint tpArg, const PDLoc *pickupPDLoc, int pickupIdxArg, int distToPickupArg, int distFromPickupArg, int tIdxPVeh, int tIdxDVeh) {
             pVeh = &pVehArg;
             dVeh = &dVehArg;
             transfer = tpArg;
-            pickupIdx = pickupRelPDLoc.pdIdx;
+            pickupIdx = pickupIdxArg;
             transferIdxPVeh = tIdxPVeh;
             transferIdxDVeh = tIdxDVeh;
 
-            pickup = &pickupPDLoc;
-            distToPickup = pickupRelPDLoc.detourToPD;
-            distFromPickup = pickupRelPDLoc.detourFromPD;
+            pickup = pickupPDLoc;
+            distToPickup = distToPickupArg;
+            distFromPickup = distFromPickupArg;
             distToTransferPVeh = tpArg.distancePVehToTransfer;
             distFromTransferPVeh = tpArg.distancePVehFromTransfer;
             distToTransferDVeh = tpArg.distanceDVehToTransfer;
@@ -68,7 +70,7 @@ namespace karri {
         }
 
         bool isFinished() const {
-            return !pickupBNSLowerBoundUsed && !pickupPairedLowerBoundUsed && !dropoffBNSLowerBoundUsed && !!dropoffPairedLowerBoundUsed;
+            return !pickupBNSLowerBoundUsed && !pickupPairedLowerBoundUsed && !dropoffBNSLowerBoundUsed && !dropoffPairedLowerBoundUsed;
         }
 
         const Vehicle *pVeh = nullptr;

@@ -30,7 +30,7 @@ class TransferALSDVehFinder {
             calc(calc) {}
 
     void findAssignments() {
-        std::cout << "Find Assignments with Transfer ALS DVeh\n";
+        // std::cout << "Find Assignments with Transfer ALS DVeh\n";
         findAssignmentsWithDropoffALS();
     }
 
@@ -53,6 +53,10 @@ class TransferALSDVehFinder {
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
                 
                 for (const auto pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
+                    // pVeh an dVeh can not be the same vehicles
+                    if (dVehId == pVehId)
+                        continue;
+                    
                     const auto *pVeh = &fleet[pVehId];
                     const auto numStopsPVeh = routeState.numStopsOf(pVehId);
                     const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);

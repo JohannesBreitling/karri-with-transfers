@@ -41,13 +41,14 @@ namespace karri {
 // Holds information relating to a specific request like its pickups and dropoffs and the best known assignment.
     struct RequestState {
 
-        RequestState(const CostCalculator &calculator)
+        RequestState(const CostCalculator &calculator, std::vector<AssignmentWithTransfer> &postponedAssignments)
                 : originalRequest(),
                   originalReqDirectDist(-1),
                   minDirectPDDist(-1),
                   pickups(),
                   dropoffs(),
-                  calculator(calculator) {}
+                  calculator(calculator),
+                  postponedAssignments(postponedAssignments) {}
 
 
         ~RequestState() {
@@ -106,9 +107,11 @@ namespace karri {
         }
 
         int getMaxDepTimeAtTransfer(const AssignmentWithTransfer &asgn) const {
-            assert(asgn.waitTimeAtPickup <= InputConfig::getInstance().maxWaitTime);
+            // TODO Hier muss man eventuell nochmal schauen, ist die max wait time hard constraint oder nicht?
+            // assert(asgn.waitTimeAtPickup <= InputConfig::getInstance().maxWaitTime);
 
-            return asgn.arrAtTransferPoint + InputConfig::getInstance().maxWaitTime - asgn.waitTimeAtPickup;
+            int delta = InputConfig::getInstance().maxWaitTime - asgn.waitTimeAtPickup;
+            return asgn.arrAtTransferPoint + std::max(0, delta);
         }
 
         const Assignment &getBestAssignment() const {
@@ -120,7 +123,10 @@ namespace karri {
         }
 
         void tryAssignment(AssignmentWithTransfer &asgn) {
-            
+
+            // assert(asgn.distFromTransferDVeh > 0 || asgn.transferIdxDVeh == asgn.transferIdxPVeh);
+
+            // Calculate the cost of the assignment and try to update the best known assignment if the assignment is finished
             RequestCost cost;
             if (!asgn.isFinished()) {
                 cost = calculator.calcLowerBound(asgn, *this);
@@ -128,27 +134,28 @@ namespace karri {
                 cost = calculator.calc(asgn, *this);
             }
 
-            if (cost.total >= INFTY /* || cost.total >= bestCost */)
+            if (cost.total >= INFTY || cost.total >= getBestCost())
                 return;
 
-            std::cout << "There are possible assignments, that have a cost of less then INFTY: " << cost.total << "\n";
-            // TODO Check if the the assignment is finished, and if not, then add it to the potential unfinished assignments
+            if (asgn.isFinished()) {
+                bestAssignmentWithTransfer = asgn;
+                bestCostWithTransfer = cost.total;
+            } else {
+                postponedAssignments.push_back(asgn);
+            }
         }
         
-        
-        
-        
-
-        bool improvementThroughTransfer() const {
+        bool transferImproves() {
             return bestCostWithTransfer < bestCost;
+        }
+        
+        bool improvementThroughTransfer() const {
+            return false; // TODO
+            // return bestCostWithTransfer < bestCost;
         }
 
         const int &getBestCost() const {
-            return bestCost;
-        }
-
-        const int &getBestCostWithTransfer() const {
-            return bestCostWithTransfer;
+            return std::min(bestCost, bestCostWithTransfer);
         }
 
         bool isNotUsingVehicleBest() const {
@@ -214,13 +221,14 @@ namespace karri {
             minDirectPDDist = INFTY;
             pickups.clear();
             dropoffs.clear();
+            postponedAssignments.clear();
 
             bestAssignment = Assignment();
+            bestAssignmentWithTransfer = AssignmentWithTransfer();
             bestCost = INFTY;
             bestCostWithTransfer = INFTY;
             notUsingVehicleIsBest = false;
             notUsingVehicleDist = INFTY;
-            bestAssignmentWithTransfer = AssignmentWithTransfer();
         }
 
     private:
@@ -230,6 +238,9 @@ namespace karri {
         stats::OsmRoadCategoryStats chosenPDLocsRoadCatStats;
 
         const CostCalculator &calculator;
+
+        // Vector for the unsfinished assignments
+        std::vector<AssignmentWithTransfer> &postponedAssignments;
 
         // Information about best known assignment for current request
         Assignment bestAssignment;

@@ -110,16 +110,18 @@ namespace karri {
             // * Find vehicles that are feasible for a Pickup / Dropoff before the next stop
             pbnsAssignments.findPickupAndDropoffVehicles();
 
+            const int bestCostWithoutTransfer = reqState.getBestCost();
+
             // * Find the best assignment that contains a transfer
             assignmentsWithTransfer.findBestAssignment();
             
             // * Output the solution with the best costs
-            if (reqState.improvementThroughTransfer()) {
+            if (reqState.transferImproves()) {
                 std::cout << "--------------------------------" << std::endl;
                 std::cout << "Improvement because of transfer!" << std::endl;
                 std::cout << "Request " << reqState.originalRequest.requestId << std::endl;
-                std::cout << "Best Cost: " << reqState.getBestCost() << std::endl;
-                std::cout << "New Best Cost: " << reqState.getBestCostWithTransfer() << std::endl;
+                std::cout << "Best Cost w/o Transfer: " << bestCostWithoutTransfer << std::endl;
+                std::cout << "New Best Cost: " << reqState.getBestCost() << std::endl;
                 std::cout << "--------------------------------" << std::endl;
             }
                 

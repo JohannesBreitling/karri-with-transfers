@@ -39,7 +39,7 @@ namespace karri {
             calc(calc) {}
 
         void findAssignments() {
-            std::cout << "Find Assignments with Transfer ALS PVeh\n";
+            // std::cout << "Find Assignments with Transfer ALS PVeh\n";
 
             // Reset the last stop distances
             lastStopDistances = std::map<int, std::map<int, std::vector<int>>>{};
@@ -263,6 +263,10 @@ namespace karri {
 
             // Loop over all the possible dropoff vehicles and dropoffs
             for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
+                // pVeh an dVeh can not be the same vehicles
+                if (dVehId == pVeh->vehicleId)
+                    continue;
+
                 const auto &dVeh = fleet[dVehId];
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
                 const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
@@ -318,6 +322,10 @@ namespace karri {
 
             // Loop over all the possible dropoff vehicles and dropoffs
             for (const auto dVehId : dVehIds) {
+                // pVeh an dVeh can not be the same vehicles
+                if (dVehId == pVeh->vehicleId)
+                    continue;
+                
                 const auto &dVeh = fleet[dVehId];
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
                 const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);

@@ -55,7 +55,7 @@ namespace karri::TransferPointStrategies {
             }
 
             if (!edges.count(e)) {
-                // Vertex would be seen the first time in a search later than the first search
+                // Edge would be seen the first time in a search later than the first search
                 return;
             }
 
@@ -126,7 +126,7 @@ namespace karri::TransferPointStrategies {
                 transferPoints(transferPoints) {}
 
         void findTransferPoints(
-            Vehicle &pVeh, Vehicle &dVeh,
+            const Vehicle &pVeh, const Vehicle &dVeh,
             const int numStopsPVeh, const int numStopsDVeh,
             const ConstantVectorRange<int> &stopLocationsPVeh, const ConstantVectorRange<int> &stopLocationsDVeh,
             const ConstantVectorRange<int> &stopIdsPVeh, const ConstantVectorRange<int> &stopIdsDVeh
@@ -164,7 +164,7 @@ namespace karri::TransferPointStrategies {
                         assert(tp.distanceDVehFromTransfer >= 0);
                     }
                     
-                    transferPoints[{stopIdxPVeh, stopIdxDVeh}] = tpsForStopPair;                    
+                    transferPoints[{stopIdxPVeh, stopIdxDVeh}] = tpsForStopPair;
                     possibleTransferPoints.clear();
                 }
             }
@@ -183,22 +183,57 @@ namespace karri::TransferPointStrategies {
             const int maxLeewayPVeh = routeState.leewayOfLegStartingAt(pStopId);
             const int maxLeewayDVeh = routeState.leewayOfLegStartingAt(dStopId);
 
+            offsetPNStop = inputGraph.travelTime(pNStopLoc);
+            offsetDNStop = inputGraph.travelTime(dNStopLoc);            
+
             maxDetour = maxLeewayPVeh;
+            offsetReverseSearch = offsetPNStop;
 
             dijSearchTransferPointsFw.run(pStopVertex);
+            searchSpaceIntersection.edgeFound(pStopLoc, 0);
             searchSpaceIntersection.nextSearch();
         
             dijSearchTransferPointsBw.run(pNextStopVertex);
+            searchSpaceIntersection.edgeFound(pNStopLoc, offsetPNStop);
             searchSpaceIntersection.nextSearch();
 
             maxDetour = maxLeewayDVeh;
-            
+            offsetReverseSearch = offsetDNStop;
+
             dijSearchTransferPointsFw.run(dStopVertex);
+            searchSpaceIntersection.edgeFound(dStopLoc, 0);
             searchSpaceIntersection.nextSearch();
             
             dijSearchTransferPointsBw.run(dNextStopVertex);
+            searchSpaceIntersection.edgeFound(dNStopLoc, offsetDNStop);
 
             possibleTransferPoints = searchSpaceIntersection.getIntersection();
+
+            // Test for the some special transfer points
+            /*
+            bool atPStop, atPNStop, atDStop, atDNStop = false;
+            for (const auto &tp : possibleTransferPoints) {
+
+                if (tp.distancePVehToTransfer == 0) {
+                    atPStop = true;
+                }
+
+                if (tp.distanceDVehFromTransfer == 0) {
+                    atPNStop = true;
+                }
+
+                if (tp.distanceDVehToTransfer == 0) {
+                    atDStop = true;
+                }
+
+                if (tp.distanceDVehFromTransfer == 0) {
+                    atDNStop = true;
+                }
+            }
+
+            if (atPStop || atPNStop || atDStop || atDNStop)
+                std::cout << "ES GIBT SO EINEN MÖGLICHEN PUNKT!!!!!!!!!!" << std::endl; 
+            */
         }
 
         void settleVertex(int v, int distance) {
@@ -227,8 +262,10 @@ namespace karri::TransferPointStrategies {
                 
                 for (int i = 0; i < degree; i++) {
                     const auto e = firstEdge + i;    
-                    const auto travelTime = reverseGraph.travelTime(e);
-                    const auto distanceToEdgeHead = distance + travelTime;
+                    // const auto travelTime = reverseGraph.travelTime(e);
+                    
+                    assert(offsetReverseSearch > 0);
+                    const auto distanceToEdgeHead = distance + offsetReverseSearch;
                 
                     if (distanceToEdgeHead < maxDetour) {
                         searchSpaceIntersection.edgeFound(e, distanceToEdgeHead);
@@ -240,6 +277,10 @@ namespace karri::TransferPointStrategies {
     private:
         using DistanceLabel = typename DijLabelSet::DistanceLabel;
         using LabelMask = typename DijLabelSet::LabelMask;
+
+        int offsetPNStop = 0;
+        int offsetDNStop = 0;
+        int offsetReverseSearch = 0;
 
 
         struct TransferPointSearch {

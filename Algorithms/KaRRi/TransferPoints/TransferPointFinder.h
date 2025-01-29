@@ -48,8 +48,7 @@ namespace karri {
             transferPoints.clear();
         }
 
-        void findTransferPoints(Vehicle &pVeh, Vehicle &dVeh) {
-
+        void findTransferPoints(const Vehicle &pVeh, const Vehicle &dVeh) {
             // Get the stop locations of the two vehicles               
             const auto &stopLocationsPVeh = routeState.stopLocationsFor(pVeh.vehicleId);
             const auto &stopLocationsDVeh = routeState.stopLocationsFor(dVeh.vehicleId);
