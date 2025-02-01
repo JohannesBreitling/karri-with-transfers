@@ -123,7 +123,6 @@ namespace karri {
         }
 
         void tryAssignment(AssignmentWithTransfer &asgn) {
-
             // assert(asgn.distFromTransferDVeh > 0 || asgn.transferIdxDVeh == asgn.transferIdxPVeh);
 
             // Calculate the cost of the assignment and try to update the best known assignment if the assignment is finished
@@ -131,6 +130,7 @@ namespace karri {
             if (!asgn.isFinished()) {
                 cost = calculator.calcLowerBound(asgn, *this);
             } else {
+                // assert(asgn.distFromDropoff > 0 || asgn.distToDropoff == 0);
                 cost = calculator.calc(asgn, *this);
             }
 
@@ -150,7 +150,7 @@ namespace karri {
         }
         
         bool improvementThroughTransfer() const {
-            return false; // TODO
+            return false;
             // return bestCostWithTransfer < bestCost;
         }
 

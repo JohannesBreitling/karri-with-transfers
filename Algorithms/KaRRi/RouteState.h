@@ -552,8 +552,6 @@ namespace karri {
             auto transferIdx = asgn.transferIdxDVeh;
             auto dropoffIdx = asgn.dropoffIdx;
 
-            // const auto numStops = numStopsOf(vehId);
-
             assert(transferIdx >= 0);
             assert(transferIdx < end - start);
             assert(dropoffIdx >= 0);

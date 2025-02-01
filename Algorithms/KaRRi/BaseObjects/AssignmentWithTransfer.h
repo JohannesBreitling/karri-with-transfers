@@ -34,6 +34,13 @@
 
 namespace karri {
 
+    enum INS_TYPES {
+        NOT_SET,
+        BEFORE_NEXT_STOP,
+        ORDINARY,
+        AFTER_LAST_STOP
+    };
+
     struct AssignmentWithTransfer {
 
         // using RelevantPDLoc = RelevantPDLocs::RelevantPDLoc;
@@ -102,10 +109,20 @@ namespace karri {
         int distToDropoff; // distance from previous stop to dropoff (or from transfer point if transferIdxDVeh == dropoffIdx)
         int distFromDropoff; // distance from dropoff to next stop (or 0 if there is no next stop)
 
-        int costPVeh; // Cost of the trip until the passenger arrives at the transfer point
+        RequestCost costPVeh; // Cost of the trip until the passenger arrives at the transfer point
         int waitTimeAtPickup; // Wait time at pickup
         int arrAtTransferPoint; // Arrival time of pVeh at transfer point
 
+        // For statistics
+        enum INS_TYPES pickupType = NOT_SET;
+        bool pickupAtStop;
+        enum INS_TYPES transferTypePVeh = NOT_SET;
+        bool transferAtStopPVeh;
+
+        enum INS_TYPES transferTypeDVeh = NOT_SET;
+        bool transferAtStopDVeh;
+        enum INS_TYPES dropoffType = NOT_SET;
+        bool dropoffAtStop;
     };
 
 }

@@ -72,7 +72,7 @@ namespace karri {
                 const Fleet &fleet, const std::vector<Request> &requests,
                 AssignmentFinderT &assignmentFinder, SystemStateUpdaterT &systemStateUpdater,
                 const ScheduledStopsT &scheduledStops,
-                const bool verbose = false)
+                const bool verbose = true) // TODO Change hiere to false
                 : fleet(fleet),
                   requests(requests),
                   assignmentFinder(assignmentFinder),
@@ -297,7 +297,6 @@ namespace karri {
 
             if (asgnFinderResponse.improvementThroughTransfer()) {
                 applyAssignmentWithTransfer(asgnFinderResponse.getBestAssignmentWithTransfer(), reqId);
-
             } else {
                 applyAssignment(asgnFinderResponse, reqId, occTime);
             }

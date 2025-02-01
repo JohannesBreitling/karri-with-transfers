@@ -3,7 +3,7 @@
 
 namespace karri {
 
-template<typename TransferALSStrategyT, typename TransfersDropoffALSStrategyT>
+template<typename TransferALSStrategyT, typename TransfersDropoffALSStrategyT, typename CurVehLocToPickupSearchesT>
 class TransferALSDVehFinder {
     
     // The dVeh drives the detour to the transfer point
@@ -14,6 +14,7 @@ class TransferALSDVehFinder {
         TransferALSDVehFinder(
             TransferALSStrategyT &strategy,
             TransfersDropoffALSStrategyT &dropoffALSStrategy,
+            CurVehLocToPickupSearchesT &searches,
             const RelevantPDLocs &relORDPickups,
             const RelevantPDLocs &relBNSPickups,
             const Fleet &fleet,
@@ -22,6 +23,7 @@ class TransferALSDVehFinder {
             CostCalculator &calc
         ) : strategy(strategy),
             dropoffALSStrategy(dropoffALSStrategy),
+            searches(searches),
             relORDPickups(relORDPickups),
             relBNSPickups(relBNSPickups),
             fleet(fleet),
@@ -52,6 +54,7 @@ class TransferALSDVehFinder {
                 const auto *dVeh = &fleet[dVehId];
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
                 
+                // Pickup BNS
                 for (const auto pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
                     // pVeh an dVeh can not be the same vehicles
                     if (dVehId == pVehId)
@@ -69,6 +72,10 @@ class TransferALSDVehFinder {
 
                         for (const auto &pickup : relBNSPickups.relevantSpotsFor(pVehId)) {
                             const auto *pickupPDLoc = &requestState.pickups[pickup.pdId];
+
+                            // Use lower bounds if the distance to the pickup is not known
+                            const bool bnsLowerBoundUsed = searches.knowsDistance(pVeh->vehicleId, pickup.pdId);
+                            const int distanceToPickup = bnsLowerBoundUsed ? pickup.distToPDLoc : searches.getDistance(pVeh->vehicleId, pickup.pdId);
 
                             for (int i = 1; i < numStopsPVeh; i++) {
                                 assert(pickup.stopIndex == 0);
@@ -91,7 +98,9 @@ class TransferALSDVehFinder {
                                 asgn.pickup = pickupPDLoc;
                                 asgn.dropoff = &dropoff;
 
-                                asgn.distToPickup = pickup.distToPDLoc;
+                                asgn.pickupBNSLowerBoundUsed = bnsLowerBoundUsed;
+                                asgn.distToPickup = distanceToPickup;
+
                                 asgn.distFromPickup = pickup.distFromPDLocToNextStop;
                                 asgn.distToDropoff = distancesToDropoff[i - 1];
                                 asgn.distFromDropoff = 0;
@@ -174,6 +183,8 @@ class TransferALSDVehFinder {
 
         TransferALSStrategyT &strategy;
         TransfersDropoffALSStrategyT &dropoffALSStrategy;
+
+        CurVehLocToPickupSearchesT &searches;
 
         const RelevantPDLocs &relORDPickups;
         const RelevantPDLocs &relBNSPickups;

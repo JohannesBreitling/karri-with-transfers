@@ -164,6 +164,8 @@ namespace karri {
                         continue;
 
                     AssignmentWithTransfer asgn(pVeh, dVeh, tp, pickupPDLoc, pickup.stopIndex, pickup.distToPDLoc, pickup.distFromPDLocToNextStop, trIdxPVeh, trIdxDVeh);
+                    asgn.pickupType = ORDINARY;
+                    asgn.transferTypePVeh = ORDINARY;
 
                     assert(asgn.pickup->id >= 0);
                     // Try the partial assignment
@@ -187,6 +189,8 @@ namespace karri {
                         continue;
 
                     AssignmentWithTransfer asgn(pVeh, dVeh, tp, pickupPDLoc, pickup.stopIndex, pickup.distToPDLoc, pickup.distFromPDLocToNextStop, trIdxPVeh, trIdxDVeh);
+                    asgn.pickupType = BEFORE_NEXT_STOP;
+                    asgn.transferTypePVeh = trIdxPVeh == 0 ? BEFORE_NEXT_STOP : ORDINARY;
                     
                     assert(asgn.pickup->id >= 0);
                     // Try the partial assignment
@@ -207,6 +211,7 @@ namespace karri {
             }
 
             if (asgn.pickupIdx == 0) {
+                // Assignment with pickup BNS
                 if (searches.knowsDistance(asgn.pVeh->vehicleId, asgn.pickup->id)) {
                     asgn.distToPickup = searches.getDistance(asgn.pVeh->vehicleId, asgn.pickup->id);
                 } else {
@@ -238,13 +243,37 @@ namespace karri {
                 return;
 
             for (const auto &dropoff : relBNSDropoffs.relevantSpotsFor(asgn.dVeh->vehicleId)) {
+                assert(asgn.transferIdxDVeh == 0);
                 assert(dropoff.stopIndex == 0);
 
+                PDLoc *dropoffPDLoc = &requestState.dropoffs[dropoff.pdId];
+                if (dropoffPDLoc->loc == asgn.transfer.loc)
+                    continue;
+                
                 AssignmentWithTransfer newAssignment(asgn);
                 newAssignment.dropoff = &requestState.dropoffs[dropoff.pdId];
                 newAssignment.distToDropoff = dropoff.distToPDLoc;
+                newAssignment.dropoffType = BEFORE_NEXT_STOP;
+
                 newAssignment.distFromDropoff = dropoff.distFromPDLocToNextStop;
+                assert(dropoff.distFromPDLocToNextStop > 0 || dropoff.distToPDLoc == 0);
+                assert(asgn.distFromDropoff > 0 || asgn.distToDropoff == 0);
                 newAssignment.dropoffIdx = dropoff.stopIndex;
+                newAssignment.transferTypeDVeh = BEFORE_NEXT_STOP;
+
+                if (newAssignment.transferIdxDVeh == newAssignment.dropoffIdx) {
+                    // Transfer and dropoff are inserted in the same leg (paired)
+                    newAssignment.dropoffPairedLowerBoundUsed = true;
+                    newAssignment.distFromTransferDVeh = 0;
+                    newAssignment.distToDropoff = pairedLowerBoundTD;
+                }
+
+                // Transfer BNS in dropoff vehicle
+                if (searches.knowsDistanceTransfer(newAssignment.dVeh->vehicleId, newAssignment.transfer.loc)) {
+                    newAssignment.distToTransferDVeh = searches.getDistanceTransfer(newAssignment.dVeh->vehicleId, newAssignment.transfer.loc);
+                } else {
+                    newAssignment.dropoffBNSLowerBoundUsed = true;
+                }
 
                 if (newAssignment.dropoff->loc == newAssignment.transfer.loc)
                     continue;
@@ -261,14 +290,33 @@ namespace karri {
                 if (dropoff.stopIndex < asgn.transferIdxDVeh)
                     continue;
 
+                PDLoc *dropoffPDLoc = &requestState.dropoffs[dropoff.pdId];
+                if (dropoffPDLoc->loc == asgn.transfer.loc)
+                    continue;
+
                 AssignmentWithTransfer newAssignment(asgn);
-                newAssignment.dropoff = &requestState.dropoffs[dropoff.pdId];
+                newAssignment.dropoff = dropoffPDLoc;
                 newAssignment.distToDropoff = dropoff.distToPDLoc;
                 newAssignment.distFromDropoff = dropoff.distFromPDLocToNextStop;
+                assert(dropoff.distFromPDLocToNextStop > 0 || dropoff.distToPDLoc == 0);
+                assert(asgn.distFromDropoff > 0 || asgn.distToDropoff == 0);
                 newAssignment.dropoffIdx = dropoff.stopIndex;
+                newAssignment.dropoffType = ORDINARY;
+                newAssignment.transferTypeDVeh = newAssignment.transferIdxDVeh == 0 ? BEFORE_NEXT_STOP : ORDINARY;
+
+                if (newAssignment.transferIdxDVeh == newAssignment.dropoffIdx) {
+                    // Transfer and dropoff are inserted in the same leg (paired)
+                    newAssignment.dropoffPairedLowerBoundUsed = true;
+                    newAssignment.distFromTransferDVeh = 0;
+                    newAssignment.distToDropoff = pairedLowerBoundTD;
+                }
 
                 if (newAssignment.dropoff->loc == newAssignment.transfer.loc)
                     continue;
+
+                // If the dropoff coincides with a stop, we skip the assignment if the dropoff will be inserted in a different leg
+                if (dropoffIsAtStop(newAssignment.dVeh, dropoffPDLoc->loc) >= 0 && dropoff.stopIndex != dropoffIsAtStop(newAssignment.dVeh, dropoffPDLoc->loc))
+                    continue; 
 
                 requestState.tryAssignment(newAssignment);
             }
@@ -283,11 +331,15 @@ namespace karri {
                 if (distanceToDropoff == INFTY)
                     continue;
 
+                if (dropoff.loc == asgn.transfer.loc)
+                    continue;
                 AssignmentWithTransfer newAssignment(asgn);
                 newAssignment.dropoff = &dropoff;
                 newAssignment.distToDropoff = distanceToDropoff;
                 newAssignment.distFromDropoff = 0;
                 newAssignment.dropoffIdx = routeState.numStopsOf(asgn.dVeh->vehicleId) - 1;
+                newAssignment.dropoffType = AFTER_LAST_STOP;
+                newAssignment.transferTypeDVeh = newAssignment.transferIdxDVeh == 0 ? BEFORE_NEXT_STOP : ORDINARY;
 
                 if (newAssignment.dropoff->loc == newAssignment.transfer.loc)
                     continue;
@@ -592,6 +644,17 @@ namespace karri {
             const int lb = vehChQuery.runAnyShortestPath(sourceRanks, targetRanks);
             
             return lb;
+        }
+
+        // If the dropoff coincides with a stop, we return the index of the stop
+        // Otherwise -1 is returned
+        int dropoffIsAtStop(const Vehicle* dVeh, const int dropoffLoc) {
+            for (int i = 0; i < routeState.numStopsOf(dVeh->vehicleId); i++) {
+                if (routeState.stopLocationsFor(dVeh->vehicleId)[i] == dropoffLoc)
+                    return i;
+            }
+
+            return -1;
         }
 
         int pairedLowerBoundPT = INFTY;

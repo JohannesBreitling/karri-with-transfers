@@ -152,8 +152,8 @@ namespace karri {
             const auto numStops = routeState.numStopsOf(vehId);
 
             const auto actualDepTimeAtTransfer = getActualDepTimeAtTranfer(asgn, context, routeState);
-            const auto initialTransferDetour = calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context, routeState);
-            assert(initialTransferDetour >= 0);
+            const auto initialTransferDetour = std::max(calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context, routeState), 0);
+            // assert(initialTransferDetour >= 0); // TODO Hier nochmal schauen
 
             int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.transferIdxDVeh, asgn.dropoffIdx, initialTransferDetour, routeState);
             const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
@@ -895,17 +895,24 @@ namespace karri {
             const auto changeInTripCostsOfOthers = F::calcChangeInTripCostsOfExistingPassengers(addedTripTimeForExistingPassengers);
             const auto vehCostPVeh = F::calcVehicleCost(residualDetourAtEnd);
 
-            asgn.cost.walkingCost = walkingCostPVeh;
-            asgn.cost.tripCost = tripCostPVeh;
-            asgn.cost.waitTimeViolationCost = waitTimeViolationCost;
-            asgn.cost.changeInTripCostsOfOthers = changeInTripCostsOfOthers;
-            asgn.cost.vehCost = vehCostPVeh;
+            RequestCost costPVeh;
+            costPVeh.walkingCost = walkingCostPVeh;
+            costPVeh.tripCost = tripCostPVeh;
+            costPVeh.waitTimeViolationCost = waitTimeViolationCost;
+            costPVeh.changeInTripCostsOfOthers = changeInTripCostsOfOthers;
+            costPVeh.vehCost = vehCostPVeh;
+
+            assert(walkingCostPVeh >= 0 && tripCostPVeh >= 0 && waitTimeViolationCost >= 0 && changeInTripCostsOfOthers >= 0 && vehCostPVeh >= 0);
 
             const int total = vehCostPVeh + walkingCostPVeh + tripCostPVeh + waitTimeViolationCost + changeInTripCostsOfOthers;
-            asgn.cost.total = total;
+            assert(total >= 0);
+            
+            costPVeh.total = total;
+
+            asgn.cost = costPVeh;
+            asgn.costPVeh = costPVeh;
 
             assert(asgn.cost.total >= 0);
-
             return asgn.cost;
         }
 
@@ -916,7 +923,6 @@ namespace karri {
                 
                 return asgn.cost;
             }
-                
 
             using namespace time_utils;
 
@@ -928,16 +934,21 @@ namespace karri {
             const int waitTimeViolationCost = F::calcWaitViolationCost(asgn.arrAtTransferPoint, actualDepTimeAtTransfer, asgn.waitTimeAtPickup, context);
             const int changeInTripCostsOfOthers = F::calcChangeInTripCostsOfExistingPassengers(addedTripTime);
             const int vehCost = F::calcVehicleCost(residualDetourAtEnd);
-            
-            asgn.cost.walkingCost += walkingCost;
-            asgn.cost.tripCost += tripCost;
-            asgn.cost.waitTimeViolationCost += waitTimeViolationCost;
-            asgn.cost.changeInTripCostsOfOthers += changeInTripCostsOfOthers;
-            asgn.cost.vehCost += vehCost;
+
+            if (walkingCost >= INFTY || tripCost >= INFTY || waitTimeViolationCost >= INFTY || changeInTripCostsOfOthers >= INFTY || vehCost >= INFTY) {
+                return RequestCost::INFTY_COST();
+            }
+
+            asgn.cost.walkingCost = asgn.costPVeh.walkingCost + walkingCost;
+            asgn.cost.tripCost = asgn.costPVeh.tripCost + tripCost;
+            asgn.cost.waitTimeViolationCost = asgn.costPVeh.waitTimeViolationCost + waitTimeViolationCost;
+            asgn.cost.changeInTripCostsOfOthers = asgn.costPVeh.changeInTripCostsOfOthers + changeInTripCostsOfOthers;
+            asgn.cost.vehCost = asgn.costPVeh.vehCost + vehCost;
             assert(asgn.cost.walkingCost >= 0 && asgn.cost.tripCost >= 0 && asgn.cost.waitTimeViolationCost >= 0 && asgn.cost.changeInTripCostsOfOthers >= 0 && asgn.cost.vehCost >= 0);
             
             if (asgn.cost.walkingCost >= INFTY || asgn.cost.tripCost >= INFTY || asgn.cost.waitTimeViolationCost >= INFTY || asgn.cost.changeInTripCostsOfOthers >= INFTY || asgn.cost.vehCost >= INFTY) {
-
+                asgn.cost.total = INFTY;
+                return asgn.cost;
             }
 
             int total = (vehCost + walkingCost + tripCost + waitTimeViolationCost + changeInTripCostsOfOthers);

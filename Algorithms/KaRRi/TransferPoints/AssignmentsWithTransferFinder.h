@@ -85,6 +85,8 @@ namespace karri {
             transferPoints = std::map<std::tuple<int, int>, std::vector<TransferPoint>>{};
         }
 
+        // TODO Stats wie die Verteilung der Verbesserung der Kosten liegen und so
+        // TODO Im Aufschrieb, SPP gut ausarbeiten, um das Framework gut zu erklären, um eventuelle Follow Ups zu erleichtern 
         // Method to find the best assignment with exactly one transfer, using the best found cost without transfer to prune solutions
         void findBestAssignment() {
             Timer totalTimer;

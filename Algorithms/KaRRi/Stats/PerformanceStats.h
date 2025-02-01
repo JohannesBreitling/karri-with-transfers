@@ -282,9 +282,70 @@ namespace karri::stats {
     };
 
     struct AssignmentsWithTransferPerformanceStats {
+
+        //* Total Stats for AssignmentsWithTransfer (summed for all requests)
+        int64_t numImprovedRequests; 
+
+        
+        //* General Stats for Request
+        
+        int64_t numVehiclesPickupORD;
+        int64_t numVehiclesPickupBNS;
+        int64_t numVehiclesPickupALS;
+
+        int64_t numVehiclesDropoffBNS;
+        int64_t numVehiclesDropoffORD;
+        int64_t numVehiclesDropoffALS;
+
+        int64_t numRelPickupsORD;
+        int64_t numRelPickupsBNS;
+        int64_t numRelPickupsALS;
+
+        int64_t timeTotalForRequest;
+
+        
+        //* Stats for Ordinary Transfer 
+        int64_t numPVehDVehPairs;
+
+        // Stats for Transfer Point Calculation
+        int64_t numNodesVisitedInDijkstra;
+        int64_t numDijkstraSearches;
+        int64_t numTransferPoints;
+        int64_t timeTPCalculation;
+
+
+
+        //* Stats for Transfer ALS PVeh
+        
+
+        //* Stats for Transfer ALS DVeh
+        int64_t transferALSnumLastStopToAllStopSearches;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
         int64_t numPickupDropoffPairs;
         int64_t numStopPairs;
-        int64_t numTransferPoints;
 
         // TODO numDijkstraSearches....
 
@@ -304,7 +365,9 @@ namespace karri::stats {
 
         int64_t totalTime;
 
+
         void clear() {
+            
             numPickupDropoffPairs = 0;
             numStopPairs = 0;
             numTransferPoints = 0;

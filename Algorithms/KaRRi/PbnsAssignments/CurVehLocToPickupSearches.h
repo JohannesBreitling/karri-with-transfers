@@ -329,7 +329,7 @@ namespace karri {
 
                 if (!knowsDistanceTransfer(vehicle.vehicleId, transferLoc)) {
                     if (vehLocation.location == transferLoc) {
-                        distancesTransfer[{vehicle.vehicleId, transferLoc}] = distToCurLoc;
+                        distancesTransfer[{vehicle.vehicleId, transferLoc}] = distToCurLoc; // TODO Ist das so richtig?
                     } else {
                         targets[i] = ch.rank(inputGraph.edgeTail(transferLoc));
                         targetOffsets[i] = inputGraph.travelTime(transferLoc);
