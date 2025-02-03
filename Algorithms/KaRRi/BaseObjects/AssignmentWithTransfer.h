@@ -58,6 +58,23 @@ namespace karri {
             dVeh = &dVehArg;
             transfer = tpArg;
         }
+
+        AssignmentWithTransfer(const Vehicle *pVehArg, const Vehicle *dVehArg, const TransferPoint tpArg, const PDLoc *pickupPDLoc, int pickupIdxArg, int distToPickupArg, int distFromPickupArg, int tIdxPVeh, int tIdxDVeh) {
+            pVeh = pVehArg;
+            dVeh = dVehArg;
+            transfer = tpArg;
+            pickupIdx = pickupIdxArg;
+            transferIdxPVeh = tIdxPVeh;
+            transferIdxDVeh = tIdxDVeh;
+
+            pickup = pickupPDLoc;
+            distToPickup = distToPickupArg;
+            distFromPickup = distFromPickupArg;
+            distToTransferPVeh = tpArg.distancePVehToTransfer;
+            distFromTransferPVeh = tpArg.distancePVehFromTransfer;
+            distToTransferDVeh = tpArg.distanceDVehToTransfer;
+            distFromTransferDVeh = tpArg.distanceDVehFromTransfer;
+        }
         
         AssignmentWithTransfer(const Vehicle &pVehArg, const Vehicle &dVehArg, const TransferPoint tpArg, const PDLoc *pickupPDLoc, int pickupIdxArg, int distToPickupArg, int distFromPickupArg, int tIdxPVeh, int tIdxDVeh) {
             pVeh = &pVehArg;
@@ -123,6 +140,9 @@ namespace karri {
         bool transferAtStopDVeh;
         enum INS_TYPES dropoffType = NOT_SET;
         bool dropoffAtStop;
+
+        int tripTimePVeh;
+        int tripTimeDVeh;
     };
 
 }

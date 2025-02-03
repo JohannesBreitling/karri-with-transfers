@@ -60,6 +60,8 @@ namespace karri {
         struct RequestData {
             // TODO Erweitern für den Fall, dass ein AssignmentWithTransfer vorliegt
             int depTime;
+            int arrAtTransferPoint;
+            int depTimeAtTransferPoint;
             int walkingTimeToPickup;
             int walkingTimeFromDropoff;
             int assignmentCost;
@@ -72,7 +74,7 @@ namespace karri {
                 const Fleet &fleet, const std::vector<Request> &requests,
                 AssignmentFinderT &assignmentFinder, SystemStateUpdaterT &systemStateUpdater,
                 const ScheduledStopsT &scheduledStops,
-                const bool verbose = true) // TODO Change hiere to false
+                const bool verbose = true) // TODO Change here to false
                 : fleet(fleet),
                   requests(requests),
                   assignmentFinder(assignmentFinder),
@@ -167,7 +169,7 @@ namespace karri {
                     break;
                 
                 case ASSIGNED_TO_PVEH:
-                    
+                    handleArrivalAtTransferPoint(reqId, occTime);
                     break;
                 
                 case ASSIGNED_TO_VEH:
@@ -250,7 +252,7 @@ namespace karri {
                 } else {
                     requestState[reqId] = WALKING_TO_DEST;
                     requestEvents.insert(reqId, occTime + reqData.walkingTimeFromDropoff);
-                }                
+                }
             }
 
             // Next event for this vehicle is the departure at this stop:
@@ -305,6 +307,20 @@ namespace karri {
             eventSimulationStatsLogger << occTime << ",RequestReceipt," << time << '\n';
         }
 
+        void handleArrivalAtTransferPoint(const int reqId, const int occTime) {
+
+            assert(requestState[reqId] == ASSIGNED_TO_PVEH);
+
+            int id, key;
+            requestEvents.deleteMin(id, key);
+            assert(reqId == id && occTime == key);
+
+            // TODO Ist das ausreichend??        
+            requestState[reqId] = ASSIGNED_TO_VEH;
+            requestData[reqId].arrAtTransferPoint = occTime;
+
+        }
+
         template<typename AssignmentWithTransferT>
         void applyAssignmentWithTransfer(const AssignmentWithTransferT &asgn, const int reqId) {
             if (!asgn.dVeh || !asgn.pVeh || !asgn.pickup || !asgn.dropoff) {
@@ -322,8 +338,14 @@ namespace karri {
             systemStateUpdater.insertBestAssignmentWithTransfer(asgn, pickupStopId, transferStopIdPVeh, transferStopIdDVeh, dropoffStopId);
             systemStateUpdater.writePerformanceLogs();
             
-            assert(pickupStopId >= 0 && dropoffStopId >= 0);
-            assert(transferStopIdPVeh >= 0 && transferStopIdDVeh >= 0);
+            //if (pickupStopId == -1 || transferStopIdPVeh == -1 || transferStopIdDVeh == -1 || dropoffStopId == -1) {
+            //    requestState[reqId] = FINISHED;
+            //    systemStateUpdater.writePerformanceLogs();
+            //    return;
+            //}
+
+            // assert(pickStopId >= 0 && dropoffStopId >= 0);
+            // assert(transferStopIdPVeh >= 0 && transferStopIdDVeh >= 0);
 
             const auto pVehId = asgn.pVeh->vehicleId;
             const auto dVehId = asgn.dVeh->vehicleId;

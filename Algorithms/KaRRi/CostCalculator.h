@@ -887,6 +887,7 @@ namespace karri {
             const auto arrTimeAtTransfer = getArrTimeAtTransfer(depTimeAtPickup, asgn, initialPickupDetour, transferAtExistingStop, routeState);
             asgn.arrAtTransferPoint = arrTimeAtTransfer;
             const int tripTimePVeh = arrTimeAtTransfer - context.originalRequest.requestTime;
+            asgn.tripTimePVeh = tripTimePVeh;
 
             const auto walkingCostPVeh = F::calcWalkingCost(asgn.pickup->walkingDist, InputConfig::getInstance().pickupRadius);
             const auto tripCostPVeh = F::calcTripCost(tripTimePVeh, context);
@@ -928,6 +929,7 @@ namespace karri {
 
             const int arrTimeAtDropoff = getArrTimeAtDropoff(actualDepTimeAtTransfer, asgn, initialTransferDetour, dropoffAtExistingStop, routeState);
             const int tripTime = arrTimeAtDropoff - asgn.arrAtTransferPoint + asgn.dropoff->walkingDist;
+            asgn.tripTimeDVeh = tripTime;
 
             const int walkingCost = F::calcWalkingCost(asgn.dropoff->walkingDist, InputConfig::getInstance().dropoffRadius);
             const int tripCost = F::calcTripCost(tripTime, context);

@@ -102,6 +102,10 @@ namespace karri {
             return getPassengerArrAtPickup(pickupId) + getMaxPDTripTime(pickupId, dropoffId);
         }
 
+        int getMaxArrTimeAtTransfer(const AssignmentWithTransfer &asgn) const {
+            return getMaxArrTimeAtDropoff(asgn.pickup->id, asgn.dropoff->id) - asgn.tripTimeDVeh;
+        }
+
         int getMaxDepTimeAtPickup() const {
             return originalRequest.requestTime + InputConfig::getInstance().maxWaitTime;
         }
@@ -123,8 +127,9 @@ namespace karri {
         }
 
         void tryAssignment(AssignmentWithTransfer &asgn) {
-            // assert(asgn.distFromTransferDVeh > 0 || asgn.transferIdxDVeh == asgn.transferIdxPVeh);
-
+            assert(asgn.pVeh->vehicleId >= 0 && asgn.dVeh->vehicleId >= 0 && asgn.pVeh->vehicleId != asgn.dVeh->vehicleId && asgn.pickup && asgn.dropoff);
+            assert(asgn.distFromPickup >= 0 && asgn.distToPickup >= 0 && asgn.distToTransferPVeh >= 0 && asgn.distFromTransferPVeh >= 0 && asgn.distToTransferDVeh >= 0 && asgn.distFromTransferDVeh >= 0 && asgn.distToDropoff >= 0 && asgn.distFromDropoff >= 0);
+            
             // Calculate the cost of the assignment and try to update the best known assignment if the assignment is finished
             RequestCost cost;
             if (!asgn.isFinished()) {
@@ -151,7 +156,7 @@ namespace karri {
         
         bool improvementThroughTransfer() const {
             return false;
-            // return bestCostWithTransfer < bestCost;
+            return bestCostWithTransfer < bestCost;
         }
 
         const int &getBestCost() const {

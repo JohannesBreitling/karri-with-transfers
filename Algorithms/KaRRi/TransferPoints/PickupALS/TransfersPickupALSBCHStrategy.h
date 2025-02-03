@@ -196,11 +196,27 @@ namespace karri::Transfers {
                   vehiclesSeenForPickups(fleet.size()) {}
 
         int getDistanceToPickup(const int vehId, const unsigned int pickupId) {
-            return distances.getDistance(vehId, pickupId);
+            
+            bool found = false;
+            for (const auto testVehId : vehiclesSeenForPickups) {
+                if (testVehId == vehId)
+                    found = true;
+            }
+            assert(found);
+
+            const int distance = distances.getDistance(vehId, pickupId); 
+            assert(distance >= 0);
+            return distance;
         }
         
         Subset findPickupsAfterLastStop() {
             runBchSearches();
+
+            // TODO Test
+            for (const auto pickup : requestState.pickups) {
+                for (const auto vehId : vehiclesSeenForPickups)
+                    assert(getDistanceToPickup(vehId, pickup.id) >= 0);
+            }
             
             return vehiclesSeenForPickups;
         }
@@ -255,6 +271,15 @@ namespace karri::Transfers {
 
             distances.setCurBatchIdx(firstPickupId / K);
             search.run(pickupTails, travelTimes);
+
+            // TODO
+            /* for (const int vehId : vehiclesSeenForPickups) {
+                const auto distancesForBatch = distances.getDistancesForCurBatch(vehId);
+
+                for (int i = 0; i < K; i++) {
+                    assert(distancesForBatch[i] >= 0);
+                }
+            } */
 
             // totalNumEdgeRelaxations += search.getNumEdgeRelaxations();
             // totalNumVerticesSettled += search.getNumVerticesSettled();

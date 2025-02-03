@@ -220,7 +220,7 @@ namespace karri {
             assert(start + asgn.dropoffIdx < end);
             const auto arrAtDropoff = schedArrTimes[start + asgn.dropoffIdx];
 
-            return arrAtDropoff - asgn.arrAtTransferPoint + asgn.distToTransferDVeh + asgn.distFromTransferDVeh + asgn.distToDropoff + asgn.distFromDropoff;
+            return arrAtDropoff - asgn.arrAtTransferPoint + asgn.distToTransferDVeh + asgn.distFromTransferDVeh + asgn.distToDropoff + asgn.distFromDropoff; // TODO Ist das hier korrekt??
         }
 
         template<typename RequestStateT>
@@ -307,7 +307,6 @@ namespace karri {
                 dropoffInsertedAsNewStop = true;
             }
 
-            // Propagate updated scheduled arrival and departure times as well as latest permissible arrival times.
             if (start + dropoffIndex < end - 1) {
                 // At this point minDepTimes[start + dropoffIndex] is correct. If dropoff has been inserted not as the last
                 // stop, propagate the changes to minDep and minArr times forward until the last stop.
@@ -404,7 +403,17 @@ namespace karri {
             bool pickupInsertedAsNewStop = false;
             bool transferInsertedAsNewStop = false;
 
-            if ((pickupIdx > 0 || schedDepTimes[start] > now) && pickup.loc == stopLocations[start + pickupIdx]) {
+            const bool pickupNotInsertedAsNewStopCond = (pickupIdx > 0 || schedDepTimes[start] > now) && pickup.loc == stopLocations[start + pickupIdx];
+            
+            const int stopLocationTransfer = pickupNotInsertedAsNewStopCond ? stopLocations[start + transferIdx] : stopLocations[start + transferIdx + 1];
+            const bool transferNotInsertedAsNewStopCond = pickup.loc != transfer.loc && transfer.loc == stopLocationTransfer;
+
+            if (pickupNotInsertedAsNewStopCond && transferNotInsertedAsNewStopCond) {
+                std::cout << "Wir machen nen taktischen Skip..." << std::endl;
+                return {-1, -1}; 
+            }
+
+            if (pickupNotInsertedAsNewStopCond) {
                 assert(start + pickupIdx == end - 1
                     || pickupIdx == transferIdx
                     || asgn.distFromPickup == schedArrTimes[start + pickupIdx + 1] - schedDepTimes[start + pickupIdx]);
@@ -448,9 +457,14 @@ namespace karri {
                 propagateSchedArrAndDepForward(start + pickupIdx + 1, start + transferIdx, asgn.distFromPickup);
             }
 
-            if (pickup.loc != transfer.loc && transfer.loc == stopLocations[start + transferIdx]) {
-                maxArrTimes[start + transferIdx] = std::min(maxArrTimes[start + transferIdx], requestState.getMaxArrTimeAtDropoff(pickup.id, asgn.dropoff->id) - getMinTripTimeForDVeh(asgn));
+            const int actualStopLocationTransfer = stopLocations[start + transferIdx];
+            const bool conditionTransferNotNewStop = pickup.loc != transfer.loc && transfer.loc == actualStopLocationTransfer;
+            if (conditionTransferNotNewStop) {
+                // maxArrTimes[start + transferIdx] = std::min(maxArrTimes[start + transferIdx], requestState.getMaxArrTimeAtDropoff(pickup.id, asgn.dropoff->id) - getMinTripTimeForDVeh(asgn)); // TODO Check that again...
+                maxArrTimes[start + transferIdx] = std::min(maxArrTimes[start + transferIdx], requestState.getMaxArrTimeAtTransfer(asgn));
+                // maxArrTimes[start + dropoffIndex] = std::min(maxArrTimes[start + dropoffIndex], requestState.getMaxArrTimeAtDropoff(pickup.id, dropoff.id));
             } else {
+                // Insert transfer as new stop
                 ++transferIdx;
                 stableInsertion(vehId, transferIdx, getUnusedStopId(),
                                 pos, stopIds, stopLocations, schedArrTimes, schedDepTimes, vehWaitTimesPrefixSum,
@@ -459,20 +473,26 @@ namespace karri {
                 schedArrTimes[start + transferIdx] = schedDepTimes[start + transferIdx - 1] + asgn.distToTransferPVeh;
                 schedDepTimes[start + transferIdx] = schedArrTimes[start + transferIdx] + InputConfig::getInstance().stopTime;
                 // compare maxVehArrTime to next stop later
-                maxArrTimes[start + transferIdx] = requestState.getMaxArrTimeAtDropoff(pickup.id, asgn.dropoff->id) - getMinTripTimeForDVeh(asgn);
+                // maxArrTimes[start + transferIdx] = requestState.getMaxArrTimeAtDropoff(pickup.id, asgn.dropoff->id) - getMinTripTimeForDVeh(asgn); // TODO Nochmal checken
+                maxArrTimes[start + transferIdx] = requestState.getMaxArrTimeAtTransfer(asgn);
                 occupancies[start + transferIdx] = occupancies[start + transferIdx - 1];
                 numDropoffsPrefixSum[start + transferIdx] = numDropoffsPrefixSum[start + transferIdx - 1];
                 transferInsertedAsNewStop = true;
             }
 
             // Propagate updated scheduled arrival and departure times as well as latest permissible arrival times.
-            if (start + transferIdx < end - 1) {
+            if (start + transferIdx < end - 1 && (transferInsertedAsNewStop || pickupInsertedAsNewStop)) {
                 // At this point minDepTimes[start + dropoffIndex] is correct. If dropoff has been inserted not as the last
                 // stop, propagate the changes to minDep and minArr times forward until the last stop.
                 propagateSchedArrAndDepForward(start + transferIdx + 1, end - 1, asgn.distFromTransferPVeh);
-
+ 
                 // If there are stops after the dropoff, consider them for propagating changes to the maxArrTimes
                 propagateMaxArrTimeBackward(start + transferIdx, start + pickupIdx);
+            } else if (start + transferIdx < end - 1) {
+                std::cout << "What do we do in this case?..." << std::endl;
+                propagateSchedArrAndDepForward(start + transferIdx + 1, end - 1);
+                propagateMaxArrTimeBackward(start + transferIdx, start + pickupIdx);
+                // assert(false);
             } else {
                 // If there are no stops after the dropoff, propagate maxArrTimes backwards not including dropoff
                 propagateMaxArrTimeBackward(start + transferIdx - 1, start + pickupIdx);
@@ -560,7 +580,10 @@ namespace karri {
             bool transferInsertedAsNewStop = false;
             bool dropoffInsertedAsNewStop = false;
 
-            if ((transferIdx > 0 || schedDepTimes[start] > now) && transfer.loc == stopLocations[start + transferIdx]) {
+            // printStopLocations(vehId); // TODO Test
+            const int stopLocationTransfer = stopLocations[start + transferIdx];
+            const bool conditionTransferAsNewStop = (transferIdx > 0 || schedDepTimes[start] > now) && transfer.loc == stopLocationTransfer;
+            if (conditionTransferAsNewStop) {
                 assert(start + transferIdx == end - 1 || transferIdx == dropoffIdx ||
                        asgn.distFromTransferDVeh == schedArrTimes[start + transferIdx + 1] - schedDepTimes[start + transferIdx]);
 
@@ -578,7 +601,7 @@ namespace karri {
             } else {
                 // If vehicle is currently idle, the vehicle can leave its current stop at the earliest when the
                 // request is made. In that case, we update the arrival time to count the idling as one stopTime.
-                schedDepTimes[end - 1] = std::max(schedDepTimes[end - 1], asgn.arrAtTransferPoint);
+                schedDepTimes[end - 1] = std::max(schedDepTimes[end - 1], requestState.originalRequest.requestTime);
                 schedArrTimes[end - 1] = schedDepTimes[end - 1] - InputConfig::getInstance().stopTime;
                 ++transferIdx;
                 ++dropoffIdx;
@@ -601,6 +624,11 @@ namespace karri {
                 propagateSchedArrAndDepForward(start + transferIdx + 1, start + dropoffIdx, asgn.distFromTransferDVeh);
             }
 
+            // printStopLocations(vehId); // TODO Test
+            // const int stopLocationBeforeTransfer = stopLocations[start + transferIdx - 1];
+            // (void) stopLocationBeforeTransfer;
+            // const int stopLocationTransfer = stopLocations[start + transferIdx];
+            // const bool conditionTransferNewStop = pickup.loc != transfer.loc && transfer.loc == stopLocationTransfer;
             if (transfer.loc != dropoff.loc && dropoff.loc == stopLocations[start + dropoffIdx]) {
                 maxArrTimes[start + dropoffIdx] = std::min(maxArrTimes[start + dropoffIdx],
                                                              requestState.getMaxArrTimeAtDropoff(asgn.pickup->id,
@@ -850,6 +878,24 @@ namespace karri {
             }
         }
 
+        void propagateSchedArrAndDepForward(const int fromIdx, const int toIdx) { // TODO Das hier nochmal besprechen
+            int distPrevToCurrent = 0;
+            
+            for (int l = fromIdx; l <= toIdx; ++l) {
+                schedArrTimes[l] = schedDepTimes[l - 1] + distPrevToCurrent;
+
+                // If the planned departure time is already later than the new arrival time demands, then the planned
+                // departure time remains unaffected and subsequent arrival/departure times will not change either.
+                if (schedDepTimes[l] >= schedArrTimes[l] + InputConfig::getInstance().stopTime) {
+                    break;
+                }
+
+                const auto oldMinDepTime = schedDepTimes[l];
+                schedDepTimes[l] = schedArrTimes[l] + InputConfig::getInstance().stopTime; // = max(schedDepTimes[l], schedArrTimes[l] + stopTime);
+                if (l < toIdx) distPrevToCurrent = schedArrTimes[l + 1] - oldMinDepTime;
+            }
+        }
+
         // Backwards propagation of changes to maxArrTimes from fromIdx down to toIdx
         void propagateMaxArrTimeBackward(const int fromIdx, const int toIdx) {
             for (int l = fromIdx; l >= toIdx; --l) {
@@ -967,6 +1013,15 @@ namespace karri {
                     }
                 }
             }
+        }
+
+        void printStopLocations(const int vehId) {
+            std::string sep = "";
+            for (int i = 0; i < stopLocationsFor(vehId).size(); ++i) {
+                std::cout << sep << i << ": " << stopLocationsFor(vehId)[i];
+                sep = ", ";
+            }
+            std::cout << std::endl;
         }
 
         // Index Array:

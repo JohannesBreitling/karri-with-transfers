@@ -58,27 +58,27 @@ namespace karri {
             std::vector<int> pVehIds = constructPVehSet();
             std::vector<int> dVehIds = constructDVehSet();
 
-            std::vector<Vehicle> pVehs = std::vector<Vehicle>{};
-            std::vector<Vehicle> dVehs = std::vector<Vehicle>{};
+            std::vector<const Vehicle*> pVehs = std::vector<const Vehicle*>{};
+            std::vector<const Vehicle*> dVehs = std::vector<const Vehicle*>{};
 
             for (const int pVehId : pVehIds) {
-                pVehs.push_back(fleet[pVehId]);
+                pVehs.push_back(&fleet[pVehId]);
             }
 
             for (const int dVehId : dVehIds) {
-                dVehs.push_back(fleet[dVehId]);
+                dVehs.push_back(&fleet[dVehId]);
             }
             
             // Loop over all the possible vehicle combinations
-            for (const auto pVeh : pVehs) {
-                for (const auto dVeh : dVehs) {
+            for (const auto *pVeh : pVehs) {
+                for (const auto *dVeh : dVehs) {
                     // pVeh an dVeh can not be the same vehicles
-                    if (dVeh.vehicleId == pVeh.vehicleId)
+                    if (dVeh->vehicleId == pVeh->vehicleId)
                         continue;
                     
                     // Now we have a vehicle pair to work with
                     // Find the transfer points between the two vehicles
-                    calculateTransferPoints(&pVeh, &dVeh);
+                    calculateTransferPoints(pVeh, dVeh);
 
                     if (transferPointsSize() == 0)
                         continue;
@@ -121,18 +121,18 @@ namespace karri {
             tpFinder.findTransferPoints(*pVeh, *dVeh);
         }
 
-        void findAssignmentsForVehiclePair(const Vehicle &pVeh, const Vehicle &dVeh) {
+        void findAssignmentsForVehiclePair(const Vehicle *pVeh, const Vehicle *dVeh) {
 
-            pairedLowerBoundPT = calculateLowerBoundPairedPT(pVeh, dVeh);
-            pairedLowerBoundTD = calculateLowerBoundPairedTD(pVeh, dVeh);
+            pairedLowerBoundPT = calculateLowerBoundPairedPT(pVeh);
+            pairedLowerBoundTD = calculateLowerBoundPairedTD(dVeh);
 
-            const int numStopsPVeh = routeState.numStopsOf(pVeh.vehicleId);
-            const int numStopsDVeh = routeState.numStopsOf(dVeh.vehicleId);
+            const int numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
+            const int numStopsDVeh = routeState.numStopsOf(dVeh->vehicleId);
 
-            if (!relORDPickups.hasRelevantSpotsFor(pVeh.vehicleId) && !relBNSPickups.hasRelevantSpotsFor(pVeh.vehicleId))
+            if (!relORDPickups.hasRelevantSpotsFor(pVeh->vehicleId) && !relBNSPickups.hasRelevantSpotsFor(pVeh->vehicleId))
                 return;
 
-            if (!relBNSDropoffs.hasRelevantSpotsFor(dVeh.vehicleId) && !relORDDropoffs.hasRelevantSpotsFor(dVeh.vehicleId) && dVehIdsALS.size() == 0)
+            if (!relBNSDropoffs.hasRelevantSpotsFor(dVeh->vehicleId) && !relORDDropoffs.hasRelevantSpotsFor(dVeh->vehicleId) && dVehIdsALS.size() == 0)
                 return;
 
             for  (int trIdxPVeh = 0; trIdxPVeh < numStopsPVeh - 1; trIdxPVeh++) {
@@ -145,13 +145,13 @@ namespace karri {
         }
 
         
-        void tryPickupORD(const Vehicle &pVeh, const Vehicle &dVeh, const int trIdxPVeh, const int trIdxDVeh) {
-            if (trIdxPVeh == 0 || !relORDPickups.hasRelevantSpotsFor(pVeh.vehicleId))
+        void tryPickupORD(const Vehicle *pVeh, const Vehicle *dVeh, const int trIdxPVeh, const int trIdxDVeh) {
+            if (trIdxPVeh == 0 || !relORDPickups.hasRelevantSpotsFor(pVeh->vehicleId))
                 return;
 
             const auto transferPointsForStopPair = transferPoints[{trIdxPVeh, trIdxDVeh}];
 
-            for (const auto &pickup : relORDPickups.relevantSpotsFor(pVeh.vehicleId)) {
+            for (const auto &pickup : relORDPickups.relevantSpotsFor(pVeh->vehicleId)) {
                 if (pickup.stopIndex > trIdxPVeh)
                     continue;
                 
@@ -174,13 +174,13 @@ namespace karri {
             }
         }
         
-        void tryPickupBNS(const Vehicle &pVeh, const Vehicle &dVeh, const int trIdxPVeh, const int trIdxDVeh) {
-            if (!relBNSPickups.hasRelevantSpotsFor(pVeh.vehicleId))
+        void tryPickupBNS(const Vehicle *pVeh, const Vehicle *dVeh, const int trIdxPVeh, const int trIdxDVeh) {
+            if (!relBNSPickups.hasRelevantSpotsFor(pVeh->vehicleId))
                 return;
             
             const auto transferPointsForStopPair = transferPoints[{trIdxPVeh, trIdxDVeh}];
 
-            for (const auto &pickup : relBNSPickups.relevantSpotsFor(pVeh.vehicleId)) {
+            for (const auto &pickup : relBNSPickups.relevantSpotsFor(pVeh->vehicleId)) {
                 for (const auto tp : transferPointsForStopPair) {
                     // Build the partial assignment with the transfer point
                     PDLoc *pickupPDLoc = &requestState.pickups[pickup.pdId];
@@ -356,7 +356,7 @@ namespace karri {
             return total;
         }
 
-        void finishAssignments(const Vehicle &pVeh, const Vehicle &dVeh) {
+        void finishAssignments(const Vehicle *pVeh, const Vehicle *dVeh) {
             // Method to finish the assignments that have lower bounds used
             std::vector<AssignmentWithTransfer> toCalculate = std::vector<AssignmentWithTransfer>{};
             std::vector<AssignmentWithTransfer> currentlyCalculating = std::vector<AssignmentWithTransfer>{};
@@ -374,11 +374,11 @@ namespace karri {
             }
 
             if (currentlyCalculating.size() > 0)
-                searches.computeExactDistancesVia(pVeh);
+                searches.computeExactDistancesVia(*pVeh);
 
             for (auto asgn : currentlyCalculating) {
-                assert(searches.knowsDistance(pVeh.vehicleId, asgn.pickup->id));
-                const int distance = searches.getDistance(pVeh.vehicleId, asgn.pickup->id);
+                assert(searches.knowsDistance(pVeh->vehicleId, asgn.pickup->id));
+                const int distance = searches.getDistance(pVeh->vehicleId, asgn.pickup->id);
                 asgn.distToPickup = distance;
                 asgn.pickupBNSLowerBoundUsed = false;
 
@@ -463,11 +463,11 @@ namespace karri {
             temp.clear();
 
             if (currentlyCalculating.size() > 0)
-                searches.computeExactTransferDistancesVia(dVeh);
+                searches.computeExactTransferDistancesVia(*dVeh);
 
             for (auto asgn : currentlyCalculating) {
-                assert(searches.knowsDistanceTransfer(dVeh.vehicleId, asgn.transfer.loc));
-                const int distance = searches.getDistanceTransfer(dVeh.vehicleId, asgn.transfer.loc);
+                assert(searches.knowsDistanceTransfer(dVeh->vehicleId, asgn.transfer.loc));
+                const int distance = searches.getDistanceTransfer(dVeh->vehicleId, asgn.transfer.loc);
                 asgn.distToTransferDVeh = distance;
                 asgn.dropoffBNSLowerBoundUsed = false;
 
@@ -574,18 +574,18 @@ namespace karri {
             return dVehIds;
         }
 
-        int calculateLowerBoundPairedPT(const Vehicle &pVeh, const Vehicle & /*dVeh*/) {
+        int calculateLowerBoundPairedPT(const Vehicle *pVeh) {
             std::vector<int> sources = std::vector<int>{};
             std::vector<int> targets = std::vector<int>{};
 
-            for (const auto &pickup : relBNSPickups.relevantSpotsFor(pVeh.vehicleId)) {
+            for (const auto &pickup : relBNSPickups.relevantSpotsFor(pVeh->vehicleId)) {
                 const auto pickupEdge = requestState.pickups[pickup.pdId].loc;
                 const auto head = inputGraph.edgeHead(pickupEdge);
                 
                 sources.push_back(head);
             }
 
-            for (const auto &pickup : relORDPickups.relevantSpotsFor(pVeh.vehicleId)) {
+            for (const auto &pickup : relORDPickups.relevantSpotsFor(pVeh->vehicleId)) {
                 const auto pickupEdge = requestState.pickups[pickup.pdId].loc;
                 const auto head = inputGraph.edgeHead(pickupEdge);
 
@@ -611,18 +611,18 @@ namespace karri {
             return lb; 
         }
 
-        int calculateLowerBoundPairedTD(const Vehicle & /*pVeh*/, const Vehicle &dVeh) {
+        int calculateLowerBoundPairedTD(const Vehicle *dVeh) {
             std::vector<int> sources = std::vector<int>{};
             std::vector<int> targets = std::vector<int>{};
 
-            for (const auto &dropoff : relBNSDropoffs.relevantSpotsFor(dVeh.vehicleId)) {
+            for (const auto &dropoff : relBNSDropoffs.relevantSpotsFor(dVeh->vehicleId)) {
                 const auto dropoffEdge = requestState.dropoffs[dropoff.pdId].loc;
                 const auto tail = inputGraph.edgeTail(dropoffEdge);
                 
                 targets.push_back(tail);
             }
 
-            for (const auto &dropoff : relORDDropoffs.relevantSpotsFor(dVeh.vehicleId)) {
+            for (const auto &dropoff : relORDDropoffs.relevantSpotsFor(dVeh->vehicleId)) {
                 const auto dropoffEdge = requestState.dropoffs[dropoff.pdId].loc;
                 const auto tail = inputGraph.edgeTail(dropoffEdge);
 

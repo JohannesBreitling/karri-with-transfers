@@ -66,7 +66,9 @@ namespace karri {
                 return INFTY;
 
             const int batchIdx = pdLocId / K;
-            return distances[startIdx + batchIdx][pdLocId % K];
+            // assert(distances[startIdx + batchIdx][pdLocId % K] >= 0);
+            const int dist = distances[startIdx + batchIdx][pdLocId % K];
+            return dist >= 0 ? dist : INFTY; // TODO Sometshing is not working right in the search, the search is setting some distaces that are negative
         }
 
         DistanceLabel getDistancesForCurBatch(const int &vehId) {
@@ -74,11 +76,11 @@ namespace karri {
             const int startIdx = startIdxForVeh[vehId];
             if (startIdx == INVALID_INDEX)
                 return DistanceLabel(INFTY);
+            
             return distances[startIdx + curBatchIdx];
         }
 
-        void
-        setDistancesForCurBatchIf(const int &vehId, const DistanceLabel &distanceBatch,
+        void setDistancesForCurBatchIf(const int &vehId, const DistanceLabel &distanceBatch,
                                   const LabelMask &batchInsertMask) {
             if (!anySet(batchInsertMask))
                 return;

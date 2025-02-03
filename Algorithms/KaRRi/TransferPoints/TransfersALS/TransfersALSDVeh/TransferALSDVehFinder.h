@@ -84,7 +84,7 @@ class TransferALSDVehFinder {
                                 assert(numStopsPVeh - 1 == distancesToDropoff.size());
                                 
                                 // Construct the transfer point
-                                TransferPoint tp = TransferPoint(stopLocationsPVeh[i], pVeh, dVeh);                                
+                                TransferPoint tp = TransferPoint(stopLocationsPVeh[i], pVeh, dVeh);
                                 tp.distancePVehToTransfer = 0;
                                 tp.distancePVehFromTransfer = 0;
                                 tp.distanceDVehToTransfer = distancesToTransfer[i - 1];
@@ -115,6 +115,15 @@ class TransferALSDVehFinder {
                                 asgn.transferIdxPVeh = i;
                                 asgn.transferIdxDVeh = numStopsDVeh - 1;
 
+                                asgn.pickupType = BEFORE_NEXT_STOP;
+                                asgn.transferTypePVeh = ORDINARY;
+                                asgn.transferTypeDVeh = AFTER_LAST_STOP;
+                                asgn.dropoffType = AFTER_LAST_STOP;
+
+                                // Skip the assignment if the pickup is in the same leg as the transfer, because then we would drive back to the stop before the pickup to perform the transfer
+                                if (asgn.pickupIdx == asgn.transferIdxPVeh)
+                                    continue;
+
                                 // Try the finished assignment with ORD dropoff
                                 requestState.tryAssignment(asgn);
                             }
@@ -127,6 +136,9 @@ class TransferALSDVehFinder {
                     const auto *pVeh = &fleet[pVehId];
                     const auto numStopsPVeh = routeState.numStopsOf(pVehId);
                     const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
+
+                    if (dVehId == pVehId)
+                        continue;
 
                     //* Calculate the distances from the vehicles last stop to all stops of possible pickup vehicles
                     const auto distancesToTransfer = strategy.calculateDistancesFromLastStopToAllStops(*dVeh, *pVeh);
@@ -171,6 +183,15 @@ class TransferALSDVehFinder {
                                 asgn.dropoffIdx = numStopsDVeh - 1;
                                 asgn.transferIdxPVeh = i;
                                 asgn.transferIdxDVeh = numStopsDVeh - 1;
+
+                                asgn.pickupType = ORDINARY;
+                                asgn.transferTypePVeh = ORDINARY;
+                                asgn.transferTypeDVeh = AFTER_LAST_STOP;
+                                asgn.dropoffType = AFTER_LAST_STOP;
+
+                                // Skip the assignment if the pickup is in the same leg as the transfer, because then we would drive back to the stop before the pickup to perform the transfer
+                                if (asgn.pickupIdx == asgn.transferIdxPVeh)
+                                    continue;
 
                                 // Try the finished assignment with ORD dropoff
                                 requestState.tryAssignment(asgn);

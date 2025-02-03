@@ -143,6 +143,15 @@ namespace karri {
             timer.restart();
 
             auto [pIdxPVeh, dIdxPVeh] = routeState.insertPVeh(asgn, requestState);
+
+            if (pIdxPVeh == -1 || dIdxPVeh == -1) {
+                pickupStopId = -1;
+                transferStopIdPVeh = -1;
+                transferStopIdDVeh = -1;
+                dropoffStopId = -1;
+                return;
+            }
+            
             updateBucketStatePVeh(asgn, pIdxPVeh, dIdxPVeh, depTimeAtLastStopBeforePVeh);
 
             // If the vehicle has to be rerouted at its current location for a PBNS assignment, we introduce an
