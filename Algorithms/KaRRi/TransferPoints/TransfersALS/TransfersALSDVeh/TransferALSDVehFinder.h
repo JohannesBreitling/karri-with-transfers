@@ -32,12 +32,24 @@ class TransferALSDVehFinder {
             calc(calc) {}
 
     void findAssignments() {
-        // std::cout << "Find Assignments with Transfer ALS DVeh\n";
+        auto &stats = requestState.stats().transferALSDVehStats;
+        (void) stats;
+        init();
+
         findAssignmentsWithDropoffALS();
+    
+    }
+
+    void init() {
+        // TODO Initialize stats    
     }
 
     private:
         void findAssignmentsWithDropoffALS() {
+
+
+
+
             // The pickup has to be BNS or ORD
             // The set of pickup vehicles are the vehicles with BNS or ORD pickups
             if (relORDPickups.getVehiclesWithRelevantPDLocs().size() == 0 && relBNSPickups.getVehiclesWithRelevantPDLocs().size() == 0)
@@ -215,6 +227,13 @@ class TransferALSDVehFinder {
         RequestState &requestState;
 
         CostCalculator &calc;
+
+        int64_t numPossibleDropoffVehs;
+        int64_t numPossiblePickupVehs;
+        int64_t numORDPVehs;
+        int64_t numBNSPVehs;
+        int64_t numORDPickups;
+        int64_t numBNSPickups;
 
 };
 

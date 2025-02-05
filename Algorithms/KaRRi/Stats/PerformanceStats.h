@@ -281,8 +281,61 @@ namespace karri::stats {
         }
     };
 
-    struct AssignmentsWithTransferPerformanceStats {
+    struct AssignmentsWithOrdinaryTransferPerformanceStats {
 
+
+        /* int64_t initializationTime;
+
+        int64_t numRelevantStopsForPickups;
+        int64_t numRelevantStopsForDropoffs;
+        int64_t filterRelevantPDLocsTime;
+
+        int64_t locatingVehiclesTime;
+        int64_t numCHSearches;
+        int64_t directCHSearchTime;
+
+        int64_t numCandidateVehicles;
+        int64_t numAssignmentsTried;
+        int64_t tryAssignmentsTime; */
+    };
+
+    struct AssignmentsWithTransferALSPVehPerformanceStats {
+
+
+        /* int64_t initializationTime;
+
+        int64_t numRelevantStopsForPickups;
+        int64_t numRelevantStopsForDropoffs;
+        int64_t filterRelevantPDLocsTime;
+
+        int64_t locatingVehiclesTime;
+        int64_t numCHSearches;
+        int64_t directCHSearchTime;
+
+        int64_t numCandidateVehicles;
+        int64_t numAssignmentsTried;
+        int64_t tryAssignmentsTime; */
+    };
+
+    struct AssignmentsWithTransferALSDVehPerformanceStats {
+
+
+        /* int64_t initializationTime;
+
+        int64_t numRelevantStopsForPickups;
+        int64_t numRelevantStopsForDropoffs;
+        int64_t filterRelevantPDLocsTime;
+
+        int64_t locatingVehiclesTime;
+        int64_t numCHSearches;
+        int64_t directCHSearchTime;
+
+        int64_t numCandidateVehicles;
+        int64_t numAssignmentsTried;
+        int64_t tryAssignmentsTime; */
+    };
+
+    struct AssignmentsWithTransferPerformanceStats {
         //* Total Stats for AssignmentsWithTransfer (summed for all requests)
         int64_t numImprovedRequests; 
 
@@ -714,6 +767,11 @@ namespace karri::stats {
         PalsAssignmentsPerformanceStats palsAssignmentsStats;
         DalsAssignmentsPerformanceStats dalsAssignmentsStats;
         UpdatePerformanceStats updateStats;
+
+        AssignmentsWithOrdinaryTransferPerformanceStats ordTransferStats;
+        AssignmentsWithTransferALSPVehPerformanceStats transferALSPVehStats;
+        AssignmentsWithTransferALSDVehPerformanceStats transferALSDVehStats;
+
         AssignmentsWithTransferPerformanceStats transferStats;
 
         int64_t getTotalTime() const {

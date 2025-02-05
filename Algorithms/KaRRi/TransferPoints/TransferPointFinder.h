@@ -46,6 +46,7 @@ namespace karri {
 
         void init() {
             transferPoints.clear();
+            transferPoints = std::map<std::tuple<int, int>, std::vector<TransferPoint>>{};
         }
 
         void findTransferPoints(const Vehicle &pVeh, const Vehicle &dVeh) {

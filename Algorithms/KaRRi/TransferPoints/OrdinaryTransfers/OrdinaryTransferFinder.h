@@ -90,7 +90,6 @@ namespace karri {
                         return;
                     
                     for (const auto &asgn : promisingPartials) {
-                        assert(asgn.pickup->id >= 0);
                         tryDropoffBNS(asgn);
                         tryDropoffORD(asgn);
                         tryDropoffALS(asgn);
@@ -117,7 +116,7 @@ namespace karri {
         void calculateTransferPoints(const Vehicle *pVeh, const Vehicle *dVeh) {
             tpFinder.init();
 
-            //* Use the transfer point finder to find the possible transfer points       
+            //* Use the transfer point finder to find the possible transfer points  
             tpFinder.findTransferPoints(*pVeh, *dVeh);
         }
 
@@ -151,6 +150,13 @@ namespace karri {
 
             const auto transferPointsForStopPair = transferPoints[{trIdxPVeh, trIdxDVeh}];
 
+            if (transferPointsForStopPair.size() == 0)
+                return;
+
+            for (const auto tp : transferPointsForStopPair) { // TODO Tests the transfer point calculation
+                assertTransferPointCalculation(tp);
+            }
+
             for (const auto &pickup : relORDPickups.relevantSpotsFor(pVeh->vehicleId)) {
                 if (pickup.stopIndex > trIdxPVeh)
                     continue;
@@ -179,6 +185,13 @@ namespace karri {
                 return;
             
             const auto transferPointsForStopPair = transferPoints[{trIdxPVeh, trIdxDVeh}];
+
+            if (transferPointsForStopPair.size() == 0)
+                return;
+
+            for (const auto tp : transferPointsForStopPair) { // TODO Tests the transfer point calculation
+                assertTransferPointCalculation(tp);
+            }
 
             for (const auto &pickup : relBNSPickups.relevantSpotsFor(pVeh->vehicleId)) {
                 for (const auto tp : transferPointsForStopPair) {
@@ -343,7 +356,6 @@ namespace karri {
 
                 if (newAssignment.dropoff->loc == newAssignment.transfer.loc)
                     continue;
-
                 requestState.tryAssignment(newAssignment);
             }
         }
@@ -655,6 +667,69 @@ namespace karri {
             }
 
             return -1;
+        }
+
+        void assertTransferPointCalculation(const TransferPoint tp) {
+            const auto stopLocationsPVeh = routeState.stopLocationsFor(tp.pVeh->vehicleId);
+            const auto stopLocationsDVeh = routeState.stopLocationsFor(tp.dVeh->vehicleId);
+
+            const auto stopIndexPVeh = tp.dropoffAtTransferStopIdx;
+            const auto stopIndexDVeh = tp.pickupFromTransferStopIdx;
+
+            const auto stopLocPVeh = stopLocationsPVeh[stopIndexPVeh];
+            const auto nextStopLocPVeh = stopLocationsPVeh[stopIndexPVeh + 1];
+            const auto stopLocDVeh = stopLocationsDVeh[stopIndexDVeh];
+            const auto nextStopLocDVeh = stopLocationsDVeh[stopIndexDVeh + 1];
+
+            const auto headStopPVeh = inputGraph.edgeHead(stopLocPVeh);
+            const auto tailNextStopPVeh = inputGraph.edgeTail(nextStopLocPVeh);
+            const auto headStopDVeh = inputGraph.edgeHead(stopLocDVeh);
+            const auto tailNextStopDVeh = inputGraph.edgeTail(nextStopLocDVeh);
+
+            // Calculate leg length pVeh and dVeh
+            const auto headStopPVehRank = vehCh.rank(headStopPVeh);
+            const auto tailNextStopPVehRank = vehCh.rank(tailNextStopPVeh);
+            const auto headStopDVehRank = vehCh.rank(headStopDVeh);
+            const auto tailNextStopDVehRank = vehCh.rank(tailNextStopDVeh);
+
+            const auto nextStopPVehLength = inputGraph.travelTime(nextStopLocPVeh);
+            const auto nextStopDVehLength = inputGraph.travelTime(nextStopLocDVeh);
+
+            vehChQuery.run(headStopPVehRank, tailNextStopPVehRank);
+            const int legLenthPVeh = vehChQuery.getDistance() + nextStopPVehLength;
+
+            vehChQuery.run(headStopDVehRank, tailNextStopDVehRank);
+            const int legLenthDVeh = vehChQuery.getDistance() + nextStopDVehLength;
+
+            const auto routeStateLengthPVeh = time_utils::calcLengthOfLegStartingAt(stopIndexPVeh, tp.pVeh->vehicleId, routeState);
+            const auto routeStateLengthDVeh = time_utils::calcLengthOfLegStartingAt(stopIndexDVeh, tp.dVeh->vehicleId, routeState);
+            
+            assert(routeStateLengthPVeh == legLenthPVeh);
+            assert(routeStateLengthDVeh == legLenthDVeh);
+
+            // Recalculate the distance to and from the transfer point
+            const auto transferPointHead = inputGraph.edgeHead(tp.loc);
+            const auto transferPointTail = inputGraph.edgeTail(tp.loc);
+            const auto transferPointHeadRank = vehCh.rank(transferPointHead);
+            const auto transferPointTailRank = vehCh.rank(transferPointTail);
+            const auto transferLength = inputGraph.travelTime(tp.loc);
+
+            vehChQuery.run(headStopPVehRank, transferPointTailRank);
+            const auto distToTransferPVeh = stopLocPVeh == tp.loc ? 0 : vehChQuery.getDistance() + transferLength;
+
+            vehChQuery.run(transferPointHeadRank, tailNextStopPVehRank);
+            const auto distFromTransferPVeh = nextStopLocPVeh == tp.loc ? 0 : vehChQuery.getDistance() + nextStopPVehLength;
+
+            vehChQuery.run(headStopDVehRank, transferPointTailRank);
+            const auto distToTransferDVeh = stopLocDVeh == tp.loc ? 0 : vehChQuery.getDistance() + transferLength;
+
+            vehChQuery.run(transferPointHeadRank, tailNextStopDVehRank);
+            const auto distFromTransferDVeh = nextStopLocDVeh == tp.loc ? 0 : vehChQuery.getDistance() + nextStopDVehLength;
+
+            assert(distToTransferPVeh == tp.distancePVehToTransfer);
+            assert(distFromTransferPVeh == tp.distancePVehFromTransfer);
+            assert(distToTransferDVeh == tp.distanceDVehToTransfer);
+            assert(distFromTransferDVeh == tp.distanceDVehFromTransfer);
         }
 
         int pairedLowerBoundPT = INFTY;

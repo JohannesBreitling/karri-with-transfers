@@ -53,31 +53,7 @@ namespace karri::Transfers {
             LabelMask doesDistanceNotAdmitBestAsgn(const DistanceLabel &distancesToPickups,
                                                    const bool /* considerPickupWalkingDists = false */) const {
                 assert(strat.requestState.minDirectPDDist < INFTY);
-
-                return ~(distancesToPickups < INFTY);
-
-                // TODO Acutal pruning
-                
-                /*
-                if (strat.upperBoundCost >= INFTY) {
-                    // If current best is INFTY, only indices i with distancesToPickups[i] >= INFTY or
-                    // minDirectDistances[i] >= INFTY are worse than the current best.
-                    return ~(distancesToPickups < INFTY);
-                }
-
-                const auto &walkingDists = considerPickupWalkingDists ? strat.currentPickupWalkingDists : 0;
-
-                const DistanceLabel directDist = strat.requestState.minDirectPDDist;
-                const auto detourTillDepAtPickup = distancesToPickups + DistanceLabel(InputConfig::getInstance().stopTime);
-                auto tripTimeTillDepAtPickup = detourTillDepAtPickup;
-                tripTimeTillDepAtPickup.max(walkingDists);
-                DistanceLabel costLowerBound = calc.template calcLowerBoundCostForKPairedAssignmentsAfterLastStop<LabelSetT>(
-                        detourTillDepAtPickup, tripTimeTillDepAtPickup, directDist, walkingDists, strat.requestState);
-
-                costLowerBound.setIf(DistanceLabel(INFTY), ~(distancesToPickups < INFTY));
-
-                return strat.upperBoundCost < costLowerBound;
-                */
+                return ~(distancesToPickups < INFTY); // No actual pruning because of the transfer
             }
 
             // Returns whether a given arrival time and minimum distance from a vehicle's last stop to the pickup cannot
@@ -89,80 +65,35 @@ namespace karri::Transfers {
                                                   const DistanceLabel &minDistancesToPickups) const {
                 assert(strat.requestState.minDirectPDDist < INFTY);
 
-                return ~((arrTimesAtPickups < INFTY) & (minDistancesToPickups < INFTY));
-
-                // TODO Actual pruning
-
-                
-                /*
                 if (strat.upperBoundCost >= INFTY) {
                     // If current best is INFTY, only indices i with arrTimesAtPickups[i] >= INFTY or
                     // minDistancesToPickups[i] >= INFTY are worse than the current best.
                     return ~((arrTimesAtPickups < INFTY) & (minDistancesToPickups < INFTY));
                 }
-
-                const DistanceLabel directDist = strat.requestState.minDirectPDDist;
+                
                 const auto detourTillDepAtPickup = minDistancesToPickups + DistanceLabel(InputConfig::getInstance().stopTime);
                 auto depTimeAtPickup = arrTimesAtPickups + DistanceLabel(InputConfig::getInstance().stopTime);
                 const auto reqTime = DistanceLabel(strat.requestState.originalRequest.requestTime);
-                depTimeAtPickup.max(reqTime + strat.currentPickupWalkingDists);
+                depTimeAtPickup.max(reqTime);
                 const auto tripTimeTillDepAtPickup = depTimeAtPickup - reqTime;
                 DistanceLabel costLowerBound = calc.template calcLowerBoundCostForKPairedAssignmentsAfterLastStop<LabelSetT>(
-                        detourTillDepAtPickup, tripTimeTillDepAtPickup, directDist, strat.currentPickupWalkingDists, strat.requestState);
+                        detourTillDepAtPickup, tripTimeTillDepAtPickup, 0, 0, strat.requestState);
 
                 costLowerBound.setIf(DistanceLabel(INFTY),
                                      ~((arrTimesAtPickups < INFTY) & (minDistancesToPickups < INFTY)));
                 return strat.upperBoundCost < costLowerBound;
-                */
             }
 
-            LabelMask isWorseThanBestKnownVehicleDependent(const int /* vehId */,
-                                                            const DistanceLabel &distancesToPickups) {
-                
-                return ~(distancesToPickups < INFTY);
-
-                // TODO Actual Pruning
-                
-                /*
-                if (strat.upperBoundCost >= INFTY) {
-                    // If current best is INFTY, only indices i with distancesToDropoffs[i] >= INFTY are worse than
-                    // the current best.
-                    return ~(distancesToPickups < INFTY);
-                }
-
-                const DistanceLabel directDist = strat.requestState.minDirectPDDist;
-                const auto detourTillDepAtPickup = distancesToPickups + InputConfig::getInstance().stopTime;
-                const auto &stopIdx = strat.routeState.numStopsOf(vehId) - 1;
-                const int vehDepTimeAtLastStop = time_utils::getVehDepTimeAtStopForRequest(vehId, stopIdx,
-                                                                                           strat.requestState,
-                                                                                           strat.routeState);
-                auto depTimeAtPickups = vehDepTimeAtLastStop + distancesToPickups + InputConfig::getInstance().stopTime;
-                depTimeAtPickups.max(strat.curPassengerArrTimesAtPickups);
-                const auto tripTimeTillDepAtPickup = depTimeAtPickups - strat.requestState.originalRequest.requestTime;
-                DistanceLabel costLowerBound = calc.template calcLowerBoundCostForKPairedAssignmentsAfterLastStop<LabelSetT>(
-                        detourTillDepAtPickup, tripTimeTillDepAtPickup, directDist, strat.currentPickupWalkingDists,
-                        strat.requestState);
-
-                costLowerBound.setIf(INFTY, ~(distancesToPickups < INFTY));
-                return strat.upperBoundCost < costLowerBound;
-                */
+            LabelMask isWorseThanBestKnownVehicleDependent(const int /* vehId */, const DistanceLabel &distancesToPickups) {
+                return ~(distancesToPickups < INFTY); // No actual pruning because of the transfer
             }
 
             void updateUpperBoundCost(const int /* vehId */, const DistanceLabel & /*distancesToPickups*/) {
-                /*
-                assert(allSet(distancesToPickups >= 0));
-                const DistanceLabel cost = calc.template calcUpperBoundCostForKPairedAssignmentsAfterLastStop<LabelSetT>(
-                        strat.fleet[vehId], distancesToPickups, strat.curPassengerArrTimesAtPickups,
-                        strat.curDistancesToDest,
-                        strat.currentPickupWalkingDists, strat.requestState);
-
-                strat.upperBoundCost = std::min(strat.upperBoundCost, cost.horizontalMin());
-                */
+                return; // No actual pruning because of the transfer
             }
 
             bool isVehicleEligible(const int &) const {
-                // All vehicles can perform PALS assignments.
-                return true;
+                return true; // All vehicles can perform PALS assignments
             }
 
         private:

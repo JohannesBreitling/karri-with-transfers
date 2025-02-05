@@ -152,8 +152,8 @@ namespace karri {
             const auto numStops = routeState.numStopsOf(vehId);
 
             const auto actualDepTimeAtTransfer = getActualDepTimeAtTranfer(asgn, context, routeState);
-            const auto initialTransferDetour = std::max(calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context, routeState), 0);
-            // assert(initialTransferDetour >= 0); // TODO Hier nochmal schauen
+            const auto initialTransferDetour = calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context, routeState);
+            assert(initialTransferDetour >= 0); // TODO Hier nochmal schauen
 
             int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.transferIdxDVeh, asgn.dropoffIdx, initialTransferDetour, routeState);
             const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
@@ -267,8 +267,9 @@ namespace karri {
 
             bool transferAtExistingStop = isTransferAtExistingStopPVeh(asgn, routeState);
 
-            const auto initalTransferDetour = std::max(calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState), 0);
-            // assert(initalTransferDetour >= 0); // TODO Hier lassen wir kleine Fehler zu....
+            // const auto initalTransferDetour = std::max(calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState), 0);
+            const auto initalTransferDetour = calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState);
+            assert(initalTransferDetour >= 0); // TODO Hier lassen wir kleine Fehler zu....
 
             const auto detourRightAfterTransfer = calcDetourRightAfterTransferPVeh(asgn, initialPickupDetour, initalTransferDetour, routeState);
             assert(detourRightAfterTransfer >= 0);

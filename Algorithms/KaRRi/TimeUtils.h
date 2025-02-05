@@ -360,17 +360,10 @@ namespace karri::time_utils {
 
         assert(asgn.transferIdxDVeh < routeState.numStopsOf(asgn.dVeh->vehicleId));
 
-        if (asgn.transferIdxDVeh == asgn.dropoffIdx)
-            return timeUntilDep;
-
-        // TODO Check this: Assignment does pickup up the customer at existing stop
-        if (asgn.distToTransferDVeh == 0 && asgn.distFromTransferDVeh == 0)
+        if ((asgn.transferIdxDVeh == asgn.dropoffIdx) || (asgn.distToTransferDVeh == 0 && asgn.distFromTransferDVeh == 0))
             return timeUntilDep;
 
         const auto legLength = calcLengthOfLegStartingAt(asgn.transferIdxDVeh, asgn.dVeh->vehicleId, routeState);
-        // TODO assert(asgn.distToTransferDVeh + asgn.distFromTransferDVeh >= legLength);
-
-        // TODO assert(timeUntilDep + asgn.distFromTransferDVeh - legLength >= 0);
         return timeUntilDep + asgn.distFromTransferDVeh - legLength;
     }
 
