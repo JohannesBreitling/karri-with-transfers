@@ -154,6 +154,8 @@ namespace karri {
                 return;
 
             for (const auto tp : transferPointsForStopPair) { // TODO Tests the transfer point calculation
+                assert(tp.pVeh->vehicleId == pVeh->vehicleId);
+                assert(tp.dVeh->vehicleId == dVeh->vehicleId);
                 assertTransferPointCalculation(tp);
             }
 
@@ -190,6 +192,8 @@ namespace karri {
                 return;
 
             for (const auto tp : transferPointsForStopPair) { // TODO Tests the transfer point calculation
+                assert(tp.pVeh->vehicleId == pVeh->vehicleId);
+                assert(tp.dVeh->vehicleId == dVeh->vehicleId);
                 assertTransferPointCalculation(tp);
             }
 
@@ -670,6 +674,7 @@ namespace karri {
         }
 
         void assertTransferPointCalculation(const TransferPoint tp) {
+
             const auto stopLocationsPVeh = routeState.stopLocationsFor(tp.pVeh->vehicleId);
             const auto stopLocationsDVeh = routeState.stopLocationsFor(tp.dVeh->vehicleId);
 
@@ -725,11 +730,32 @@ namespace karri {
 
             vehChQuery.run(transferPointHeadRank, tailNextStopDVehRank);
             const auto distFromTransferDVeh = nextStopLocDVeh == tp.loc ? 0 : vehChQuery.getDistance() + nextStopDVehLength;
+            
+            if (distToTransferPVeh != tp.distancePVehToTransfer || distFromTransferPVeh != tp.distancePVehFromTransfer || distToTransferDVeh != tp.distanceDVehToTransfer || distFromTransferDVeh != tp.distanceDVehFromTransfer) {
+                std::cout << std::endl;
+                std::cout << "Error for tp.. pVeh: " << tp.pVeh->vehicleId << " dVeh: " << tp.dVeh->vehicleId << " indices: (" << tp.dropoffAtTransferStopIdx << ", " << tp.pickupFromTransferStopIdx << ")" << std::endl;
+                assert(false);   
+            }
 
-            assert(distToTransferPVeh == tp.distancePVehToTransfer);
-            assert(distFromTransferPVeh == tp.distancePVehFromTransfer);
-            assert(distToTransferDVeh == tp.distanceDVehToTransfer);
-            assert(distFromTransferDVeh == tp.distanceDVehFromTransfer);
+            if (distToTransferPVeh != tp.distancePVehToTransfer) {
+                std::cout << "distToTransferPVeh is wrong..." << std::endl;
+                std::cout << "should: " << distToTransferPVeh << " is: " << tp.distancePVehToTransfer << " delta : " << (distToTransferPVeh - tp.distancePVehToTransfer) << std::endl;
+            }
+
+            if (distFromTransferPVeh != tp.distancePVehFromTransfer) {
+                std::cout << "distFromTransferPVeh is wrong..." << std::endl;
+                std::cout << "should: " << distFromTransferPVeh << " is: " << tp.distancePVehFromTransfer << " delta : " << (distFromTransferPVeh - tp.distancePVehFromTransfer) << std::endl;
+            }
+
+            if (distToTransferDVeh != tp.distanceDVehToTransfer) {
+                std::cout << "distToTransferDVeh is wrong..." << std::endl;
+                std::cout << "should: " << distToTransferDVeh << " is: " << tp.distanceDVehToTransfer << " delta : " << (distToTransferDVeh - tp.distanceDVehToTransfer) << std::endl;
+            }
+
+            if (distFromTransferDVeh != tp.distanceDVehFromTransfer) {
+                std::cout << "distFromTransferDVeh is wrong..." << std::endl;
+                std::cout << "should: " << distFromTransferDVeh << " is: " << tp.distanceDVehFromTransfer << " delta : " << (distFromTransferDVeh - tp.distanceDVehFromTransfer) << std::endl;
+            }
         }
 
         int pairedLowerBoundPT = INFTY;

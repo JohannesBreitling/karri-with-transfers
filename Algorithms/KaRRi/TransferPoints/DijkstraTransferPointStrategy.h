@@ -130,12 +130,22 @@ namespace karri::TransferPointStrategies {
             const ConstantVectorRange<int> &stopLocationsPVeh, const ConstantVectorRange<int> &stopLocationsDVeh,
             const ConstantVectorRange<int> &stopIdsPVeh, const ConstantVectorRange<int> &stopIdsDVeh
         ) {
+
             if (numStopsPVeh <= 1 || numStopsDVeh <= 1)
                 return;
+
+            transferPoints = std::map<std::tuple<int, int>, std::vector<TransferPoint>>{};
 
             // Loop over all the possible stop pairs
             for (int stopIdxPVeh = 0; stopIdxPVeh < numStopsPVeh - 1; stopIdxPVeh++) {
                 for (int stopIdxDVeh = 0; stopIdxDVeh < numStopsDVeh - 1; stopIdxDVeh++) {
+                    assert(numStopsPVeh > 1 && numStopsDVeh > 1);
+                    assert(stopLocationsPVeh.size() == stopIdsPVeh.size());
+                    assert(stopLocationsDVeh.size() == stopIdsDVeh.size());
+
+                    currSearch = 0;
+                    possibleTransferPoints = std::vector<TransferPoint>{};
+
                     const int stopLocPStop = stopLocationsPVeh[stopIdxPVeh];
                     const int stopLocPNStop = stopLocationsPVeh[stopIdxPVeh + 1];
                     const int stopLocDStop = stopLocationsDVeh[stopIdxDVeh];
@@ -148,21 +158,20 @@ namespace karri::TransferPointStrategies {
                     
                     findTransferPointsBetweenStops(stopLocPStop, stopLocPNStop, stopLocDStop, stopLocDNStop, stopIdPStop, stopIdPNStop, stopIdDStop, stopIdDNStop);
 
-                    std::vector<TransferPoint> tpsForStopPair = {};
+                    transferPoints[{stopIdxPVeh, stopIdxDVeh}] = std::vector<TransferPoint>{};
                     for (auto &tp : possibleTransferPoints) {
                         tp.pVeh = &pVeh;
                         tp.dVeh = &dVeh;
                         tp.dropoffAtTransferStopIdx = stopIdxPVeh;
                         tp.pickupFromTransferStopIdx = stopIdxDVeh;
-                        tpsForStopPair.push_back(tp);
+                        // tpsForStopPair.push_back(tp);    
+                        transferPoints[{stopIdxPVeh, stopIdxDVeh}].push_back(tp);
 
                         assert(tp.distancePVehToTransfer >= 0);
                         assert(tp.distancePVehFromTransfer >= 0);
                         assert(tp.distanceDVehToTransfer >= 0);
                         assert(tp.distanceDVehFromTransfer >= 0);
                     }
-                    
-                    transferPoints[{stopIdxPVeh, stopIdxDVeh}] = tpsForStopPair;
                     possibleTransferPoints.clear();
                 }
             }
@@ -210,6 +219,7 @@ namespace karri::TransferPointStrategies {
             dijSearchTransferPointsBw.run(dNextStopVertex);
             searchSpaceIntersection.edgeFound(dNStopLoc, 0);
 
+            possibleTransferPoints = std::vector<TransferPoint>{};
             possibleTransferPoints = searchSpaceIntersection.getIntersection();
         }
 

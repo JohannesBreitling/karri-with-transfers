@@ -269,7 +269,7 @@ namespace karri {
 
             // const auto initalTransferDetour = std::max(calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState), 0);
             const auto initalTransferDetour = calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState);
-            assert(initalTransferDetour >= 0); // TODO Hier lassen wir kleine Fehler zu....
+            assert(initalTransferDetour >= 0);
 
             const auto detourRightAfterTransfer = calcDetourRightAfterTransferPVeh(asgn, initialPickupDetour, initalTransferDetour, routeState);
             assert(detourRightAfterTransfer >= 0);
