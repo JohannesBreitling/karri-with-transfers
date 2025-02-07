@@ -111,8 +111,8 @@ namespace karri {
                 auto *pVeh = &fleet[pVehId];
 
                 for (const auto &pickup : relORDPickups.relevantSpotsFor(pVehId)) {
-                    tryDropoffORD(pVeh, pickup);
-                    tryDropoffALS(pVeh, pickup);
+                    tryDropoffORD(pVeh, &pickup);
+                    tryDropoffALS(pVeh, &pickup);
                 }
             }
         }
@@ -128,8 +128,8 @@ namespace karri {
                 auto *pVeh = &fleet[pVehId];
 
                 for (const auto &pickup : relORDPickups.relevantSpotsFor(pVehId)) {
-                    tryDropoffORD(pVeh, pickup);
-                    tryDropoffALS(pVeh, pickup);
+                    tryDropoffORD(pVeh, &pickup);
+                    tryDropoffALS(pVeh, &pickup);
                 }
 
                 if (postponedAssignments.size() == 0)
@@ -150,17 +150,17 @@ namespace karri {
             for (const auto pVehId : pVehIds) {
                 const auto *pVeh = &fleet[pVehId]; 
 
-                for (const auto pickup : requestState.pickups) {
+                for (const auto &pickup : requestState.pickups) {
                     // Get the distance from the last stop of the pVeh to the pickup
                     const auto distanceToPickup = pickupALSStrategy.getDistanceToPickup(pVehId, pickup.id);
-                    tryDropoffORDForPickupALS(pVeh, pickup, distanceToPickup);
-                    tryDropoffALSForPickupALS(pVeh, pickup, distanceToPickup);
+                    tryDropoffORDForPickupALS(pVeh, &pickup, distanceToPickup);
+                    tryDropoffALSForPickupALS(pVeh, &pickup, distanceToPickup);
                 }
             }
         }
 
 
-        void tryDropoffORDForPickupALS(const Vehicle *pVeh, const PDLoc pickup, const int distanceToPickup) {
+        void tryDropoffORDForPickupALS(const Vehicle *pVeh, const PDLoc *pickup, const int distanceToPickup) {
             const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
             
             if (distanceToPickup >= INFTY)
@@ -176,7 +176,7 @@ namespace karri {
                     continue;
                 
                 // Calculate the distances from the pickup to the stops of the dropoff vehicle
-                const auto distancesToTransfer = strategy.calculateDistancesFromPickupToAllStops(pickup.loc, *dVeh);
+                const auto distancesToTransfer = strategy.calculateDistancesFromPickupToAllStops(pickup->loc, *dVeh);
                 
                 for (const auto &dropoff : relORDDropoffs.relevantSpotsFor(dVehId)) {
                     // Try all possible transfer points
@@ -193,7 +193,7 @@ namespace karri {
                         AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
 
                         const auto *dropoffPDLoc = &requestState.dropoffs[dropoff.pdId];
-                        asgn.pickup = &pickup;
+                        asgn.pickup = pickup;
                         asgn.dropoff = dropoffPDLoc;
                         asgn.distToPickup = distanceToPickup;
                         asgn.distFromPickup = 0;
@@ -225,7 +225,7 @@ namespace karri {
             }
         }
 
-        void tryDropoffALSForPickupALS(const Vehicle *pVeh, const PDLoc pickup, const int distanceToPickup) {
+        void tryDropoffALSForPickupALS(const Vehicle *pVeh, const PDLoc *pickup, const int distanceToPickup) {
             // In this case we consider all the vehicles that are able to perform the dropoff ALS
             const auto dVehIds = dropoffALSStrategy.findDropoffsAfterLastStop();
             const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
@@ -246,7 +246,7 @@ namespace karri {
                     continue;
                 
                 // Calculate the distances from the pickup to the stops of the dropoff vehicle
-                const auto distancesToTransfer = strategy.calculateDistancesFromPickupToAllStops(pickup.loc, *dVeh);
+                const auto distancesToTransfer = strategy.calculateDistancesFromPickupToAllStops(pickup->loc, *dVeh);
 
                 for (const auto &dropoff : requestState.dropoffs) {
                     assert(numStopsDVeh - 1 == distancesToTransfer.size());
@@ -262,7 +262,7 @@ namespace karri {
                         // Build the assignment
                         AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
                         
-                        asgn.pickup = &pickup;
+                        asgn.pickup = pickup;
                         asgn.dropoff = &dropoff;
 
                         asgn.distToPickup = distanceToPickup;
@@ -292,12 +292,16 @@ namespace karri {
             }
         }
 
-        void tryDropoffORD(const Vehicle *pVeh, const RelevantPDLoc &pickup) {
+        void tryDropoffORD(const Vehicle *pVeh, const RelevantPDLoc *pickup) {
             const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
-            const auto *pickupPDLoc = &requestState.pickups[pickup.pdId];
+            const auto *pickupPDLoc = &requestState.pickups[pickup->pdId];
 
-            const bool bnsLowerBoundUsed = searches.knowsDistance(pVeh->vehicleId, pickup.pdId);
-            const int distanceToPickup = bnsLowerBoundUsed ? pickup.distToPDLoc : searches.getDistance(pVeh->vehicleId, pickup.pdId);
+            bool bnsLowerBoundUsed = false; 
+            int distanceToPickup = pickup->distToPDLoc;
+            if (pickup->stopIndex == 0) {
+                bnsLowerBoundUsed = searches.knowsDistance(pVeh->vehicleId, pickup->pdId);
+                distanceToPickup = bnsLowerBoundUsed ? pickup->distToPDLoc : searches.getDistance(pVeh->vehicleId, pickup->pdId);
+            }
 
             if (distanceToPickup >= INFTY)
                 return;
@@ -330,7 +334,7 @@ namespace karri {
 
                         asgn.pickup = pickupPDLoc;
                         asgn.dropoff = dropoffPDLoc;
-                        asgn.distFromPickup = pickup.distFromPDLocToNextStop;
+                        asgn.distFromPickup = pickup->distFromPDLocToNextStop;
                         asgn.distToDropoff = dropoff.distToPDLoc;
                         asgn.distFromDropoff = dropoff.distFromPDLocToNextStop;
 
@@ -341,12 +345,12 @@ namespace karri {
                         asgn.distFromTransferPVeh = 0;
                         asgn.distToTransferDVeh = 0;
                         asgn.distFromTransferDVeh = 0;
-                        asgn.pickupType = pickup.stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
+                        asgn.pickupType = pickup->stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
                         asgn.dropoffType = ORDINARY;
                         asgn.transferTypePVeh = AFTER_LAST_STOP;
                         asgn.transferTypeDVeh = ORDINARY;
 
-                        asgn.pickupIdx = pickup.stopIndex;
+                        asgn.pickupIdx = pickup->stopIndex;
                         asgn.dropoffIdx = dropoff.stopIndex;
                         asgn.transferIdxPVeh = numStopsPVeh - 1;
                         asgn.transferIdxDVeh = i;
@@ -362,7 +366,7 @@ namespace karri {
             }
         }
 
-        void tryDropoffALS(const Vehicle *pVeh, const RelevantPDLoc &pickup) {
+        void tryDropoffALS(const Vehicle *pVeh, const RelevantPDLoc *pickup) {
             // In this case we consider all the vehicles that are able to perform the dropoff ALS
             const auto dVehIds = dropoffALSStrategy.findDropoffsAfterLastStop();
             
@@ -371,8 +375,12 @@ namespace karri {
 
             const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
 
-            const bool bnsLowerBoundUsed = searches.knowsDistance(pVeh->vehicleId, pickup.pdId); // TODO Das ist ein bissle falsch.... Es muss ja noch die Bedingung vorliegen, dass überhaupt BNS vorliegt
-            const int distanceToPickup = bnsLowerBoundUsed ? pickup.distToPDLoc : searches.getDistance(pVeh->vehicleId, pickup.pdId);
+            bool bnsLowerBoundUsed = false; 
+            int distanceToPickup = pickup->distToPDLoc;
+            if (pickup->stopIndex == 0) {
+                bnsLowerBoundUsed = searches.knowsDistance(pVeh->vehicleId, pickup->pdId);
+                distanceToPickup = bnsLowerBoundUsed ? pickup->distToPDLoc : searches.getDistance(pVeh->vehicleId, pickup->pdId);
+            }
 
             if (distanceToPickup >= INFTY)
                 return;
@@ -402,10 +410,10 @@ namespace karri {
 
                         // Build the assignment
                         AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
-                        const auto *pickupPDLoc = &requestState.pickups[pickup.pdId];
+                        const auto *pickupPDLoc = &requestState.pickups[pickup->pdId];
                         asgn.pickup = pickupPDLoc;
                         asgn.dropoff = &dropoff;
-                        asgn.distFromPickup = pickup.distFromPDLocToNextStop;
+                        asgn.distFromPickup = pickup->distFromPDLocToNextStop;
 
                         asgn.pickupBNSLowerBoundUsed = bnsLowerBoundUsed;
                         asgn.distToPickup = distanceToPickup;
@@ -418,11 +426,11 @@ namespace karri {
                         asgn.distToDropoff = dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
                         asgn.distFromDropoff = 0;
                         asgn.dropoffType = AFTER_LAST_STOP;
-                        asgn.pickupType = pickup.stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
+                        asgn.pickupType = pickup->stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
                         asgn.transferTypePVeh = AFTER_LAST_STOP;
                         asgn.transferTypeDVeh = ORDINARY;
 
-                        asgn.pickupIdx = pickup.stopIndex;
+                        asgn.pickupIdx = pickup->stopIndex;
                         asgn.dropoffIdx = numStopsDVeh - 1;
                         asgn.transferIdxPVeh = numStopsPVeh - 1;
                         asgn.transferIdxDVeh = i;

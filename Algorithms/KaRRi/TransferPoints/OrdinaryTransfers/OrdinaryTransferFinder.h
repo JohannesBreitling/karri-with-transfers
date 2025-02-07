@@ -89,7 +89,16 @@ namespace karri {
                     if (promisingPartials.size() == 0)
                         return;
                     
-                    for (const auto &asgn : promisingPartials) {
+                    for (auto &asgn : promisingPartials) {
+                        // Transfer BNS in dropoff vehicle
+                        if (asgn.transferIdxDVeh == 0) {
+                            if (searches.knowsDistanceTransfer(asgn.dVeh->vehicleId, asgn.transfer.loc)) {
+                                asgn.distToTransferDVeh = searches.getDistanceTransfer(asgn.dVeh->vehicleId, asgn.transfer.loc);
+                            } else {
+                                asgn.dropoffBNSLowerBoundUsed = true;
+                            }
+                        }
+
                         tryDropoffBNS(asgn);
                         tryDropoffORD(asgn);
                         tryDropoffALS(asgn);
@@ -153,14 +162,6 @@ namespace karri {
             if (transferPointsForStopPair.size() == 0)
                 return;
 
-            /*
-            for (const auto tp : transferPointsForStopPair) { // TODO Tests the transfer point calculation
-                assert(tp.pVeh->vehicleId == pVeh->vehicleId);
-                assert(tp.dVeh->vehicleId == dVeh->vehicleId);
-                assertTransferPointCalculation(tp);
-            }
-            */
-
             for (const auto &pickup : relORDPickups.relevantSpotsFor(pVeh->vehicleId)) {
                 if (pickup.stopIndex > trIdxPVeh)
                     continue;
@@ -170,7 +171,7 @@ namespace karri {
                     // Build the partial assignment with the transfer point
                     PDLoc *pickupPDLoc = &requestState.pickups[pickup.pdId];
 
-                    if (pickupPDLoc->loc == tp.loc)
+                    if (pickupPDLoc->loc == tp.loc || transferIsLaterOnRoute(dVeh->vehicleId, trIdxDVeh, tp.loc))
                         continue;
 
                     AssignmentWithTransfer asgn(pVeh, dVeh, tp, pickupPDLoc, pickup.stopIndex, pickup.distToPDLoc, pickup.distFromPDLocToNextStop, trIdxPVeh, trIdxDVeh);
@@ -193,19 +194,12 @@ namespace karri {
             if (transferPointsForStopPair.size() == 0)
                 return;
 
-            /*
-            for (const auto tp : transferPointsForStopPair) { // TODO Tests the transfer point calculation
-                assert(tp.pVeh->vehicleId == pVeh->vehicleId);
-                assert(tp.dVeh->vehicleId == dVeh->vehicleId);
-                assertTransferPointCalculation(tp);
-            }*/
-
             for (const auto &pickup : relBNSPickups.relevantSpotsFor(pVeh->vehicleId)) {
                 for (const auto tp : transferPointsForStopPair) {
                     // Build the partial assignment with the transfer point
                     PDLoc *pickupPDLoc = &requestState.pickups[pickup.pdId];
 
-                    if (pickupPDLoc->loc == tp.loc)
+                    if (pickupPDLoc->loc == tp.loc || transferIsLaterOnRoute(dVeh->vehicleId, trIdxDVeh, tp.loc))
                         continue;
 
                     AssignmentWithTransfer asgn(pVeh, dVeh, tp, pickupPDLoc, pickup.stopIndex, pickup.distToPDLoc, pickup.distFromPDLocToNextStop, trIdxPVeh, trIdxDVeh);
@@ -217,6 +211,19 @@ namespace karri {
                     tryPartialAssignment(asgn);
                 }
             }
+        }
+
+        bool transferIsLaterOnRoute(const int vehId, const int idx, const int loc) {
+            const auto stopLocations = routeState.stopLocationsFor(vehId);
+            if (idx >= stopLocations.size())
+                return false;
+
+            for (int i = idx + 1; i < stopLocations.size(); ++i) {
+                if (stopLocations[i] == loc)
+                    return true;
+            }
+
+            return false;
         }
 
         void tryPartialAssignment(AssignmentWithTransfer &asgn) {
@@ -288,17 +295,10 @@ namespace karri {
                     newAssignment.distToDropoff = pairedLowerBoundTD;
                 }
 
-                // Transfer BNS in dropoff vehicle
-                if (searches.knowsDistanceTransfer(newAssignment.dVeh->vehicleId, newAssignment.transfer.loc)) {
-                    newAssignment.distToTransferDVeh = searches.getDistanceTransfer(newAssignment.dVeh->vehicleId, newAssignment.transfer.loc);
-                } else {
-                    newAssignment.dropoffBNSLowerBoundUsed = true;
-                }
-
                 if (newAssignment.dropoff->loc == newAssignment.transfer.loc)
                     continue;
 
-                requestState.tryAssignment(newAssignment);
+                tryAssignment(newAssignment);
             }
         }
 
@@ -338,7 +338,7 @@ namespace karri {
                 if (dropoffIsAtStop(newAssignment.dVeh, dropoffPDLoc->loc) >= 0 && dropoff.stopIndex != dropoffIsAtStop(newAssignment.dVeh, dropoffPDLoc->loc))
                     continue; 
 
-                requestState.tryAssignment(newAssignment);
+                tryAssignment(newAssignment);
             }
         }
 
@@ -346,7 +346,7 @@ namespace karri {
             if (!alsDropoffVehs[asgn.dVeh->vehicleId])
                 return;
             
-            for (const auto &dropoff : requestState.dropoffs) {
+            for (const auto *dropoff : requestState.dropoffs) {
                 int distanceToDropoff = dropoffALSStrategy.getDistanceToDropoff(asgn.dVeh->vehicleId, dropoff.id);
                 if (distanceToDropoff == INFTY)
                     continue;
@@ -354,7 +354,7 @@ namespace karri {
                 if (dropoff.loc == asgn.transfer.loc)
                     continue;
                 AssignmentWithTransfer newAssignment(asgn);
-                newAssignment.dropoff = &dropoff;
+                newAssignment.dropoff = dropoff;
                 newAssignment.distToDropoff = distanceToDropoff;
                 newAssignment.distFromDropoff = 0;
                 newAssignment.dropoffIdx = routeState.numStopsOf(asgn.dVeh->vehicleId) - 1;
@@ -363,7 +363,7 @@ namespace karri {
 
                 if (newAssignment.dropoff->loc == newAssignment.transfer.loc)
                     continue;
-                requestState.tryAssignment(newAssignment);
+                tryAssignment(newAssignment);
             }
         }
 
@@ -373,6 +373,17 @@ namespace karri {
                 total += it.second.size();
             
             return total;
+        }
+
+        void tryAssignment(AssignmentWithTransfer &asgn) {
+
+            if (asgn.isFinished()) {
+                // Test for the distance from transfer
+                const auto stopLocationsDVeh = routeState.stopLocationsFor(asgn.dVeh->vehicleId);
+                assert(asgn.transferIdxDVeh == asgn.dropoffIdx || asgn.distFromTransferDVeh > 0 || asgn.transfer.loc == stopLocationsDVeh[asgn.transferIdxDVeh]);
+            }
+
+            requestState.tryAssignment(asgn);
         }
 
         void finishAssignments(const Vehicle *pVeh, const Vehicle *dVeh) {
@@ -410,7 +421,7 @@ namespace karri {
 
                     toCalculate.push_back(asgn);
                 } else {
-                    requestState.tryAssignment(asgn);
+                    tryAssignment(asgn);
                     continue;
                 }
             }
@@ -459,7 +470,7 @@ namespace karri {
                     
                     toCalculate.push_back(asgn);
                 } else {
-                    requestState.tryAssignment(asgn);
+                    tryAssignment(asgn);
                     continue;
                 }
             }
@@ -501,7 +512,7 @@ namespace karri {
 
                     toCalculate.push_back(asgn);
                 } else {
-                    requestState.tryAssignment(asgn);
+                    tryAssignment(asgn);
                 }   
             }
 
@@ -539,7 +550,7 @@ namespace karri {
 
                 // Try the assignments with the calculated distances
                 assert(asgn.isFinished());
-                requestState.tryAssignment(asgn);
+                tryAssignment(asgn);
             }
         }
 
@@ -684,21 +695,6 @@ namespace karri {
 
             assertTransferPointCalculation(asgn.transfer);
         }
-
-        void assertDetours(const AssignmentWithTransfer &asgn) {
-
-            // Assert inital pickup detour
-
-
-            // Assert initial transfer detour (pVeh)
-
-        }
-
-
-        void assertInitialPickupDetour() {
-        
-        }
-
 
         void assertTransferPointCalculation(const TransferPoint tp) {
 

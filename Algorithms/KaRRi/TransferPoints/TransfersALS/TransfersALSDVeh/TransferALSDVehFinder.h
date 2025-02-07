@@ -80,8 +80,8 @@ class TransferALSDVehFinder {
                     // Calculate the distances from the last stop of the dVeh to all stops of the pVeh
                     const auto distancesToTransfer = strategy.calculateDistancesFromLastStopToAllStops(*dVeh, *pVeh);
                 
-                    for (const auto &dropoff : requestState.dropoffs) {
-                        const auto distancesToDropoff = strategy.calculateDistancesFromAllStopsToLocation(*pVeh, dropoff.loc);
+                    for (const auto *dropoff : requestState.dropoffs) {
+                        const auto distancesToDropoff = strategy.calculateDistancesFromAllStopsToLocation(*pVeh, dropoff->loc);
 
                         for (const auto &pickup : relBNSPickups.relevantSpotsFor(pVehId)) {
                             const auto *pickupPDLoc = &requestState.pickups[pickup.pdId];
@@ -156,7 +156,7 @@ class TransferALSDVehFinder {
                     //* Calculate the distances from the vehicles last stop to all stops of possible pickup vehicles
                     const auto distancesToTransfer = strategy.calculateDistancesFromLastStopToAllStops(*dVeh, *pVeh);
                 
-                    for (const auto &dropoff : requestState.dropoffs) {
+                    for (const auto *dropoff : requestState.dropoffs) {
                         //* Calculate the distances from the stops of the pVeh to the possible dropoffs
                         const auto distancesToDropoff = strategy.calculateDistancesFromAllStopsToLocation(*pVeh, dropoff.loc);
 
@@ -180,7 +180,7 @@ class TransferALSDVehFinder {
                                 // Build the resulting assignment
                                 AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
                                 asgn.pickup = pickupPDLoc;
-                                asgn.dropoff = &dropoff;
+                                asgn.dropoff = dropoff;
 
                                 asgn.distToPickup = pickup.distToPDLoc;
                                 asgn.distFromPickup = pickup.distFromPDLocToNextStop;

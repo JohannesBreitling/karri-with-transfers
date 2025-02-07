@@ -143,16 +143,6 @@ namespace karri {
             timer.restart();
 
             auto [pIdxPVeh, dIdxPVeh] = routeState.insertPVeh(asgn, requestState);
-
-            if (pIdxPVeh == -1 || dIdxPVeh == -1) {
-                assert(false);
-                pickupStopId = -1;
-                transferStopIdPVeh = -1;
-                transferStopIdDVeh = -1;
-                dropoffStopId = -1;
-                return;
-            }
-            
             updateBucketStatePVeh(asgn, pIdxPVeh, dIdxPVeh, depTimeAtLastStopBeforePVeh);
 
             // If the vehicle has to be rerouted at its current location for a PBNS assignment, we introduce an
@@ -165,6 +155,8 @@ namespace karri {
                 ++dIdxPVeh;
             }
 
+            routeState.assertRoutePVeh(asgn); // TODO
+
             auto [pIdxDVeh, dIdxDVeh] = routeState.insertDVeh(asgn, requestState);
             updateBucketStateDVeh(asgn, pIdxDVeh, dIdxDVeh, depTimeAtLastStopBeforeDVeh);
 
@@ -175,6 +167,7 @@ namespace karri {
                 ++dIdxDVeh;
             }
 
+            routeState.assertRouteDVeh(asgn); // TODO
 
             const auto routeUpdateTime = timer.elapsed<std::chrono::nanoseconds>();
             requestState.stats().updateStats.updateRoutesTime += routeUpdateTime;

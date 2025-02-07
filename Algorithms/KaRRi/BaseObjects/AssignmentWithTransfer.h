@@ -137,6 +137,11 @@ namespace karri {
         enum INS_TYPES transferTypeDVeh = NOT_SET;
         enum INS_TYPES dropoffType = NOT_SET;
 
+        bool pickupInsertedAsNewStop = false;
+        bool transferInsertedAsNewStopPVeh = false;
+        bool transferInsertedAsNewStopDVeh = false;
+        bool dropoffInsertedAsNewStop = false;
+
         int tripTimePVeh;
         int tripTimeDVeh;
     };

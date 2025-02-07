@@ -337,15 +337,6 @@ namespace karri {
             int pickupStopId, transferStopIdPVeh, transferStopIdDVeh, dropoffStopId; 
             systemStateUpdater.insertBestAssignmentWithTransfer(asgn, pickupStopId, transferStopIdPVeh, transferStopIdDVeh, dropoffStopId);
             systemStateUpdater.writePerformanceLogs();
-            
-            //if (pickupStopId == -1 || transferStopIdPVeh == -1 || transferStopIdDVeh == -1 || dropoffStopId == -1) {
-            //    requestState[reqId] = FINISHED;
-            //    systemStateUpdater.writePerformanceLogs();
-            //    return;
-            //}
-
-            // assert(pickStopId >= 0 && dropoffStopId >= 0);
-            // assert(transferStopIdPVeh >= 0 && transferStopIdDVeh >= 0);
 
             const auto pVehId = asgn.pVeh->vehicleId;
             const auto dVehId = asgn.dVeh->vehicleId;

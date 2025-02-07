@@ -489,10 +489,7 @@ namespace karri {
                 // If there are stops after the dropoff, consider them for propagating changes to the maxArrTimes
                 propagateMaxArrTimeBackward(start + transferIdx, start + pickupIdx);
             } else if (start + transferIdx < end - 1) {
-                std::cout << "What do we do in this case?..." << std::endl;
-                propagateSchedArrAndDepForward(start + transferIdx + 1, end - 1);
-                propagateMaxArrTimeBackward(start + transferIdx, start + pickupIdx);
-                // assert(false);
+                assert(false);
             } else {
                 // If there are no stops after the dropoff, propagate maxArrTimes backwards not including dropoff
                 propagateMaxArrTimeBackward(start + transferIdx - 1, start + pickupIdx);
@@ -550,6 +547,9 @@ namespace karri {
             updateLeeways(vehId);
             updateMaxLegLength(vehId, pickupIdx, transferIdx);
 
+            // asgn.pickupInsertedAsNewStop = pickupInsertedAsNewStop;
+            // asgn.transferInsertedAsNewStopPVeh = transferInsertedAsNewStop;
+
             // Remember that request is picked up and dropped of at respective stops:
             insertion(stopIds[start + pickupIdx], requestState.originalRequest.requestId,
                       rangeOfRequestsPickedUpAtStop, requestsPickedUpAtStop);
@@ -580,7 +580,6 @@ namespace karri {
             bool transferInsertedAsNewStop = false;
             bool dropoffInsertedAsNewStop = false;
 
-            // printStopLocations(vehId); // TODO Test
             const int stopLocationTransfer = stopLocations[start + transferIdx];
             const bool conditionTransferAsNewStop = (transferIdx > 0 || schedDepTimes[start] > now) && transfer.loc == stopLocationTransfer;
             if (conditionTransferAsNewStop) {
@@ -714,6 +713,9 @@ namespace karri {
             updateLeeways(vehId);
             updateMaxLegLength(vehId, transferIdx, dropoffIdx);
 
+            // asgn.transferInsertedAsNewStopDVeh = transferInsertedAsNewStop;
+            // asgn.dropoffInsertedAsNewStop = dropoffInsertedAsNewStop;
+
 
             // Remember that request is picked up and dropped of at respective stops:
             insertion(stopIds[start + transferIdx], requestState.originalRequest.requestId,
@@ -804,6 +806,82 @@ namespace karri {
             stopIdToLeeway[newStopId] = leeway;
 
             updateMaxLegLength(vehId, 1, 1);
+        }
+
+        //* Utility methods to test if the insertion was correct
+        void assertRoutePVeh(const AssignmentWithTransfer &asgn) {
+
+            const auto numStopsPVeh = numStopsOf(asgn.pVeh->vehicleId);
+            const auto stopLocationsPVeh = stopLocationsFor(asgn.pVeh->vehicleId);
+            const auto schedDepTimesPVeh = schedDepTimesFor(asgn.pVeh->vehicleId);
+            const auto schedArrTimesPVeh = schedArrTimesFor(asgn.pVeh->vehicleId);
+
+            const auto pickupPaired = asgn.pickupIdx == asgn.transferIdxPVeh;
+            
+            int pickupIdx = 0;
+            printStopLocations(asgn.pVeh->vehicleId);
+            std::cout << asgn.pickup->loc << std::endl;
+            while (stopLocationsPVeh[pickupIdx] != asgn.pickup->loc) {
+                pickupIdx++;
+            }
+
+            int transferIdxPVeh = pickupIdx;
+
+            while (stopLocationsPVeh[transferIdxPVeh] != asgn.transfer.loc) {
+                ++transferIdxPVeh;
+            }
+            
+            if (pickupIdx < numStopsPVeh - 1 && !pickupPaired) {
+                std::cout << "Sched Dep at Pickup: " << schedDepTimesPVeh[pickupIdx] << std::endl;
+                std::cout << "Sched Arr at Next Stop: " << schedArrTimesPVeh[pickupIdx + 1] << std::endl;
+                std::cout << "Dist from Pickup: " << asgn.distFromPickup << std::endl;
+                assert(schedDepTimesPVeh[pickupIdx] == schedArrTimesPVeh[pickupIdx + 1] - asgn.distFromPickup);
+            }
+
+            if (pickupIdx < numStopsPVeh - 1 && pickupPaired) {
+                assert(pickupIdx + 1 == transferIdxPVeh);
+                std::cout << "Sched Dep at Pickup: " << schedDepTimesPVeh[pickupIdx] << std::endl;
+                std::cout << "Sched Arr at Next Stop (Transfer): " << schedArrTimesPVeh[transferIdxPVeh] << std::endl;
+                std::cout << "Dist to Transfer: " << asgn.distToTransferPVeh << std::endl;
+                assert(schedDepTimesPVeh[pickupIdx] == schedArrTimesPVeh[transferIdxPVeh] - asgn.distToPickup);
+            }
+            
+            if (pickupIdx > 0) {
+                assert(schedDepTimesPVeh[pickupIdx - 1] ==  schedArrTimesPVeh[pickupIdx] - asgn.distToPickup);
+            }
+            
+            if (transferIdxPVeh < numStopsPVeh - 1) {
+                assert(schedDepTimesPVeh[transferIdxPVeh] == schedArrTimesPVeh[transferIdxPVeh + 1] - asgn.distFromTransferPVeh);
+            }
+            
+            if (transferIdxPVeh > 0) {
+                assert(schedDepTimesPVeh[transferIdxPVeh - 1] ==  schedArrTimesPVeh[transferIdxPVeh] - asgn.distToTransferPVeh);
+            }
+        }
+
+        void assertRouteDVeh(const AssignmentWithTransfer &asgn) {
+            const auto numStopsDVeh = numStopsOf(asgn.dVeh->vehicleId);
+            const auto schedDepTimesDVeh = schedDepTimesFor(asgn.dVeh->vehicleId);
+            const auto schedArrTimesDVeh = schedArrTimesFor(asgn.dVeh->vehicleId);
+
+            const int transferIdxDVeh = asgn.transferIdxDVeh + asgn.transferInsertedAsNewStopDVeh;
+            const int dropoffIdx = asgn.dropoffIdx + asgn.transferInsertedAsNewStopDVeh + asgn.dropoffInsertedAsNewStop;
+
+            if (transferIdxDVeh < numStopsDVeh - 1) {
+                assert(schedDepTimesDVeh[transferIdxDVeh] == schedArrTimesDVeh[transferIdxDVeh + 1] - asgn.distFromTransferDVeh);
+            }
+            
+            if (transferIdxDVeh > 0) {
+                assert(schedDepTimesDVeh[transferIdxDVeh - 1] == schedArrTimesDVeh[transferIdxDVeh] - asgn.distToTransferDVeh);
+            }
+            
+            if (dropoffIdx < numStopsDVeh - 1) {
+                assert(schedDepTimesDVeh[dropoffIdx] == schedArrTimesDVeh[dropoffIdx + 1] - asgn.distFromDropoff);
+            }
+            
+            if (dropoffIdx > 0) {
+                assert(schedDepTimesDVeh[dropoffIdx - 1] == schedArrTimesDVeh[dropoffIdx] - asgn.distToDropoff);
+            }
         }
 
         // Scheduled stop interface for event simulation

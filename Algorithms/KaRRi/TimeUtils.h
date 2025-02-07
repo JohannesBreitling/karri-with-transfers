@@ -430,8 +430,6 @@ namespace karri::time_utils {
 
         const auto lengthOfReplacedLeg = calcLengthOfLegStartingAt(asgn.transferIdxPVeh, asgn.pVeh->vehicleId, routeState);
 
-        // assert(asgn.pickupPairedLowerBoundUsed || asgn.distToTransferPVeh + InputConfig::getInstance().stopTime + asgn.distFromTransferPVeh >= lengthOfReplacedLeg); // TODO Some very slight mistakes
-
         return asgn.distToTransferPVeh + InputConfig::getInstance().stopTime + asgn.distFromTransferPVeh - lengthOfReplacedLeg;
     }
 
