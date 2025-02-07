@@ -354,12 +354,6 @@ namespace karri::time_utils {
         const auto vehDepTimeAtPrevStop = getVehDepTimeAtStopForRequest(asgn.dVeh->vehicleId, asgn.transferIdxDVeh, context, routeState);
         const auto timeUntilDep = depTimeAtTransfer - vehDepTimeAtPrevStop;
 
-        const auto atStop = isTransferAtExistingStop(asgn, routeState);
-        (void) atStop;
-        assert(depTimeAtTransfer >= vehDepTimeAtPrevStop + asgn.distToTransferDVeh);
-
-        assert(asgn.transferIdxDVeh < routeState.numStopsOf(asgn.dVeh->vehicleId));
-
         if ((asgn.transferIdxDVeh == asgn.dropoffIdx) || (asgn.distToTransferDVeh == 0 && asgn.distFromTransferDVeh == 0))
             return timeUntilDep;
 

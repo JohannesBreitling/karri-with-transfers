@@ -17,6 +17,7 @@ class TransferALSDVehFinder {
             CurVehLocToPickupSearchesT &searches,
             const RelevantPDLocs &relORDPickups,
             const RelevantPDLocs &relBNSPickups,
+            std::vector<AssignmentWithTransfer> &postponedAssignments,
             const Fleet &fleet,
             const RouteState &routeState,
             RequestState &requestState,
@@ -26,6 +27,7 @@ class TransferALSDVehFinder {
             searches(searches),
             relORDPickups(relORDPickups),
             relBNSPickups(relBNSPickups),
+            postponedAssignments(postponedAssignments),
             fleet(fleet),
             routeState(routeState),
             requestState(requestState),
@@ -36,8 +38,11 @@ class TransferALSDVehFinder {
         (void) stats;
         init();
 
+        assert(postponedAssignments.size() == 0);
         findAssignmentsWithDropoffALS();
-    
+
+        if (postponedAssignments.size() > 0)
+            std::cout << "Pp: " << postponedAssignments.size() << std::endl;
     }
 
     void init() {
@@ -46,10 +51,6 @@ class TransferALSDVehFinder {
 
     private:
         void findAssignmentsWithDropoffALS() {
-
-
-
-
             // The pickup has to be BNS or ORD
             // The set of pickup vehicles are the vehicles with BNS or ORD pickups
             if (relORDPickups.getVehiclesWithRelevantPDLocs().size() == 0 && relBNSPickups.getVehiclesWithRelevantPDLocs().size() == 0)
@@ -85,10 +86,6 @@ class TransferALSDVehFinder {
                         for (const auto &pickup : relBNSPickups.relevantSpotsFor(pVehId)) {
                             const auto *pickupPDLoc = &requestState.pickups[pickup.pdId];
 
-                            // Use lower bounds if the distance to the pickup is not known
-                            const bool bnsLowerBoundUsed = searches.knowsDistance(pVeh->vehicleId, pickup.pdId);
-                            const int distanceToPickup = bnsLowerBoundUsed ? pickup.distToPDLoc : searches.getDistance(pVeh->vehicleId, pickup.pdId);
-
                             for (int i = 1; i < numStopsPVeh; i++) {
                                 assert(pickup.stopIndex == 0);
                                 const int distancesToTransferSize = distancesToTransfer.size();
@@ -110,10 +107,9 @@ class TransferALSDVehFinder {
                                 asgn.pickup = pickupPDLoc;
                                 asgn.dropoff = &dropoff;
 
-                                asgn.pickupBNSLowerBoundUsed = bnsLowerBoundUsed;
-                                asgn.distToPickup = distanceToPickup;
-
+                                asgn.distToPickup = pickup.distToPDLoc;
                                 asgn.distFromPickup = pickup.distFromPDLocToNextStop;
+
                                 asgn.distToDropoff = distancesToDropoff[i - 1];
                                 asgn.distFromDropoff = 0;
 
@@ -137,10 +133,15 @@ class TransferALSDVehFinder {
                                     continue;
 
                                 // Try the finished assignment with ORD dropoff
-                                requestState.tryAssignment(asgn);
+                                tryAssignment(asgn);
                             }
                         }
                     }
+
+                    if (postponedAssignments.size() == 0)
+                        continue;
+
+                    finishAssignments(pVeh);
                 }
 
                 // Pickup ORD
@@ -206,12 +207,49 @@ class TransferALSDVehFinder {
                                     continue;
 
                                 // Try the finished assignment with ORD dropoff
-                                requestState.tryAssignment(asgn);
+                                tryAssignment(asgn);
                             }
                         }
                     }
                 }
             }
+        }
+
+        void tryAssignment(AssignmentWithTransfer &asgn) {
+
+            if (asgn.pickupIdx == 0) {
+                // Pickup BNS
+                if (searches.knowsDistance(asgn.pVeh->vehicleId, asgn.pickup->id)) {
+                    asgn.distToPickup = searches.getDistance(asgn.pVeh->vehicleId, asgn.pickup->id);
+                } else {
+                    asgn.pickupBNSLowerBoundUsed = true;
+                }
+            }
+
+        }
+
+        void finishAssignments(const Vehicle *pVeh) {
+            for (auto &asgn : postponedAssignments) {
+                assert(asgn.pickupBNSLowerBoundUsed);
+                searches.addPickupForProcessing(asgn.pickup->id, asgn.distToPickup);
+            }
+
+            searches.computeExactDistancesVia(*pVeh);
+
+            for (auto asgn : postponedAssignments) {
+                assert(searches.knowsCurrentLocationOf(pVeh->vehicleId));
+                assert(searches.knowsDistance(pVeh->vehicleId, asgn.pickup->id));
+
+                const int distance = searches.getDistance(pVeh->vehicleId, asgn.pickup->id);
+                asgn.distToPickup = distance;
+                asgn.pickupBNSLowerBoundUsed = false;
+
+                assert(asgn.isFinished());
+ 
+                requestState.tryAssignment(asgn);
+            }
+
+            postponedAssignments.clear();
         }
 
         TransferALSStrategyT &strategy;
@@ -221,6 +259,8 @@ class TransferALSDVehFinder {
 
         const RelevantPDLocs &relORDPickups;
         const RelevantPDLocs &relBNSPickups;
+
+        std::vector<AssignmentWithTransfer> &postponedAssignments;
         
         const Fleet &fleet;
         const RouteState &routeState;

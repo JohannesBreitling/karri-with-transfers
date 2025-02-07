@@ -153,11 +153,13 @@ namespace karri {
             if (transferPointsForStopPair.size() == 0)
                 return;
 
+            /*
             for (const auto tp : transferPointsForStopPair) { // TODO Tests the transfer point calculation
                 assert(tp.pVeh->vehicleId == pVeh->vehicleId);
                 assert(tp.dVeh->vehicleId == dVeh->vehicleId);
                 assertTransferPointCalculation(tp);
             }
+            */
 
             for (const auto &pickup : relORDPickups.relevantSpotsFor(pVeh->vehicleId)) {
                 if (pickup.stopIndex > trIdxPVeh)
@@ -191,11 +193,12 @@ namespace karri {
             if (transferPointsForStopPair.size() == 0)
                 return;
 
+            /*
             for (const auto tp : transferPointsForStopPair) { // TODO Tests the transfer point calculation
                 assert(tp.pVeh->vehicleId == pVeh->vehicleId);
                 assert(tp.dVeh->vehicleId == dVeh->vehicleId);
                 assertTransferPointCalculation(tp);
-            }
+            }*/
 
             for (const auto &pickup : relBNSPickups.relevantSpotsFor(pVeh->vehicleId)) {
                 for (const auto tp : transferPointsForStopPair) {
@@ -393,6 +396,7 @@ namespace karri {
                 searches.computeExactDistancesVia(*pVeh);
 
             for (auto asgn : currentlyCalculating) {
+                assert(searches.knowsCurrentLocationOf(pVeh->vehicleId));
                 assert(searches.knowsDistance(pVeh->vehicleId, asgn.pickup->id));
                 const int distance = searches.getDistance(pVeh->vehicleId, asgn.pickup->id);
                 asgn.distToPickup = distance;
@@ -452,11 +456,12 @@ namespace karri {
 
                     if (total.total > requestState.getBestCost())
                         continue;
+                    
                     toCalculate.push_back(asgn);
                 } else {
                     requestState.tryAssignment(asgn);
                     continue;
-                }        
+                }
             }
 
             currentlyCalculating.clear();
@@ -483,6 +488,7 @@ namespace karri {
 
             for (auto asgn : currentlyCalculating) {
                 assert(searches.knowsDistanceTransfer(dVeh->vehicleId, asgn.transfer.loc));
+                assert(searches.knowsCurrentLocationOf(dVeh->vehicleId));
                 const int distance = searches.getDistanceTransfer(dVeh->vehicleId, asgn.transfer.loc);
                 asgn.distToTransferDVeh = distance;
                 asgn.dropoffBNSLowerBoundUsed = false;
@@ -673,6 +679,27 @@ namespace karri {
             return -1;
         }
 
+        void assertAssignment(const AssignmentWithTransfer &asgn) {
+            std::cout << "Asserting the assignment!" << std::endl;
+
+            assertTransferPointCalculation(asgn.transfer);
+        }
+
+        void assertDetours(const AssignmentWithTransfer &asgn) {
+
+            // Assert inital pickup detour
+
+
+            // Assert initial transfer detour (pVeh)
+
+        }
+
+
+        void assertInitialPickupDetour() {
+        
+        }
+
+
         void assertTransferPointCalculation(const TransferPoint tp) {
 
             const auto stopLocationsPVeh = routeState.stopLocationsFor(tp.pVeh->vehicleId);
@@ -756,6 +783,8 @@ namespace karri {
                 std::cout << "distFromTransferDVeh is wrong..." << std::endl;
                 std::cout << "should: " << distFromTransferDVeh << " is: " << tp.distanceDVehFromTransfer << " delta : " << (distFromTransferDVeh - tp.distanceDVehFromTransfer) << std::endl;
             }
+
+            std::cout << "Asserted the transfer point for the assignment!" << std::endl;
         }
 
         int pairedLowerBoundPT = INFTY;

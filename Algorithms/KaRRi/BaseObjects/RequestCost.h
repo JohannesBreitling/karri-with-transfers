@@ -14,6 +14,8 @@ namespace karri {
             int changeInTripCostsOfOthers;
             int vehCost;
 
+            bool error = false;
+
             static RequestCost INFTY_COST() {
                 RequestCost cost;
 
@@ -22,6 +24,7 @@ namespace karri {
                 cost.waitTimeViolationCost = INFTY;
                 cost.changeInTripCostsOfOthers = INFTY;
                 cost.vehCost = INFTY;
+                cost.error = false;
 
                 return cost;
             }

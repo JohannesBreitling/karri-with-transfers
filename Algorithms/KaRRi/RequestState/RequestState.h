@@ -155,7 +155,7 @@ namespace karri {
         }
         
         bool improvementThroughTransfer() const {
-            return false;
+            // return false;
             return bestCostWithTransfer < bestCost;
         }
 

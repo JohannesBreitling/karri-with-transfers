@@ -132,14 +132,10 @@ namespace karri {
 
         // For statistics
         enum INS_TYPES pickupType = NOT_SET;
-        bool pickupAtStop;
         enum INS_TYPES transferTypePVeh = NOT_SET;
-        bool transferAtStopPVeh;
 
         enum INS_TYPES transferTypeDVeh = NOT_SET;
-        bool transferAtStopDVeh;
         enum INS_TYPES dropoffType = NOT_SET;
-        bool dropoffAtStop;
 
         int tripTimePVeh;
         int tripTimeDVeh;

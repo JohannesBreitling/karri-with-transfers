@@ -32,7 +32,6 @@
 
 #include "Algorithms/KaRRi/TimeUtils.h"
 #include "Algorithms/KaRRi/BaseObjects/AssignmentWithTransfer.h"
-#include "Algorithms/KaRRi/PbnsAssignments/VehicleLocator.h"
 #include "Algorithms/Dijkstra/Dijkstra.h"
 #include "DataStructures/Graph/Attributes/TravelTimeAttribute.h"
 
@@ -56,7 +55,6 @@ namespace karri {
             DropoffVehicles &dVehs,
             TransferPointFinder<StrategyT> &tpFinder,
             std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints,
-            const VehicleLocator<InputGraphT, VehCHEnvT> &locator,
             CurVehLocToPickupSearchesT &searches)
                             : ordinaryTransfers(ordinaryTransfers),
                               transfersALSPVeh(transfersALSPVeh),
@@ -73,12 +71,7 @@ namespace karri {
                               pickupDropoffPairs(std::vector<std::tuple<Vehicle, Vehicle>>{}),
                               tpFinder(tpFinder),
                               transferPoints(transferPoints),
-                              locator(locator),
-                              searches(searches),
-                              assignmentsWithUnknownPickupDistance(std::vector<AssignmentWithTransfer>{}),
-                              assignmentsWithUnknownTransferDistance(std::vector<AssignmentWithTransfer>{}),
-                              calculatedDirectDistances(std::map<std::tuple<int, int>, int>{}),
-                              dijSearchLowerBound(inputGraph) {}
+                              searches(searches) {}
 
         void init() {
             pickupDropoffPairs = std::vector<std::tuple<Vehicle, Vehicle>>{};
@@ -104,11 +97,17 @@ namespace karri {
             // * TRANSFER AFTER LAST STOP (PVeh)
             // The pickup vehicle picks up the user either bns, ord or als
             // Then the pickup vehicle drives to one of the stops of the dropoff vehicle, where the transfer is done
-            transfersALSPVeh.findAssignments();
+            //? transfersALSPVeh.findAssignments();
             
+            // * TRANSFER AFTER LAST STOP (PVeh)
+            // The pickup vehicle picks up the user either bns, ord or als
+            // Then the pickup vehicle drives to one of the stops of the dropoff vehicle, where the transfer is done
             ordinaryTransfers.findAssignments();
             
-            transfersALSDVeh.findAssignments();
+            // * TRANSFER AFTER LAST STOP (PVeh)
+            // The pickup vehicle picks up the user either bns, ord or als
+            // Then the pickup vehicle drives to one of the stops of the dropoff vehicle, where the transfer is done
+            // transfersALSDVeh.findAssignments();
 
             return;
 
@@ -160,19 +159,7 @@ namespace karri {
         std::vector<Pickup> alsPickups;
         std::vector<Dropoff> alsDropoffs;
 
-        std::vector<AssignmentWithTransfer> promisingPartials;
-        std::vector<AssignmentWithTransfer> unfinishedAssignments;
-
-        const VehicleLocator<InputGraphT, VehCHEnvT> &locator;
         CurVehLocToPickupSearchesT &searches;
-        std::vector<AssignmentWithTransfer> assignmentsWithUnknownPickupDistance;
-        std::vector<AssignmentWithTransfer> assignmentsWithUnknownTransferDistance;
-
-        std::map<std::tuple<int, int>, int> calculatedDirectDistances;
-
-        int pairedLowerBoundPT;
-        int pairedLowerBoundTD;
-        Dijkstra<InputGraphT, TravelTimeAttribute, DijLabelSet> dijSearchLowerBound;
 
         // int64_t numAssignmentsTried = 0;
         // int64_t numPartialsTried = 0;

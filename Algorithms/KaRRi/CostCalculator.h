@@ -136,13 +136,8 @@ namespace karri {
 
             assert(asgn.dropoff);
 
-            if (!asgn.dropoff) {
-                asgn.cost.total = INFTY;
-                return asgn.cost;
-            }
-
-            if (asgn.distToDropoff == INFTY || asgn.distFromDropoff == INFTY)  {
-                asgn.cost.total = INFTY;
+            if (!asgn.dropoff || asgn.distToDropoff == INFTY || asgn.distFromDropoff == INFTY)  {
+                asgn.cost = RequestCost::INFTY_COST();
                 return asgn.cost;
             }
 
@@ -153,27 +148,25 @@ namespace karri {
 
             const auto actualDepTimeAtTransfer = getActualDepTimeAtTranfer(asgn, context, routeState);
             const auto initialTransferDetour = calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context, routeState);
-            assert(initialTransferDetour >= 0); // TODO Hier nochmal schauen
+            assert(initialTransferDetour >= 0);
 
             int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.transferIdxDVeh, asgn.dropoffIdx, initialTransferDetour, routeState);
             const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
 
             const auto initialDropoffDetour = calcInitialDropoffDetour(asgn, dropoffAtExistingStop, routeState);
-            //assert(initialDropoffDetour >= 0);
+            assert(asgn.transferIdxDVeh == asgn.dropoffIdx || initialDropoffDetour >= 0);
 
             const auto detourRightAfterDropoff = calcDetourRightAfterDropoff(asgn, initialTransferDetour,
                                                                              initialDropoffDetour, routeState);
-            //assert(detourRightAfterDropoff >= 0);
 
             const auto residualDetourAtEnd = calcResidualTotalDetourForStopAfterDropoff(asgn.dVeh->vehicleId,
                                                                                         asgn.dropoffIdx,
                                                                                         numStops - 1,
                                                                                         detourRightAfterDropoff,
                                                                                         routeState);         
-            //assert(residualDetourAtEnd >= 0);
 
             if (checkHardConstraints && isAnyHardConstraintViolatedDVeh(asgn, context, initialTransferDetour, detourRightAfterDropoff, residualDetourAtEnd, dropoffAtExistingStop, routeState)) {
-                asgn.cost.total = INFTY;
+                asgn.cost = RequestCost::INFTY_COST();
                 return asgn.cost;
             }
  
@@ -263,23 +256,23 @@ namespace karri {
             const auto numStops = routeState.numStopsOf(vehId);
             const auto actualDepTimeAtPickup = getActualDepTimeAtPickup(asgn, context, routeState);
             const auto initialPickupDetour = calcInitialPickupDetour(asgn, actualDepTimeAtPickup, context, routeState);
+            assert(initialPickupDetour >= 0);
+            
             int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.pickupIdx, asgn.transferIdxPVeh, initialPickupDetour, routeState);
-
             bool transferAtExistingStop = isTransferAtExistingStopPVeh(asgn, routeState);
 
-            // const auto initalTransferDetour = std::max(calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState), 0);
             const auto initalTransferDetour = calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState);
-            assert(initalTransferDetour >= 0);
+            assert(asgn.pickupIdx == asgn.transferIdxPVeh || initalTransferDetour >= 0);
 
             const auto detourRightAfterTransfer = calcDetourRightAfterTransferPVeh(asgn, initialPickupDetour, initalTransferDetour, routeState);
-            assert(detourRightAfterTransfer >= 0);
-            
+            // The detourRightAfterTransfer is greater than or equal to zero by definition of the method
+
             const auto residualDetourAtEnd = calcResidualTotalDetourForStopAfterDropoff(asgn.pVeh->vehicleId,
                                                                                         asgn.transferIdxPVeh,
                                                                                         numStops - 1,
                                                                                         detourRightAfterTransfer,
                                                                                         routeState);
-            assert(residualDetourAtEnd >= 0);
+            // The residualDetourAtEnd is greater than or equal to zero by definition of the method
 
             if (checkHardConstraints && isAnyHardConstraintViolatedPVeh(asgn, context, initialPickupDetour,
                                                                     detourRightAfterTransfer, residualDetourAtEnd,
@@ -327,19 +320,12 @@ namespace karri {
 
             const auto initalTransferDetour = std::max(calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState), 0);
 
-            const auto detourRightAfterTransfer = std::max(calcDetourRightAfterTransferPVeh(asgn, initialPickupDetour, initalTransferDetour, routeState), 0);
-            const auto residualDetourAtEnd = std::max(calcResidualTotalDetourForStopAfterDropoff(asgn.pVeh->vehicleId,
+            const auto detourRightAfterTransfer = calcDetourRightAfterTransferPVeh(asgn, initialPickupDetour, initalTransferDetour, routeState);
+            const auto residualDetourAtEnd = calcResidualTotalDetourForStopAfterDropoff(asgn.pVeh->vehicleId,
                                                                                         asgn.transferIdxPVeh,
                                                                                         numStops - 1,
                                                                                         detourRightAfterTransfer,
-                                                                                        routeState), 0);
-
-            // std::cout << "Actual Departure : " << actualDepTimeAtPickup << std::endl;
-            // std::cout << "Initial Pickup Detour : " << initialPickupDetour << std::endl;
-            // std::cout << "Added Trip Time : " << addedTripTime << std::endl;
-            // std::cout << "Initial transfer detour : " << initalTransferDetour << std::endl;
-            // std::cout << "Detour right after transfer : " << detourRightAfterTransfer << std::endl;
-            // std::cout << "Residual detour at end : " << residualDetourAtEnd << std::endl;
+                                                                                        routeState);
 
             if (checkHardConstraints && isAnyHardConstraintViolatedPVeh(asgn, context, initialPickupDetour,
                                                                     detourRightAfterTransfer, residualDetourAtEnd,
@@ -921,8 +907,7 @@ namespace karri {
         template<typename RequestContext>
         RequestCost calcFinalCost(AssignmentWithTransfer &asgn, const RequestContext &context, const int initialTransferDetour, const int residualDetourAtEnd, const int actualDepTimeAtTransfer, const bool dropoffAtExistingStop, const int addedTripTime) const {
             if (!asgn.dVeh || !asgn.pVeh || !asgn.pickup || !asgn.dropoff) {
-                asgn.cost.total = INFTY;
-                
+                asgn.cost = RequestCost::INFTY_COST();
                 return asgn.cost;
             }
 
@@ -939,7 +924,8 @@ namespace karri {
             const int vehCost = F::calcVehicleCost(residualDetourAtEnd);
 
             if (walkingCost >= INFTY || tripCost >= INFTY || waitTimeViolationCost >= INFTY || changeInTripCostsOfOthers >= INFTY || vehCost >= INFTY) {
-                return RequestCost::INFTY_COST();
+                asgn.cost = RequestCost::INFTY_COST();
+                return asgn.cost;
             }
 
             asgn.cost.walkingCost = asgn.costPVeh.walkingCost + walkingCost;
@@ -950,18 +936,13 @@ namespace karri {
             assert(asgn.cost.walkingCost >= 0 && asgn.cost.tripCost >= 0 && asgn.cost.waitTimeViolationCost >= 0 && asgn.cost.changeInTripCostsOfOthers >= 0 && asgn.cost.vehCost >= 0);
             
             if (asgn.cost.walkingCost >= INFTY || asgn.cost.tripCost >= INFTY || asgn.cost.waitTimeViolationCost >= INFTY || asgn.cost.changeInTripCostsOfOthers >= INFTY || asgn.cost.vehCost >= INFTY) {
-                asgn.cost.total = INFTY;
+                asgn.cost = RequestCost::INFTY_COST();
                 return asgn.cost;
             }
 
             int total = (vehCost + walkingCost + tripCost + waitTimeViolationCost + changeInTripCostsOfOthers);
-            if (total < 0 || total >= INFTY || asgn.cost.total >= INFTY || total + asgn.cost.total >= INFTY || asgn.cost.total < 0) {
-                // Integer overflow
-                asgn.cost.total = INFTY;
-                return asgn.cost;
-            }
-            
-            asgn.cost.total += total;
+            assert(total >= 0);
+            asgn.cost.total = total;
             return asgn.cost;
         }
 

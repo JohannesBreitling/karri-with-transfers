@@ -145,6 +145,7 @@ namespace karri {
             auto [pIdxPVeh, dIdxPVeh] = routeState.insertPVeh(asgn, requestState);
 
             if (pIdxPVeh == -1 || dIdxPVeh == -1) {
+                assert(false);
                 pickupStopId = -1;
                 transferStopIdPVeh = -1;
                 transferStopIdDVeh = -1;

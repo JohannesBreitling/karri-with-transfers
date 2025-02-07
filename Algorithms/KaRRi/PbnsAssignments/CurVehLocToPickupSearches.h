@@ -286,6 +286,8 @@ namespace karri {
 
             waitingQueue.clear();
             prevNumPickups = requestState.numPickups();
+            
+            assert(knowsCurrentLocationOf(vehicle.vehicleId));
 
             totalVehicleToPickupSearchTimeForRequest += timer.elapsed<std::chrono::nanoseconds>();
             totalNumCHSearchesRunForRequest += numChSearchesRun;
@@ -329,7 +331,7 @@ namespace karri {
 
                 if (!knowsDistanceTransfer(vehicle.vehicleId, transferLoc)) {
                     if (vehLocation.location == transferLoc) {
-                        distancesTransfer[{vehicle.vehicleId, transferLoc}] = distToCurLoc; // TODO Ist das so richtig?
+                        distancesTransfer[{vehicle.vehicleId, transferLoc}] = distToCurLoc;
                     } else {
                         targets[i] = ch.rank(inputGraph.edgeTail(transferLoc));
                         targetOffsets[i] = inputGraph.travelTime(transferLoc);
@@ -371,6 +373,8 @@ namespace karri {
                     i = 0;
                 }
             }
+
+            assert(knowsCurrentLocationOf(vehicle.vehicleId));
 
             waitingQueueTransfer.clear();
             // prevNumPickups = requestState.numPickups();

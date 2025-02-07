@@ -24,6 +24,7 @@ namespace karri {
             const RelevantPDLocs &relORDPickups,
             const RelevantPDLocs &relBNSPickups,
             const RelevantPDLocs &relORDDropoffs,
+            std::vector<AssignmentWithTransfer> &postponedAssignments,
             const Fleet &fleet,
             const RouteState &routeState,
             RequestState &requestState,
@@ -35,6 +36,7 @@ namespace karri {
             relORDPickups(relORDPickups),
             relBNSPickups(relBNSPickups),
             relORDDropoffs(relORDDropoffs),
+            postponedAssignments(postponedAssignments),
             fleet(fleet),
             routeState(routeState),
             requestState(requestState),
@@ -85,10 +87,15 @@ namespace karri {
                     lastStopDistances[pVehId][dVehId] = distances;
                 }
             }
+
+            assert(postponedAssignments.size() == 0);
             
             findAssignmentsWithPickupBNS();
             findAssignmentsWithPickupORD();
             findAssignmentsWithPickupALS();
+
+            if (postponedAssignments.size() > 0)
+                std::cout << "Pp: " << postponedAssignments.size() << std::endl;
         }
 
     private:
@@ -124,6 +131,11 @@ namespace karri {
                     tryDropoffORD(pVeh, pickup);
                     tryDropoffALS(pVeh, pickup);
                 }
+
+                if (postponedAssignments.size() == 0)
+                    continue;
+
+                finishAssignments(pVeh);
             }
         }
 
@@ -422,6 +434,28 @@ namespace karri {
             }
         }
 
+        void finishAssignments(const Vehicle *pVeh) {
+            for (auto &asgn : postponedAssignments) {
+                assert(asgn.pickupBNSLowerBoundUsed);
+                searches.addPickupForProcessing(asgn.pickup->id, asgn.distToPickup);
+            }
+
+            searches.computeExactDistancesVia(*pVeh);
+
+            for (auto asgn : postponedAssignments) {
+                assert(searches.knowsCurrentLocationOf(pVeh->vehicleId));
+                assert(searches.knowsDistance(pVeh->vehicleId, asgn.pickup->id));
+
+                const int distance = searches.getDistance(pVeh->vehicleId, asgn.pickup->id);
+                asgn.distToPickup = distance;
+                asgn.pickupBNSLowerBoundUsed = false;
+
+                assert(asgn.isFinished());
+ 
+                requestState.tryAssignment(asgn);
+            }
+        }
+
         // If the dropoff coincides with a stop, we return the index of the stop
         // Otherwise -1 is returned
         int dropoffIsAtStop(const Vehicle* dVeh, const int dropoffLoc) {
@@ -443,6 +477,8 @@ namespace karri {
         const RelevantPDLocs &relORDPickups;
         const RelevantPDLocs &relBNSPickups;
         const RelevantPDLocs &relORDDropoffs;
+
+        std::vector<AssignmentWithTransfer> &postponedAssignments;
         
         const Fleet &fleet;
         const RouteState &routeState;
