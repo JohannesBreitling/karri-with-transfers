@@ -103,6 +103,7 @@ namespace karri {
         }
 
         int getMaxArrTimeAtTransfer(const AssignmentWithTransfer &asgn) const {
+            assert(asgn.pickup->id < numPickups() && asgn.dropoff->id < numDropoffs());
             return getMaxArrTimeAtDropoff(asgn.pickup->id, asgn.dropoff->id) - asgn.tripTimeDVeh;
         }
 

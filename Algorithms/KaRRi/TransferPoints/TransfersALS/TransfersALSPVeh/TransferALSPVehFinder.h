@@ -214,6 +214,10 @@ namespace karri {
                         asgn.transferIdxPVeh = numStopsPVeh - 1;
                         asgn.transferIdxDVeh = i;
 
+                        // If the pickup conincides with the transfer, we skip the assignment
+                        if (asgn.pickup->loc == asgn.transfer.loc)
+                            continue; 
+
                         // If the dropoff coincides with a stop, we skip the assignment if the dropoff will be inserted in a different leg
                         if (dropoffIsAtStop(dVeh, dropoffPDLoc->loc) >= 0 && dropoff.stopIndex != dropoffIsAtStop(dVeh, dropoffPDLoc->loc))
                             continue; 
@@ -284,6 +288,10 @@ namespace karri {
                         asgn.dropoffIdx = numStopsDVeh - 1;
                         asgn.transferIdxPVeh = numStopsPVeh - 1;
                         asgn.transferIdxDVeh = i;
+
+                        // If the pickup conincides with the transfer, we skip the assignment
+                        if (asgn.pickup->loc == asgn.transfer.loc)
+                            continue; 
 
                         // Try the finished assignment with ORD dropoff
                         requestState.tryAssignment(asgn);
@@ -371,7 +379,7 @@ namespace karri {
             const auto dVehIds = dropoffALSStrategy.findDropoffsAfterLastStop();
             
             if (dVehIds.size() == 0)
-                return; 
+                return;
 
             const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
 
@@ -395,7 +403,7 @@ namespace karri {
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
                 const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
                 
-                for (const auto dropoff : requestState.dropoffs) {
+                for (const auto &dropoff : requestState.dropoffs) {
                     assert(numStopsDVeh - 1 == lastStopDistances[pVeh->vehicleId][dVeh->vehicleId].size());
 
                     // Try all possible transfer points

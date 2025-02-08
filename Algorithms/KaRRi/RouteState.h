@@ -819,7 +819,6 @@ namespace karri {
             const auto pickupPaired = asgn.pickupIdx == asgn.transferIdxPVeh;
             
             int pickupIdx = 0;
-            printStopLocations(asgn.pVeh->vehicleId);
             std::cout << asgn.pickup->loc << std::endl;
             while (stopLocationsPVeh[pickupIdx] != asgn.pickup->loc) {
                 pickupIdx++;
@@ -830,58 +829,165 @@ namespace karri {
             while (stopLocationsPVeh[transferIdxPVeh] != asgn.transfer.loc) {
                 ++transferIdxPVeh;
             }
-            
-            if (pickupIdx < numStopsPVeh - 1 && !pickupPaired) {
-                std::cout << "Sched Dep at Pickup: " << schedDepTimesPVeh[pickupIdx] << std::endl;
-                std::cout << "Sched Arr at Next Stop: " << schedArrTimesPVeh[pickupIdx + 1] << std::endl;
-                std::cout << "Dist from Pickup: " << asgn.distFromPickup << std::endl;
-                assert(schedDepTimesPVeh[pickupIdx] == schedArrTimesPVeh[pickupIdx + 1] - asgn.distFromPickup);
-            }
 
-            if (pickupIdx < numStopsPVeh - 1 && pickupPaired) {
+            const bool pickupNotAsNewStop = asgn.pickupIdx == pickupIdx;
+            const bool transferNotAsNewStop = (pickupNotAsNewStop && asgn.transferIdxPVeh == transferIdxPVeh) || (!pickupNotAsNewStop && asgn.transferIdxPVeh == transferIdxPVeh + 1);
+
+            if (pickupNotAsNewStop || transferNotAsNewStop)
+                return;
+
+            if (pickupPaired) {
+                // Assert the route of the paired insertion
+                assert(transferIdxPVeh < numStopsPVeh);
                 assert(pickupIdx + 1 == transferIdxPVeh);
+
+                if (pickupIdx > 0) { // TODO We have a case where the pickup is at a stop -> We need to handle this in a different case
+                    // Pickup is not first stop
+                    std::cout << "Sched Dep before Pickup: " << schedDepTimesPVeh[pickupIdx - 1] << std::endl;
+                    std::cout << "Sched Arr at Pickup: " << schedArrTimesPVeh[pickupIdx] << std::endl;
+                    std::cout << "Dist to Pickup: " << asgn.distToPickup << std::endl;
+                    std::cout << "Takes: " << schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[pickupIdx - 1] << std::endl;
+                    assert(schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[pickupIdx - 1] == asgn.distToPickup);
+                }
+
+                // Assert the distance to the tranfer
                 std::cout << "Sched Dep at Pickup: " << schedDepTimesPVeh[pickupIdx] << std::endl;
                 std::cout << "Sched Arr at Next Stop (Transfer): " << schedArrTimesPVeh[transferIdxPVeh] << std::endl;
                 std::cout << "Dist to Transfer: " << asgn.distToTransferPVeh << std::endl;
-                assert(schedDepTimesPVeh[pickupIdx] == schedArrTimesPVeh[transferIdxPVeh] - asgn.distToPickup);
+                std::cout << "Takes: " << schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[pickupIdx - 1] << std::endl;
+                assert(schedArrTimesPVeh[transferIdxPVeh] - schedDepTimesPVeh[pickupIdx] == asgn.distToTransferPVeh);
+            } else {
+                assert(pickupIdx >= 2);
+                if (pickupIdx > 2) {
+                    // Pickup is not first stop
+                    std::cout << "Sched Dep before Pickup: " << schedDepTimesPVeh[pickupIdx - 1] << std::endl;
+                    std::cout << "Sched Arr at Pickup: " << schedArrTimesPVeh[pickupIdx] << std::endl;
+                    std::cout << "Dist to Pickup: " << asgn.distToPickup << std::endl;
+                    std::cout << "Takes: " << schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[pickupIdx - 1] << std::endl;
+                    assert(schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[pickupIdx - 1] == asgn.distToPickup);
+                } else {
+                    std::cout << "The problem might be in here...\n";
+                    // BNS Assignment, Pickup is the first actual stop, subtract the length of the length before the transfer
+                }
+                
+                // Assert the distance from the pickup to the next stop
+                std::cout << "Sched Dep at Pickup: " << schedDepTimesPVeh[pickupIdx] << std::endl;
+                std::cout << "Sched Arr after Pickup: " << schedArrTimesPVeh[pickupIdx + 1] << std::endl;
+                std::cout << "Dist from Pickup: " << asgn.distFromPickup << std::endl;
+                std::cout << "Takes: " << schedArrTimesPVeh[pickupIdx + 1] - schedDepTimesPVeh[pickupIdx] << std::endl;
+                assert(schedArrTimesPVeh[pickupIdx + 1] - schedDepTimesPVeh[pickupIdx] == asgn.distFromPickup);
+
+                // Assert the distance to the tranfer
+                std::cout << "Sched Dep before Transfer: " << schedDepTimesPVeh[transferIdxPVeh - 1] << std::endl;
+                std::cout << "Sched Arr at Transfer: " << schedArrTimesPVeh[transferIdxPVeh] << std::endl;
+                std::cout << "Dist to Transfer: " << asgn.distToTransferPVeh << std::endl;
+                std::cout << "Takes: " << schedArrTimesPVeh[transferIdxPVeh] - schedDepTimesPVeh[transferIdxPVeh - 1] << std::endl;
+                assert(schedArrTimesPVeh[transferIdxPVeh] - schedDepTimesPVeh[transferIdxPVeh - 1] == asgn.distToTransferPVeh);
+
+                if (transferIdxPVeh < numStopsPVeh - 1) {
+                    // Transfer is not the last stop
+                    // Assert the distance from the tranfer
+                    std::cout << "Sched Dep at Transfer: " << schedDepTimesPVeh[transferIdxPVeh] << std::endl;
+                    std::cout << "Sched Arr after Transfer: " << schedArrTimesPVeh[transferIdxPVeh + 1] << std::endl;
+                    std::cout << "Dist to Transfer: " << asgn.distFromTransferPVeh << std::endl;
+                    assert(schedArrTimesPVeh[transferIdxPVeh + 1] - schedDepTimesPVeh[transferIdxPVeh] == asgn.distFromTransferPVeh);
+                }
             }
-            
-            if (pickupIdx > 0) {
-                assert(schedDepTimesPVeh[pickupIdx - 1] ==  schedArrTimesPVeh[pickupIdx] - asgn.distToPickup);
-            }
-            
-            if (transferIdxPVeh < numStopsPVeh - 1) {
-                assert(schedDepTimesPVeh[transferIdxPVeh] == schedArrTimesPVeh[transferIdxPVeh + 1] - asgn.distFromTransferPVeh);
-            }
-            
-            if (transferIdxPVeh > 0) {
-                assert(schedDepTimesPVeh[transferIdxPVeh - 1] ==  schedArrTimesPVeh[transferIdxPVeh] - asgn.distToTransferPVeh);
-            }
+
+            std::cout << "Route asserted PVeh!\n";
         }
 
         void assertRouteDVeh(const AssignmentWithTransfer &asgn) {
             const auto numStopsDVeh = numStopsOf(asgn.dVeh->vehicleId);
+            const auto stopLocationsDVeh = stopLocationsFor(asgn.dVeh->vehicleId);
             const auto schedDepTimesDVeh = schedDepTimesFor(asgn.dVeh->vehicleId);
             const auto schedArrTimesDVeh = schedArrTimesFor(asgn.dVeh->vehicleId);
 
-            const int transferIdxDVeh = asgn.transferIdxDVeh + asgn.transferInsertedAsNewStopDVeh;
-            const int dropoffIdx = asgn.dropoffIdx + asgn.transferInsertedAsNewStopDVeh + asgn.dropoffInsertedAsNewStop;
+            const auto dropoffPaired = asgn.transferIdxDVeh == asgn.dropoffIdx;
+            
+            int transferIdxDVeh = 0;
+            while (stopLocationsDVeh[transferIdxDVeh] != asgn.transfer.loc) {
+                transferIdxDVeh++;
+            }
 
-            if (transferIdxDVeh < numStopsDVeh - 1) {
-                assert(schedDepTimesDVeh[transferIdxDVeh] == schedArrTimesDVeh[transferIdxDVeh + 1] - asgn.distFromTransferDVeh);
+            int dropoffIdx = transferIdxDVeh;
+            while (stopLocationsDVeh[dropoffIdx] != asgn.dropoff->loc) {
+                ++dropoffIdx;
             }
-            
-            if (transferIdxDVeh > 0) {
-                assert(schedDepTimesDVeh[transferIdxDVeh - 1] == schedArrTimesDVeh[transferIdxDVeh] - asgn.distToTransferDVeh);
+
+            const bool transferNotAsNewStop = asgn.transferIdxDVeh == transferIdxDVeh;
+            const bool dropoffNotAsNewStop = (transferNotAsNewStop && asgn.dropoffIdx == dropoffIdx) || (!transferNotAsNewStop && asgn.dropoffIdx == dropoffIdx + 1);
+
+            if (transferNotAsNewStop || dropoffNotAsNewStop)
+                return;
+
+            if (dropoffPaired) {
+                // Assert the route of the paired insertion
+                assert(dropoffIdx < numStopsDVeh);
+                assert(transferIdxDVeh + 1 == dropoffIdx);
+
+                if (transferIdxDVeh > 0) {
+                    // Transfer is not first stop
+                    std::cout << "Sched Dep before Transfer: " << schedDepTimesDVeh[transferIdxDVeh - 1] << std::endl;
+                    std::cout << "Sched Arr at Transfer: " << schedArrTimesDVeh[transferIdxDVeh] << std::endl;
+                    std::cout << "Dist to Transfer: " << asgn.distToTransferDVeh << std::endl;
+                    std::cout << "Takes: " << schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[transferIdxDVeh - 1] << std::endl;
+                    assert(schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[transferIdxDVeh - 1] == asgn.distToTransferDVeh);
+                }
+
+                // Assert the distance to the tranfer
+                std::cout << "Sched Dep at Transfer: " << schedDepTimesDVeh[transferIdxDVeh] << std::endl;
+                std::cout << "Sched Arr at Next Stop (Dropoff): " << schedArrTimesDVeh[dropoffIdx] << std::endl;
+                std::cout << "Dist to Dropoff: " << asgn.distToDropoff << std::endl;
+                std::cout << "Takes: " << schedArrTimesDVeh[dropoffIdx] - schedDepTimesDVeh[transferIdxDVeh] << std::endl;
+                assert(schedArrTimesDVeh[dropoffIdx] - schedDepTimesDVeh[transferIdxDVeh] == asgn.distToDropoff);
+            } else {
+                // Assert the route of the normal insertion
+                assert(transferIdxDVeh >= 2);
+                if (transferIdxDVeh > 2) {
+                    // Transfer is not first stop
+                    std::cout << "Sched Dep before Transfer: " << schedDepTimesDVeh[transferIdxDVeh - 1] << std::endl;
+                    std::cout << "Sched Arr at Transfer: " << schedArrTimesDVeh[transferIdxDVeh] << std::endl;
+                    std::cout << "Dist to Transfer: " << asgn.distToTransferDVeh << std::endl;
+                    std::cout << "Takes: " << schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[transferIdxDVeh - 1] << std::endl;
+                    assert(schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[transferIdxDVeh - 1] == asgn.distToTransferDVeh);
+                } else {
+                    std::cout << "The problem might be in here...\n";
+                    // BNS Assignment, Transfer is the first actual stop, subtract the length of the length before the transfer
+                    // int lengthOfInterLeg = schedArrTimesDVeh[transferIdxDVeh - 1] - schedDepTimesDVeh[transferIdxDVeh - 2];
+                    
+                    //std::cout << "Sched Dep before Transfer: " << schedDepTimesDVeh[transferIdxDVeh - 1] << std::endl;
+                    //std::cout << "Sched Arr at Transfer: " << schedArrTimesDVeh[transferIdxDVeh] << std::endl;
+                    //std::cout << "Dist to Transfer: " << asgn.distToTransferDVeh - lengthOfInterLeg << std::endl;
+                    //std::cout << "Takes: " << schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[transferIdxDVeh - 1] << std::endl;
+                    //assert(schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[transferIdxDVeh - 1] == asgn.distToTransferDVeh - lengthOfInterLeg);
+                }
+
+                // Assert the distance from the transfer to the next stop
+                std::cout << "Sched Dep at Transfer: " << schedDepTimesDVeh[transferIdxDVeh] << std::endl;
+                std::cout << "Sched Arr after Transfer: " << schedArrTimesDVeh[transferIdxDVeh + 1] << std::endl;
+                std::cout << "Dist from Transfer: " << asgn.distFromTransferDVeh << std::endl;
+                std::cout << "Takes: " << schedArrTimesDVeh[transferIdxDVeh + 1] - schedDepTimesDVeh[transferIdxDVeh] << std::endl;
+                assert(schedArrTimesDVeh[transferIdxDVeh + 1] - schedDepTimesDVeh[transferIdxDVeh] == asgn.distFromTransferDVeh);
+
+                // Assert the distance to the dropoff
+                std::cout << "Sched Dep before Dropoff: " << schedDepTimesDVeh[dropoffIdx - 1] << std::endl;
+                std::cout << "Sched Arr at Dropoff: " << schedArrTimesDVeh[dropoffIdx] << std::endl;
+                std::cout << "Dist to Dropoff: " << asgn.distToDropoff << std::endl;
+                std::cout << "Takes: " << schedArrTimesDVeh[dropoffIdx] - schedDepTimesDVeh[dropoffIdx - 1] << std::endl;
+                assert(schedArrTimesDVeh[dropoffIdx] - schedDepTimesDVeh[dropoffIdx - 1] == asgn.distToDropoff);
+
+                if (dropoffIdx < numStopsDVeh - 1) {
+                    // Dropoff is not the last stop
+                    // Assert the distance from the dropoff
+                    std::cout << "Sched Dep at Dropoff: " << schedDepTimesDVeh[dropoffIdx] << std::endl;
+                    std::cout << "Sched Arr after Dropoff: " << schedArrTimesDVeh[dropoffIdx + 1] << std::endl;
+                    std::cout << "Dist to Dropoff: " << asgn.distFromDropoff << std::endl;
+                    assert(schedArrTimesDVeh[dropoffIdx + 1] - schedDepTimesDVeh[dropoffIdx] == asgn.distFromDropoff);
+                }
             }
-            
-            if (dropoffIdx < numStopsDVeh - 1) {
-                assert(schedDepTimesDVeh[dropoffIdx] == schedArrTimesDVeh[dropoffIdx + 1] - asgn.distFromDropoff);
-            }
-            
-            if (dropoffIdx > 0) {
-                assert(schedDepTimesDVeh[dropoffIdx - 1] == schedArrTimesDVeh[dropoffIdx] - asgn.distToDropoff);
-            }
+
+            std::cout << "Route asserted DVeh!\n";
         }
 
         // Scheduled stop interface for event simulation

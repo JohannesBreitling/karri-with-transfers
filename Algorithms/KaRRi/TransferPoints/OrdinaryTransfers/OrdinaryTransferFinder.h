@@ -346,7 +346,7 @@ namespace karri {
             if (!alsDropoffVehs[asgn.dVeh->vehicleId])
                 return;
             
-            for (const auto *dropoff : requestState.dropoffs) {
+            for (const auto &dropoff : requestState.dropoffs) {
                 int distanceToDropoff = dropoffALSStrategy.getDistanceToDropoff(asgn.dVeh->vehicleId, dropoff.id);
                 if (distanceToDropoff == INFTY)
                     continue;
@@ -354,7 +354,7 @@ namespace karri {
                 if (dropoff.loc == asgn.transfer.loc)
                     continue;
                 AssignmentWithTransfer newAssignment(asgn);
-                newAssignment.dropoff = dropoff;
+                newAssignment.dropoff = &dropoff;
                 newAssignment.distToDropoff = distanceToDropoff;
                 newAssignment.distFromDropoff = 0;
                 newAssignment.dropoffIdx = routeState.numStopsOf(asgn.dVeh->vehicleId) - 1;
