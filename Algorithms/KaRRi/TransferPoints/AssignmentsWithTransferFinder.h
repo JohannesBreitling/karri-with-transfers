@@ -97,17 +97,17 @@ namespace karri {
             // * TRANSFER AFTER LAST STOP (PVeh)
             // The pickup vehicle picks up the user either bns, ord or als
             // Then the pickup vehicle drives to one of the stops of the dropoff vehicle, where the transfer is done
-            transfersALSPVeh.findAssignments();
+            //* transfersALSPVeh.findAssignments();
             
             // * TRANSFER AFTER LAST STOP (PVeh)
             // The pickup vehicle picks up the user either bns, ord or als
             // Then the pickup vehicle drives to one of the stops of the dropoff vehicle, where the transfer is done
-            //? ordinaryTransfers.findAssignments();
+            //! ordinaryTransfers.findAssignments();
             
             // * TRANSFER AFTER LAST STOP (PVeh)
             // The pickup vehicle picks up the user either bns, ord or als
             // Then the pickup vehicle drives to one of the stops of the dropoff vehicle, where the transfer is done
-            //? transfersALSDVeh.findAssignments();
+            transfersALSDVeh.findAssignments();
 
             return;
 

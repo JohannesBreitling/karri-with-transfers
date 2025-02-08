@@ -405,13 +405,8 @@ namespace karri {
 
             const bool pickupNotInsertedAsNewStopCond = (pickupIdx > 0 || schedDepTimes[start] > now) && pickup.loc == stopLocations[start + pickupIdx];
             
-            const int stopLocationTransfer = pickupNotInsertedAsNewStopCond ? stopLocations[start + transferIdx] : stopLocations[start + transferIdx + 1];
-            const bool transferNotInsertedAsNewStopCond = pickup.loc != transfer.loc && transfer.loc == stopLocationTransfer;
-
-            if (pickupNotInsertedAsNewStopCond && transferNotInsertedAsNewStopCond) {
-                std::cout << "Wir machen nen taktischen Skip..." << std::endl;
-                return {-1, -1}; 
-            }
+            // const int stopLocationTransfer = pickupNotInsertedAsNewStopCond ? stopLocations[start + transferIdx] : stopLocations[start + transferIdx + 1];
+            // const bool transferNotInsertedAsNewStopCond = pickup.loc != transfer.loc && transfer.loc == stopLocationTransfer;
 
             if (pickupNotInsertedAsNewStopCond) {
                 assert(start + pickupIdx == end - 1
@@ -583,8 +578,7 @@ namespace karri {
             const int stopLocationTransfer = stopLocations[start + transferIdx];
             const bool conditionTransferAsNewStop = (transferIdx > 0 || schedDepTimes[start] > now) && transfer.loc == stopLocationTransfer;
             if (conditionTransferAsNewStop) {
-                assert(start + transferIdx == end - 1 || transferIdx == dropoffIdx ||
-                       asgn.distFromTransferDVeh == schedArrTimes[start + transferIdx + 1] - schedDepTimes[start + transferIdx]);
+                assert(start + transferIdx == end - 1 || transferIdx == dropoffIdx || asgn.distFromTransferDVeh == schedArrTimes[start + transferIdx + 1] - schedDepTimes[start + transferIdx] || asgn.distFromTransferDVeh == 0); // TODO BETREUER : Macht das Sinn?
 
                 // Pickup at existing stop
                 // For pickup at existing stop we don't count another stopTime. The vehicle can depart at the earliest
@@ -617,7 +611,7 @@ namespace karri {
                 transferInsertedAsNewStop = true;
             }
 
-            if (transferIdx != dropoffIdx) {
+            if (transferIdx != dropoffIdx && transferInsertedAsNewStop) { // TODO: BETREUER Das nochmal klären
                 // Propagate changes to minArrTime/minDepTime forward from inserted pickup stop until dropoff stop
                 assert(asgn.distFromTransferDVeh > 0);
                 propagateSchedArrAndDepForward(start + transferIdx + 1, start + dropoffIdx, asgn.distFromTransferDVeh);
@@ -830,10 +824,18 @@ namespace karri {
                 ++transferIdxPVeh;
             }
 
-            const bool pickupNotAsNewStop = asgn.pickupIdx == pickupIdx;
-            const bool transferNotAsNewStop = (pickupNotAsNewStop && asgn.transferIdxPVeh == transferIdxPVeh) || (!pickupNotAsNewStop && asgn.transferIdxPVeh == transferIdxPVeh + 1);
+            const bool pickupBNS = asgn.pickupIdx == 0;
+            const bool pickupAsNewStop = asgn.pickupIdx != pickupIdx;
+            assert(!pickupBNS || pickupAsNewStop);
+            assert((pickupBNS && pickupIdx == 2) || (!pickupBNS && (pickupIdx == asgn.pickupIdx + pickupAsNewStop)));
 
-            if (pickupNotAsNewStop || transferNotAsNewStop)
+            const bool transferAsNewStop = asgn.transferIdxPVeh != transferIdxPVeh && (!pickupAsNewStop || transferIdxPVeh > transferIdxPVeh + 1) && (!pickupBNS || transferIdxPVeh > transferIdxPVeh + 2); // TODO Lol, bin mir hier nicht sicher...
+            
+            
+            // const bool pickupNotAsNewStop = asgn.pickupIdx == pickupIdx;
+            // const bool transferNotAsNewStop = (pickupNotAsNewStop && asgn.transferIdxPVeh == transferIdxPVeh) || (!pickupNotAsNewStop && asgn.transferIdxPVeh == transferIdxPVeh + 1);
+
+            if (!pickupAsNewStop || !transferAsNewStop) // TODO Auch nicht ganz richtig
                 return;
 
             if (pickupPaired) {

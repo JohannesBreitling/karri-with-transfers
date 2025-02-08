@@ -119,7 +119,7 @@ namespace karri {
 
         template<bool checkHardConstraints, typename RequestContext>
         RequestCost calcBase(AssignmentWithTransfer &asgn, const RequestContext &context) const {
-            return calcBase<checkHardConstraints, false>(asgn, context);
+            return calcBase<checkHardConstraints, true>(asgn, context);
         }
         
         template<bool checkHardConstraints, bool recomputePVeh, typename RequestContext>
@@ -128,10 +128,22 @@ namespace karri {
 
             if (recomputePVeh && unfinishedPVeh) {
                 calcPartialCostForPVehLowerBound<checkHardConstraints>(asgn, context);
+
+                // TODO If the cost is bad, than return
+                if (asgn.costPVeh.total >= INFTY) {
+                    asgn.cost = RequestCost::INFTY_COST();
+                    return asgn.cost;
+                }
             }
 
             if (recomputePVeh && !unfinishedPVeh) {
                 calcPartialCostForPVeh<checkHardConstraints>(asgn, context);
+
+                // TODO If the cost is bad, than return
+                if (asgn.costPVeh.total >= INFTY) {
+                    asgn.cost = RequestCost::INFTY_COST();
+                    return asgn.cost;
+                }
             }
 
             assert(asgn.dropoff);
@@ -250,7 +262,7 @@ namespace karri {
                 asgn.distToTransferPVeh == INFTY || asgn.distFromTransferPVeh == INFTY) {
                 asgn.cost.total = INFTY;
                 return asgn.cost;
-            } 
+            }
             
             const int vehId = asgn.pVeh->vehicleId;
             const auto numStops = routeState.numStopsOf(vehId);

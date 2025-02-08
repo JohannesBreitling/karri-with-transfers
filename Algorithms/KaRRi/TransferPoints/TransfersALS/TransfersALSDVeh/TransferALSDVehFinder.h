@@ -180,7 +180,7 @@ class TransferALSDVehFinder {
                                 // Build the resulting assignment
                                 AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
                                 asgn.pickup = pickupPDLoc;
-                                asgn.dropoff = dropoff;
+                                asgn.dropoff = &dropoff;
 
                                 asgn.distToPickup = pickup.distToPDLoc;
                                 asgn.distFromPickup = pickup.distFromPDLocToNextStop;
@@ -216,7 +216,6 @@ class TransferALSDVehFinder {
         }
 
         void tryAssignment(AssignmentWithTransfer &asgn) {
-
             if (asgn.pickupIdx == 0) {
                 // Pickup BNS
                 if (searches.knowsDistance(asgn.pVeh->vehicleId, asgn.pickup->id)) {
@@ -226,6 +225,7 @@ class TransferALSDVehFinder {
                 }
             }
 
+            requestState.tryAssignment(asgn);
         }
 
         void finishAssignments(const Vehicle *pVeh) {
@@ -276,7 +276,5 @@ class TransferALSDVehFinder {
         int64_t numBNSPickups;
 
 };
-
-
 
 }
