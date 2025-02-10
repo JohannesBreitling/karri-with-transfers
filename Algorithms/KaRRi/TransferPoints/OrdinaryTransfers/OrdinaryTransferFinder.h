@@ -227,7 +227,7 @@ namespace karri {
         }
 
         void tryPartialAssignment(AssignmentWithTransfer &asgn) {
-            numPartialsTried++;         
+            numPartialsTried++;
             if (asgn.pickupIdx == asgn.transferIdxPVeh) {
                 // Paired Assignment (pVeh)
                 
@@ -378,6 +378,7 @@ namespace karri {
         void tryAssignment(AssignmentWithTransfer &asgn) {
 
             if (asgn.isFinished()) {
+                // calc.recomputePVeh(asgn, requestState);
                 // Test for the distance from transfer
                 const auto stopLocationsDVeh = routeState.stopLocationsFor(asgn.dVeh->vehicleId);
                 assert(asgn.transferIdxDVeh == asgn.dropoffIdx || asgn.distFromTransferDVeh > 0 || asgn.transfer.loc == stopLocationsDVeh[asgn.transferIdxDVeh]);

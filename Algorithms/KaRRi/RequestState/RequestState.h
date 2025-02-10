@@ -136,7 +136,7 @@ namespace karri {
             if (!asgn.isFinished()) {
                 cost = calculator.calcLowerBound(asgn, *this);
             } else {
-                // assert(asgn.distFromDropoff > 0 || asgn.distToDropoff == 0);
+                calculator.recomputePVeh(asgn, *this);
                 cost = calculator.calc(asgn, *this);
             }
 
@@ -144,7 +144,8 @@ namespace karri {
                 return;
 
             if (asgn.isFinished()) {
-                bestAssignmentWithTransfer = asgn;
+                assert(asgn.depAtPickup < asgn.arrAtTransferPoint || asgn.distToTransferPVeh == 0);
+                bestAssignmentWithTransfer = AssignmentWithTransfer(asgn);
                 bestCostWithTransfer = cost.total;
             } else {
                 postponedAssignments.push_back(asgn);

@@ -149,25 +149,33 @@ namespace karri {
             // intermediate stop at its current location representing the rerouting.
             if (asgn.pickupIdx == 0 && numStopsBeforePVeh > 1 && routeState.schedDepTimesFor(pVehId)[0] < requestState.originalRequest.requestTime) {
 
-                createIntermediateStopStopAtCurrentLocationForReroute(*asgn.pVeh,
-                                                                      requestState.originalRequest.requestTime);
+                createIntermediateStopStopAtCurrentLocationForReroute(*asgn.pVeh, requestState.originalRequest.requestTime);
+
+                assert(routeState.stopIdsFor(pVehId)[1] != 41);
+
+                assert(routeState.vehicleIdOf(routeState.stopIdsFor(pVehId)[1]) == pVehId);
+                
                 ++pIdxPVeh;
                 ++dIdxPVeh;
             }
 
-            // routeState.assertRoutePVeh(asgn); // TODO
+            routeState.assertRoutePVeh(asgn); // TODO
 
             auto [pIdxDVeh, dIdxDVeh] = routeState.insertDVeh(asgn, requestState);
             updateBucketStateDVeh(asgn, pIdxDVeh, dIdxDVeh, depTimeAtLastStopBeforeDVeh);
 
-            if (asgn.transferIdxDVeh == 0 && numStopsBeforeDVeh > 1 && routeState.schedDepTimesFor(dVehId)[0] < asgn.arrAtTransferPoint) {
-                createIntermediateStopStopAtCurrentLocationForReroute(*asgn.dVeh,
-                                                                      requestState.originalRequest.requestTime);
+            if (asgn.transferIdxDVeh == 0 && numStopsBeforeDVeh > 1 && routeState.schedDepTimesFor(dVehId)[0] < requestState.originalRequest.requestTime) {
+                createIntermediateStopStopAtCurrentLocationForReroute(*asgn.dVeh, requestState.originalRequest.requestTime);
+
+                assert(routeState.stopIdsFor(dVehId)[1] != 41);
+
+                assert(routeState.vehicleIdOf(routeState.stopIdsFor(dVehId)[1]) == dVehId);
+
                 ++pIdxDVeh;
                 ++dIdxDVeh;
             }
 
-            // routeState.assertRouteDVeh(asgn); // TODO
+            routeState.assertRouteDVeh(asgn); // TODO
 
             const auto routeUpdateTime = timer.elapsed<std::chrono::nanoseconds>();
             requestState.stats().updateStats.updateRoutesTime += routeUpdateTime;
@@ -176,6 +184,11 @@ namespace karri {
             transferStopIdPVeh = routeState.stopIdsFor(pVehId)[dIdxPVeh];
             transferStopIdDVeh = routeState.stopIdsFor(dVehId)[pIdxDVeh];
             dropoffStopId = routeState.stopIdsFor(dVehId)[dIdxDVeh];
+
+            assert(routeState.vehicleIdOf(pickupStopId) == pVehId);
+            assert(routeState.vehicleIdOf(transferStopIdPVeh) == pVehId);
+            assert(routeState.vehicleIdOf(transferStopIdDVeh) == dVehId);
+            assert(routeState.vehicleIdOf(dropoffStopId) == dVehId);
 
             // Register the inserted pickup and dropoff with the path data
             pathTracker.registerPdEventsForBestAssignment(pickupStopId, transferStopIdPVeh);

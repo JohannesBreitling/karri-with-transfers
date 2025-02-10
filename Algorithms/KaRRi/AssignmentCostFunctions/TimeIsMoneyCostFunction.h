@@ -113,7 +113,7 @@ namespace karri {
         }
 
         template<typename RequestContext>
-        static inline int calcWaitViolationCost(const int arrAtTransfer, const int actualDepTimeAtTransfer, const int waitedAtPickup, const RequestContext) {
+        static inline int calcWaitViolationCost(const int arrAtTransfer, const int actualDepTimeAtTransfer, const int waitedAtPickup, const RequestContext &) {
             return WAIT_TIME_VIOLATION_WEIGHT * std::max(actualDepTimeAtTransfer - arrAtTransfer + waitedAtPickup - InputConfig::getInstance().maxWaitTime, 0);
         }
 
