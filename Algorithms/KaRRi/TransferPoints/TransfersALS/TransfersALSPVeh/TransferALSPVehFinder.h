@@ -170,6 +170,7 @@ namespace karri {
             for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
                 const auto *dVeh = &fleet[dVehId];
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
+                (void) numStopsDVeh;
                 const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
 
                 if (dVehId == pVeh->vehicleId)
@@ -322,6 +323,7 @@ namespace karri {
 
                 const auto *dVeh = &fleet[dVehId];
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
+                (void) numStopsDVeh;
                 const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
                 
                 for (const auto &dropoff : relORDDropoffs.relevantSpotsFor(dVehId)) {

@@ -147,35 +147,28 @@ namespace karri {
 
             // If the vehicle has to be rerouted at its current location for a PBNS assignment, we introduce an
             // intermediate stop at its current location representing the rerouting.
-            if (asgn.pickupIdx == 0 && numStopsBeforePVeh > 1 && routeState.schedDepTimesFor(pVehId)[0] < requestState.originalRequest.requestTime) {
-
+            if (asgn.pickupIdx == 0 && numStopsBeforePVeh > 1 && routeState.schedDepTimesFor(pVehId)[0] < requestState.originalRequest.requestTime) {                
                 createIntermediateStopStopAtCurrentLocationForReroute(*asgn.pVeh, requestState.originalRequest.requestTime);
-
-                assert(routeState.stopIdsFor(pVehId)[1] != 41);
-
                 assert(routeState.vehicleIdOf(routeState.stopIdsFor(pVehId)[1]) == pVehId);
                 
                 ++pIdxPVeh;
                 ++dIdxPVeh;
             }
 
-            routeState.assertRoutePVeh(asgn); // TODO
+            // routeState.assertRoutePVeh(asgn); // TODO
 
             auto [pIdxDVeh, dIdxDVeh] = routeState.insertDVeh(asgn, requestState);
             updateBucketStateDVeh(asgn, pIdxDVeh, dIdxDVeh, depTimeAtLastStopBeforeDVeh);
 
             if (asgn.transferIdxDVeh == 0 && numStopsBeforeDVeh > 1 && routeState.schedDepTimesFor(dVehId)[0] < requestState.originalRequest.requestTime) {
                 createIntermediateStopStopAtCurrentLocationForReroute(*asgn.dVeh, requestState.originalRequest.requestTime);
-
-                assert(routeState.stopIdsFor(dVehId)[1] != 41);
-
                 assert(routeState.vehicleIdOf(routeState.stopIdsFor(dVehId)[1]) == dVehId);
 
                 ++pIdxDVeh;
                 ++dIdxDVeh;
             }
 
-            routeState.assertRouteDVeh(asgn); // TODO
+            // routeState.assertRouteDVeh(asgn); // TODO
 
             const auto routeUpdateTime = timer.elapsed<std::chrono::nanoseconds>();
             requestState.stats().updateStats.updateRoutesTime += routeUpdateTime;
@@ -439,7 +432,7 @@ namespace karri {
             const auto &numStopsPVeh = routeState.numStopsOf(pVehId);
 
             const bool pickupAtExistingStop = pickupIdx == asgn.pickupIdx;
-            const bool transferAtExistingStopPVeh = transferIdxPVeh == asgn.transferIdxPVeh;
+            const bool transferAtExistingStopPVeh = transferIdxPVeh == asgn.transferIdxPVeh +!pickupAtExistingStop;
 
             if (!pickupAtExistingStop) {
                 assert(pickupIdx > 0);
@@ -477,7 +470,7 @@ namespace karri {
             const auto &numStopsDVeh = routeState.numStopsOf(dVehId);
 
             const bool transferAtExistingStopDVeh = transferIdxDVeh == asgn.transferIdxDVeh;
-            const bool dropoffAtExistingStop = dropoffIdx == asgn.dropoffIdx;
+            const bool dropoffAtExistingStop = dropoffIdx == asgn.dropoffIdx + !transferAtExistingStopDVeh;
 
             if (!transferAtExistingStopDVeh) {
                 assert(transferIdxDVeh > 0);

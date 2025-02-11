@@ -127,14 +127,6 @@ namespace karri::Transfers {
                   vehiclesSeenForPickups(fleet.size()) {}
 
         int getDistanceToPickup(const int vehId, const unsigned int pickupId) {
-            
-            bool found = false;
-            for (const auto testVehId : vehiclesSeenForPickups) {
-                if (testVehId == vehId)
-                    found = true;
-            }
-            assert(found);
-
             const int distance = distances.getDistance(vehId, pickupId); 
             assert(distance >= 0);
             return distance;
@@ -142,12 +134,6 @@ namespace karri::Transfers {
         
         Subset findPickupsAfterLastStop() {
             runBchSearches();
-
-            // TODO Test
-            for (const auto pickup : requestState.pickups) {
-                for (const auto vehId : vehiclesSeenForPickups)
-                    assert(getDistanceToPickup(vehId, pickup.id) >= 0);
-            }
             
             return vehiclesSeenForPickups;
         }

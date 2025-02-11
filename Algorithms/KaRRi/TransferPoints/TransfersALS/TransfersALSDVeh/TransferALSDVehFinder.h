@@ -89,6 +89,7 @@ class TransferALSDVehFinder {
                             for (int i = 1; i < numStopsPVeh; i++) {
                                 assert(pickup.stopIndex == 0);
                                 const int distancesToTransferSize = distancesToTransfer.size();
+                                (void) distancesToTransferSize;
                                 assert(numStopsPVeh - 1 == distancesToTransferSize);
                                 assert(numStopsPVeh - 1 == distancesToDropoff.size());
                                 

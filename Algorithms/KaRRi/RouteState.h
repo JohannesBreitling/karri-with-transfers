@@ -30,7 +30,6 @@
 #include "Tools/Constants.h"
 #include "DataStructures/Utilities/DynamicRagged2DArrays.h"
 #include "DataStructures/Containers/BitVector.h"
-
 #include "Algorithms/KaRRi/BaseObjects/Vehicle.h"
 #include "Algorithms/KaRRi/BaseObjects/Assignment.h"
 #include "Algorithms/KaRRi/BaseObjects/AssignmentWithTransfer.h"
@@ -213,16 +212,6 @@ namespace karri {
             return maxLegLength;
         }
 
-        int getMinTripTimeForDVeh(const AssignmentWithTransfer &asgn) const {
-            const auto vehId = asgn.dVeh->vehicleId;
-            const auto &start = pos[vehId].start;
-            const auto &end = pos[vehId].end;
-            assert(start + asgn.dropoffIdx < end);
-            const auto arrAtDropoff = schedArrTimes[start + asgn.dropoffIdx];
-
-            return arrAtDropoff - asgn.arrAtTransferPoint + asgn.distToTransferDVeh + asgn.distFromTransferDVeh + asgn.distToDropoff + asgn.distFromDropoff; // TODO Ist das hier korrekt??
-        }
-
         template<typename RequestStateT>
         std::pair<int, int>
         insert(const Assignment &asgn, const RequestStateT &requestState) {
@@ -403,10 +392,7 @@ namespace karri {
             bool pickupInsertedAsNewStop = false;
             bool transferInsertedAsNewStop = false;
 
-            const bool pickupNotInsertedAsNewStopCond = (pickupIdx > 0 || schedDepTimes[start] > now) && pickup.loc == stopLocations[start + pickupIdx];
-            
-            // const int stopLocationTransfer = pickupNotInsertedAsNewStopCond ? stopLocations[start + transferIdx] : stopLocations[start + transferIdx + 1];
-            // const bool transferNotInsertedAsNewStopCond = pickup.loc != transfer.loc && transfer.loc == stopLocationTransfer;
+            const bool pickupNotInsertedAsNewStopCond = (pickupIdx > 0 || schedDepTimes[start] > now || numStopsOf(vehId) == 1) && pickup.loc == stopLocations[start + pickupIdx];
 
             if (pickupNotInsertedAsNewStopCond) {
                 assert(start + pickupIdx == end - 1
@@ -473,15 +459,13 @@ namespace karri {
             }
 
             // Propagate updated scheduled arrival and departure times as well as latest permissible arrival times.
-            if (start + transferIdx < end - 1 && (transferInsertedAsNewStop || pickupInsertedAsNewStop)) {
+            if (start + transferIdx < end - 1 /* && (transferInsertedAsNewStop || pickupInsertedAsNewStop) */) {
                 // At this point minDepTimes[start + dropoffIndex] is correct. If dropoff has been inserted not as the last
                 // stop, propagate the changes to minDep and minArr times forward until the last stop.
                 propagateSchedArrAndDepForward(start + transferIdx + 1, end - 1, asgn.distFromTransferPVeh);
  
                 // If there are stops after the dropoff, consider them for propagating changes to the maxArrTimes
                 propagateMaxArrTimeBackward(start + transferIdx, start + pickupIdx);
-            } else if (start + transferIdx < end - 1) {
-                assert(false);
             } else {
                 // If there are no stops after the dropoff, propagate maxArrTimes backwards not including dropoff
                 propagateMaxArrTimeBackward(start + transferIdx - 1, start + pickupIdx);
@@ -574,7 +558,7 @@ namespace karri {
             bool dropoffInsertedAsNewStop = false;
 
             const int stopLocationTransfer = stopLocations[start + transferIdx];
-            const bool conditionTransferAsNewStop = (transferIdx > 0 || schedDepTimes[start] > now) && transfer.loc == stopLocationTransfer;
+            const bool conditionTransferAsNewStop = (transferIdx > 0 || schedDepTimes[start] > now || numStopsOf(vehId) == 1) && transfer.loc == stopLocationTransfer;
             if (conditionTransferAsNewStop) {
                 assert(start + transferIdx == end - 1 || transferIdx == dropoffIdx || asgn.distFromTransferDVeh == schedArrTimes[start + transferIdx + 1] - schedDepTimes[start + transferIdx] || asgn.distFromTransferDVeh == 0);
 
@@ -798,6 +782,7 @@ namespace karri {
         }
 
         //* Utility methods to test if the insertion was correct
+        /*
         void assertRoutePVeh(const AssignmentWithTransfer &asgn) {
             const auto numStopsPVeh = numStopsOf(asgn.pVeh->vehicleId);
             const auto stopLocationsPVeh = stopLocationsFor(asgn.pVeh->vehicleId);
@@ -819,13 +804,14 @@ namespace karri {
             const int pickupLaterShifted = pickupIdx - asgn.pickupIdx;
             const int correctedTransferIdx = asgn.transferIdxPVeh + pickupLaterShifted;
             const bool transferAsNewStop = correctedTransferIdx != transferIdxPVeh;
+            (void) pickupBNS;
 
             assert(pickupBNS || pickupIdx == asgn.pickupIdx + pickupAsNewStop);
             assert(correctedTransferIdx + transferAsNewStop == transferIdxPVeh);
-            
             // Assert that the departure at the pickup is later than the arrival at the pickup
             assert(schedDepTimesPVeh[pickupIdx] >= asgn.requestTime + asgn.pickup->walkingDist);
             const int schedDepAtPickup = schedDepTimesPVeh[pickupIdx];
+            (void) schedDepAtPickup;
             assert(schedDepAtPickup == asgn.depAtPickup);
 
             // Assert that it is recognized correctly, when a transfer is not a new stop
@@ -840,6 +826,7 @@ namespace karri {
             // Assert the the arrival at the transfer point (dropoff for passenger) is correct
             if (transferIdxPVeh > 0 && transferAsNewStop) {
                 const int schedDepBeforeTransfer = schedDepTimesPVeh[transferIdxPVeh - 1];
+                (void) schedDepBeforeTransfer;
                 assert(schedDepBeforeTransfer + asgn.distToTransferPVeh == asgn.arrAtTransferPoint);
             }
 
@@ -849,6 +836,7 @@ namespace karri {
 
 
             const int schedArrAtTransfer = schedArrTimesPVeh[transferIdxPVeh];
+            (void) schedArrAtTransfer;
             assert(schedArrAtTransfer == asgn.arrAtTransferPoint);
 
             // std::cout << "Route asserted PVeh!\n";
@@ -858,6 +846,10 @@ namespace karri {
             const bool bns = asgn.pickupIdx == 0;
             const bool paired = asgn.pickupIdx == asgn.transferIdxPVeh;
             (void) numStopsPVeh;
+            (void) schedDepTimesPVeh;
+            (void) schedArrTimesPVeh;
+            (void) pickupIdx;
+            (void) transferIdxPVeh;
             
             assert(!paired || pickupIdx + 1 == transferIdxPVeh);
 
@@ -891,6 +883,8 @@ namespace karri {
         void assertTransferNewPVeh(const AssignmentWithTransfer &asgn, ConstantVectorRange<int> schedDepTimesPVeh, ConstantVectorRange<int> schedArrTimesPVeh, const int pickupIdx, const int transferIdxPVeh, const int numStopsPVeh) {
             assert(transferIdxPVeh > 0);
             (void) pickupIdx;
+            (void) asgn;
+            (void) schedDepTimesPVeh;
             // Assert the distance to the tranfer
             // std::cout << "Sched Dep before Transfer: " << schedDepTimesPVeh[transferIdxPVeh - 1] << std::endl;
             // std::cout << "Sched Arr at Transfer: " << schedArrTimesPVeh[transferIdxPVeh] << std::endl;
@@ -1010,6 +1004,8 @@ namespace karri {
 
             // std::cout << "Route asserted DVeh!\n";
         }
+
+        */
 
         // Scheduled stop interface for event simulation
         struct ScheduledStop {

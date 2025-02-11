@@ -11,7 +11,7 @@
 #	- [num runs]: optionale Angabe für Anzahl Runs. Wichtig für Laufzeitmessungen. Default: 1
 
 # Name des Skripts (zur Identifizierung)
-scriptName=run_karri_base
+scriptName=run_karri_with_transfers
 
 # Lies Eingabeparameter
 karriSourceDir=$1
@@ -69,6 +69,7 @@ do
 	# ID, um zwischen 5 runs zu unterscheiden
 	run_id=${scriptName}_${instanceName}_run$i
 	echo "Running run: ${run_id}"
-	$binaryDir/Launchers/karri -w 300 -p-radius 300 -d-radius 300 -veh-g $vehGraph -psg-g $psgGraph -v $vehicles -r $requests -veh-h $vehCh -psg-h $psgCh -o $karriOutputDir/$run_id
+	echo $karriBinaryDir
+	$karriBinaryDir/Launchers/karri -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehicles -r $requests -veh-h $vehCh -psg-h $psgCh -o $karriOutputDir/$run_id
 done
 

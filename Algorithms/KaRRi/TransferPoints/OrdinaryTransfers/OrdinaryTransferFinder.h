@@ -298,7 +298,7 @@ namespace karri {
                 if (newAssignment.dropoff->loc == newAssignment.transfer.loc)
                     continue;
 
-                tryAssignment(newAssignment);
+                requestState.tryAssignment(newAssignment);
             }
         }
 
@@ -338,7 +338,7 @@ namespace karri {
                 if (dropoffIsAtStop(newAssignment.dVeh, dropoffPDLoc->loc) >= 0 && dropoff.stopIndex != dropoffIsAtStop(newAssignment.dVeh, dropoffPDLoc->loc))
                     continue; 
 
-                tryAssignment(newAssignment);
+                requestState.tryAssignment(newAssignment);
             }
         }
 
@@ -363,7 +363,7 @@ namespace karri {
 
                 if (newAssignment.dropoff->loc == newAssignment.transfer.loc)
                     continue;
-                tryAssignment(newAssignment);
+                requestState.tryAssignment(newAssignment);
             }
         }
 
@@ -373,18 +373,6 @@ namespace karri {
                 total += it.second.size();
             
             return total;
-        }
-
-        void tryAssignment(AssignmentWithTransfer &asgn) {
-
-            if (asgn.isFinished()) {
-                // calc.recomputePVeh(asgn, requestState);
-                // Test for the distance from transfer
-                const auto stopLocationsDVeh = routeState.stopLocationsFor(asgn.dVeh->vehicleId);
-                assert(asgn.transferIdxDVeh == asgn.dropoffIdx || asgn.distFromTransferDVeh > 0 || asgn.transfer.loc == stopLocationsDVeh[asgn.transferIdxDVeh]);
-            }
-
-            requestState.tryAssignment(asgn);
         }
 
         void finishAssignments(const Vehicle *pVeh, const Vehicle *dVeh) {
@@ -422,7 +410,7 @@ namespace karri {
 
                     toCalculate.push_back(asgn);
                 } else {
-                    tryAssignment(asgn);
+                    requestState.tryAssignment(asgn);
                     continue;
                 }
             }
@@ -471,7 +459,7 @@ namespace karri {
                     
                     toCalculate.push_back(asgn);
                 } else {
-                    tryAssignment(asgn);
+                    requestState.tryAssignment(asgn);
                     continue;
                 }
             }
@@ -513,7 +501,7 @@ namespace karri {
 
                     toCalculate.push_back(asgn);
                 } else {
-                    tryAssignment(asgn);
+                    requestState.tryAssignment(asgn);
                 }   
             }
 
@@ -551,7 +539,7 @@ namespace karri {
 
                 // Try the assignments with the calculated distances
                 assert(asgn.isFinished());
-                tryAssignment(asgn);
+                requestState.tryAssignment(asgn);
             }
         }
 

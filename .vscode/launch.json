@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/Build/Release/Launchers/karri",
             // "args": ["-veh-g ./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin -psg-g ./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin -veh-h ./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin -psg-h ./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin -v ./Inputs/Vehicles/Berlin-20.csv -r ./Inputs/Requests/Berlin-200.csv -o ./Outputs/Berlin-200-20 -p-radius 0 -d-radius"],
-            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-10pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-10pct_pedestrian.csv", "-r", "./Inputs/Requests/Berlin-1pct_pedestrian.csv", "-o", "./Outputs/Berlin-400-50", "-p-radius", "0", "-d-radius", "0"],
+            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-1pct_pedestrian.csv", "-r", "./Inputs/Requests/Berlin-1pct_pedestrian.csv", "-o", "./Outputs/Berlin-1pct", "-p-radius", "0", "-d-radius", "0"],
             "environment": [{ "name": "config", "value": "Debug" }],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "karri-build"
@@ -22,7 +22,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/Build/Release/Launchers/karri",
             // "args": ["-veh-g ./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin -psg-g ./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin -veh-h ./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin -psg-h ./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin -v ./Inputs/Vehicles/Berlin-20.csv -r ./Inputs/Requests/Berlin-200.csv -o ./Outputs/Berlin-200-20 -p-radius 0 -d-radius"],
-            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-10pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-20.csv", "-r", "./Inputs/Requests/Berlin-100.csv", "-o", "./Outputs/Berlin-400-50"],
+            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-20.csv", "-r", "./Inputs/Requests/Berlin-100.csv", "-o", "./Outputs/Berlin-400-50"],
             "environment": [{ "name": "config", "value": "Debug" }],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "karri-build"
@@ -34,7 +34,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/Build/Release/Launchers/karri",
             // "args": ["-veh-g ./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin -psg-g ./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin -veh-h ./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin -psg-h ./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin -v ./Inputs/Vehicles/Berlin-20.csv -r ./Inputs/Requests/Berlin-200.csv -o ./Outputs/Berlin-200-20 -p-radius 0 -d-radius"],
-            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-10pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-50.csv", "-r", "./Inputs/Requests/Berlin-400.csv", "-o", "./Outputs/Berlin-400-50", "-p-radius", "0", "-d-radius", "0"],
+            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-50.csv", "-r", "./Inputs/Requests/Berlin-400.csv", "-o", "./Outputs/Berlin-400-50", "-p-radius", "0", "-d-radius", "0"],
             "environment": [{ "name": "config", "value": "Debug" }],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "karri-build"
@@ -46,7 +46,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/Build/Release/Launchers/karri",
             // "args": ["-veh-g ./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin -psg-g ./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin -veh-h ./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin -psg-h ./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin -v ./Inputs/Vehicles/Berlin-20.csv -r ./Inputs/Requests/Berlin-200.csv -o ./Outputs/Berlin-200-20 -p-radius 0 -d-radius"],
-            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-10pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-50.csv", "-r", "./Inputs/Requests/Berlin-400.csv", "-o", "./Outputs/Berlin-400-50"],
+            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-50.csv", "-r", "./Inputs/Requests/Berlin-400.csv", "-o", "./Outputs/Berlin-400-50"],
             "environment": [{ "name": "config", "value": "Debug" }],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "karri-build"
@@ -58,7 +58,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/Build/Release/Launchers/karri",
             // "args": ["-veh-g ./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin -psg-g ./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin -veh-h ./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin -psg-h ./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin -v ./Inputs/Vehicles/Berlin-20.csv -r ./Inputs/Requests/Berlin-200.csv -o ./Outputs/Berlin-200-20 -p-radius 0 -d-radius"],
-            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-10pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-50.csv", "-r", "./Inputs/Requests/Berlin-1000.csv", "-o", "./Outputs/Berlin-1000-50", "-p-radius", "0", "-d-radius", "0"],
+            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-50.csv", "-r", "./Inputs/Requests/Berlin-1000.csv", "-o", "./Outputs/Berlin-1000-50", "-p-radius", "0", "-d-radius", "0"],
             "environment": [{ "name": "config", "value": "Debug" }],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "karri-build"
@@ -70,7 +70,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/Build/Release/Launchers/karri",
             // "args": ["-veh-g ./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin -psg-g ./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin -veh-h ./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin -psg-h ./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin -v ./Inputs/Vehicles/Berlin-20.csv -r ./Inputs/Requests/Berlin-200.csv -o ./Outputs/Berlin-200-20 -p-radius 0 -d-radius"],
-            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-10pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-100.csv", "-r", "./Inputs/Requests/Berlin-1000.csv", "-o", "./Outputs/Berlin-1000-100", "-p-radius", "0", "-d-radius", "0"],
+            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-100.csv", "-r", "./Inputs/Requests/Berlin-1000.csv", "-o", "./Outputs/Berlin-1000-100", "-p-radius", "0", "-d-radius", "0"],
             "environment": [{ "name": "config", "value": "Debug" }],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "karri-build"
@@ -82,7 +82,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/Build/Release/Launchers/karri",
             // "args": ["-veh-g ./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin -psg-g ./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin -veh-h ./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin -psg-h ./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin -v ./Inputs/Vehicles/Berlin-20.csv -r ./Inputs/Requests/Berlin-200.csv -o ./Outputs/Berlin-200-20 -p-radius 0 -d-radius"],
-            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-10pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-400.csv", "-r", "./Inputs/Requests/Berlin-2000.csv", "-o", "./Outputs/Berlin-1000-100", "-p-radius", "0", "-d-radius", "0"],
+            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-400.csv", "-r", "./Inputs/Requests/Berlin-2000.csv", "-o", "./Outputs/Berlin-1000-100", "-p-radius", "0", "-d-radius", "0"],
             "environment": [{ "name": "config", "value": "Debug" }],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "karri-build"

@@ -50,17 +50,17 @@ namespace karri::time_utils {
         return (numStops == 1 ? std::max(minDepTimes[0], context.originalRequest.requestTime) : minDepTimes[stopIdx]);
     }
 
-    static INLINE int getVehDepTimeAtStopForTransfer(const int vehId, const int stopIdx, const int arrAtTransfer,
+    /*static INLINE int getVehDepTimeAtStopForTransfer(const int vehId, const int stopIdx, const int arrAtTransfer,
                                                     const RouteState &routeState) {
         const auto numStops = routeState.numStopsOf(vehId);
         const auto &minDepTimes = routeState.schedDepTimesFor(vehId);
 
         assert(stopIdx < numStops);
         return (numStops == 1 ? std::max(minDepTimes[0], arrAtTransfer) : minDepTimes[stopIdx]); // TODO Es ist möglich, dass das hier falsch ist weil das Auto ja auch fahren kann aber erst zu einem späteren Zeitpunkt dann am TP ankommt
-    }
+    }*/
 
     static INLINE bool isMakingStop(const int vehId, const int now, const RouteState &routeState) {
-        return routeState.schedDepTimesFor(vehId)[0] > now;
+        return routeState.schedDepTimesFor(vehId)[0] > now || routeState.numStopsOf(vehId) == 1; // TODO Es kann sein, dass ein Vehicle idle ist, und die schedDepTime aber in der Vergangenheit liegt
     }
 
     static INLINE bool isPickupAtExistingStop(const PDLoc &pickup, const int vehId, const int now, const int stopIndex,

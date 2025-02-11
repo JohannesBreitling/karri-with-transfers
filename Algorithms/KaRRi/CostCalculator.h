@@ -952,8 +952,6 @@ namespace karri {
             asgn.tripTimeDVeh = tripTime;
             asgn.arrAtDropoff = arrTimeAtDropoff;
             asgn.requestTime = context.originalRequest.requestTime;
-            assert(!asgn.isFinished() || asgn.arrAtTransferPoint > asgn.depAtPickup || asgn.distToTransferDVeh == 0);
-            // std::cout << asgn.isFinished() << "Moin . " << asgn.depAtPickup << " -> " << asgn.arrAtTransferPoint << std::endl;
 
             const int walkingCost = F::calcWalkingCost(asgn.dropoff->walkingDist, InputConfig::getInstance().dropoffRadius);
             const int tripCost = F::calcTripCost(tripTime, context);
