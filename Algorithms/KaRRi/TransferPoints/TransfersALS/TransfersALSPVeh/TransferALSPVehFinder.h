@@ -214,9 +214,9 @@ namespace karri {
                         asgn.transferIdxPVeh = numStopsPVeh - 1;
                         asgn.transferIdxDVeh = i;
 
-                        // If the pickup conincides with the transfer, we skip the assignment
-                        if (asgn.pickup->loc == asgn.transfer.loc)
-                            continue; 
+                        // If the pickup or dropoff conincides with the transfer, we skip the assignment
+                        if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
+                            continue;
 
                         // If the dropoff coincides with a stop, we skip the assignment if the dropoff will be inserted in a different leg
                         if (dropoffIsAtStop(dVeh, dropoffPDLoc->loc) >= 0 && dropoff.stopIndex != dropoffIsAtStop(dVeh, dropoffPDLoc->loc))
@@ -289,9 +289,9 @@ namespace karri {
                         asgn.transferIdxPVeh = numStopsPVeh - 1;
                         asgn.transferIdxDVeh = i;
 
-                        // If the pickup conincides with the transfer, we skip the assignment
-                        if (asgn.pickup->loc == asgn.transfer.loc)
-                            continue; 
+                        // If the pickup or dropoff conincides with the transfer, we skip the assignment
+                        if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
+                            continue;
 
                         // Try the finished assignment with ORD dropoff
                         requestState.tryAssignment(asgn);
@@ -362,6 +362,10 @@ namespace karri {
                         asgn.dropoffIdx = dropoff.stopIndex;
                         asgn.transferIdxPVeh = numStopsPVeh - 1;
                         asgn.transferIdxDVeh = i;
+
+                        // If the pickup or dropoff conincides with the transfer, we skip the assignment
+                        if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
+                            continue;
 
                         // If the dropoff coincides with a stop, we skip the assignment if the dropoff will be inserted in a different leg
                         if (dropoffIsAtStop(dVeh, dropoffPDLoc->loc) >= 0 && dropoff.stopIndex != dropoffIsAtStop(dVeh, dropoffPDLoc->loc))
@@ -442,6 +446,10 @@ namespace karri {
                         asgn.dropoffIdx = numStopsDVeh - 1;
                         asgn.transferIdxPVeh = numStopsPVeh - 1;
                         asgn.transferIdxDVeh = i;
+
+                        // If the pickup or dropoff conincides with the transfer, we skip the assignment
+                        if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
+                            continue;
 
                         // Try the finished assignment with ORD dropoff
                         requestState.tryAssignment(asgn);

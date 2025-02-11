@@ -132,6 +132,10 @@ class TransferALSDVehFinder {
                                 if (asgn.pickupIdx == asgn.transferIdxPVeh)
                                     continue;
 
+                                // If the pickup or dropoff conincides with the transfer, we skip the assignment
+                                if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
+                                    continue;
+
                                 // Try the finished assignment with ORD dropoff
                                 tryAssignment(asgn);
                             }
@@ -204,6 +208,10 @@ class TransferALSDVehFinder {
 
                                 // Skip the assignment if the pickup is in the same leg as the transfer, because then we would drive back to the stop before the pickup to perform the transfer
                                 if (asgn.pickupIdx == asgn.transferIdxPVeh)
+                                    continue;
+
+                                // If the pickup or dropoff conincides with the transfer, we skip the assignment
+                                if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
                                     continue;
 
                                 // Try the finished assignment with ORD dropoff

@@ -455,9 +455,7 @@ namespace karri {
             const int actualStopLocationTransfer = stopLocations[start + transferIdx];
             const bool conditionTransferNotNewStop = pickup.loc != transfer.loc && transfer.loc == actualStopLocationTransfer;
             if (conditionTransferNotNewStop) {
-                // maxArrTimes[start + transferIdx] = std::min(maxArrTimes[start + transferIdx], requestState.getMaxArrTimeAtDropoff(pickup.id, asgn.dropoff->id) - getMinTripTimeForDVeh(asgn)); // TODO Check that again...
                 maxArrTimes[start + transferIdx] = std::min(maxArrTimes[start + transferIdx], requestState.getMaxArrTimeAtTransfer(asgn));
-                // maxArrTimes[start + dropoffIndex] = std::min(maxArrTimes[start + dropoffIndex], requestState.getMaxArrTimeAtDropoff(pickup.id, dropoff.id));
             } else {
                 // Insert transfer as new stop
                 ++transferIdx;
@@ -468,8 +466,7 @@ namespace karri {
                 schedArrTimes[start + transferIdx] = schedDepTimes[start + transferIdx - 1] + asgn.distToTransferPVeh;
                 schedDepTimes[start + transferIdx] = schedArrTimes[start + transferIdx] + InputConfig::getInstance().stopTime;
                 // compare maxVehArrTime to next stop later
-                // maxArrTimes[start + transferIdx] = requestState.getMaxArrTimeAtDropoff(pickup.id, asgn.dropoff->id) - getMinTripTimeForDVeh(asgn); // TODO Nochmal checken
-                maxArrTimes[start + transferIdx] = requestState.getMaxArrTimeAtTransfer(asgn);
+                maxArrTimes[start + transferIdx] = asgn.arrAtTransferPoint; // In this case we set the maxArrTime so, that the arrival can not be delayed, otherwise we would have to propagate the maxArrTime to the dropoffVehicle
                 occupancies[start + transferIdx] = occupancies[start + transferIdx - 1];
                 numDropoffsPrefixSum[start + transferIdx] = numDropoffsPrefixSum[start + transferIdx - 1];
                 transferInsertedAsNewStop = true;
@@ -542,9 +539,10 @@ namespace karri {
             updateLeeways(vehId);
             updateMaxLegLength(vehId, pickupIdx, transferIdx);
 
-            // asgn.pickupInsertedAsNewStop = pickupInsertedAsNewStop;
-            // asgn.transferInsertedAsNewStopPVeh = transferInsertedAsNewStop;
-
+            for (int i = start; i < end; i++) {
+                assert(stopIdToVehicleId[stopIds[i]] == vehId);
+            }
+            
             // Remember that request is picked up and dropped of at respective stops:
             insertion(stopIds[start + pickupIdx], requestState.originalRequest.requestId,
                       rangeOfRequestsPickedUpAtStop, requestsPickedUpAtStop);
@@ -578,7 +576,7 @@ namespace karri {
             const int stopLocationTransfer = stopLocations[start + transferIdx];
             const bool conditionTransferAsNewStop = (transferIdx > 0 || schedDepTimes[start] > now) && transfer.loc == stopLocationTransfer;
             if (conditionTransferAsNewStop) {
-                assert(start + transferIdx == end - 1 || transferIdx == dropoffIdx || asgn.distFromTransferDVeh == schedArrTimes[start + transferIdx + 1] - schedDepTimes[start + transferIdx] || asgn.distFromTransferDVeh == 0); // TODO BETREUER : Macht das Sinn?
+                assert(start + transferIdx == end - 1 || transferIdx == dropoffIdx || asgn.distFromTransferDVeh == schedArrTimes[start + transferIdx + 1] - schedDepTimes[start + transferIdx] || asgn.distFromTransferDVeh == 0);
 
                 // Pickup at existing stop
                 // For pickup at existing stop we don't count another stopTime. The vehicle can depart at the earliest
@@ -611,7 +609,7 @@ namespace karri {
                 transferInsertedAsNewStop = true;
             }
 
-            if (transferIdx != dropoffIdx && transferInsertedAsNewStop) { // TODO: BETREUER Das nochmal klären
+            if (transferIdx != dropoffIdx && transferInsertedAsNewStop) {
                 // Propagate changes to minArrTime/minDepTime forward from inserted pickup stop until dropoff stop
                 assert(asgn.distFromTransferDVeh > 0);
                 propagateSchedArrAndDepForward(start + transferIdx + 1, start + dropoffIdx, asgn.distFromTransferDVeh);
@@ -702,6 +700,10 @@ namespace karri {
 
             updateLeeways(vehId);
             updateMaxLegLength(vehId, transferIdx, dropoffIdx);
+
+            for (int i = start; i < end; i++) {
+                assert(stopIdToVehicleId[stopIds[i]] == vehId);
+            }
 
 
             // Remember that request is picked up and dropped of at respective stops:
@@ -807,7 +809,7 @@ namespace karri {
             while (stopLocationsPVeh[pickupIdx] != asgn.pickup->loc) {
                 pickupIdx++;
             }
-            int transferIdxPVeh = pickupIdx;
+            int transferIdxPVeh = pickupIdx + 1;
             while (stopLocationsPVeh[transferIdxPVeh] != asgn.transfer.loc) {
                 ++transferIdxPVeh;
             }
@@ -849,7 +851,7 @@ namespace karri {
             const int schedArrAtTransfer = schedArrTimesPVeh[transferIdxPVeh];
             assert(schedArrAtTransfer == asgn.arrAtTransferPoint);
 
-            std::cout << "Route asserted PVeh!\n";
+            // std::cout << "Route asserted PVeh!\n";
         }
 
         void assertPickupNew(const AssignmentWithTransfer &asgn, ConstantVectorRange<int> schedDepTimesPVeh, ConstantVectorRange<int> schedArrTimesPVeh, const int pickupIdx, const int transferIdxPVeh, const int numStopsPVeh) {
@@ -862,26 +864,26 @@ namespace karri {
             if (!bns) {
                 // Pickup is not first stop
                 assert(pickupIdx > 1);
-                std::cout << "Sched Dep before Pickup: " << schedDepTimesPVeh[pickupIdx - 1] << std::endl;
-                std::cout << "Sched Arr at Pickup: " << schedArrTimesPVeh[pickupIdx] << std::endl;
-                std::cout << "Dist to Pickup: " << asgn.distToPickup << std::endl;
-                std::cout << "Takes: " << schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[pickupIdx - 1] << std::endl;
+                // std::cout << "Sched Dep before Pickup: " << schedDepTimesPVeh[pickupIdx - 1] << std::endl;
+                // std::cout << "Sched Arr at Pickup: " << schedArrTimesPVeh[pickupIdx] << std::endl;
+                // std::cout << "Dist to Pickup: " << asgn.distToPickup << std::endl;
+                // std::cout << "Takes: " << schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[pickupIdx - 1] << std::endl;
                 assert(schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[pickupIdx - 1] == asgn.distToPickup);
             } else {
                 assert(pickupIdx >= 0 && pickupIdx <= 2);
-                std::cout << "Sched Dep before Pickup: " << schedDepTimesPVeh[0] << std::endl;
-                std::cout << "Sched Arr at Pickup: " << schedArrTimesPVeh[pickupIdx] << std::endl;
-                std::cout << "Dist to Pickup: " << asgn.distToPickup << std::endl;
-                std::cout << "Takes: " << schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[pickupIdx - 1] << std::endl;
+                // std::cout << "Sched Dep before Pickup: " << schedDepTimesPVeh[0] << std::endl;
+                // std::cout << "Sched Arr at Pickup: " << schedArrTimesPVeh[pickupIdx] << std::endl;
+                // std::cout << "Dist to Pickup: " << asgn.distToPickup << std::endl;
+                // std::cout << "Takes: " << schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[pickupIdx - 1] << std::endl;
                 assert(schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[0] == asgn.distToPickup);   
             }
 
             if (!paired) {
                 // Pickup does not drive directly to the transfer
-                std::cout << "Sched Dep at Pickup: " << schedDepTimesPVeh[pickupIdx] << std::endl;
-                std::cout << "Sched Arr after Pickup: " << schedArrTimesPVeh[pickupIdx + 1] << std::endl;
-                std::cout << "Dist from Pickup: " << asgn.distFromPickup << std::endl;
-                std::cout << "Takes: " << schedArrTimesPVeh[pickupIdx + 1] - schedDepTimesPVeh[pickupIdx] << std::endl;
+                // std::cout << "Sched Dep at Pickup: " << schedDepTimesPVeh[pickupIdx] << std::endl;
+                // std::cout << "Sched Arr after Pickup: " << schedArrTimesPVeh[pickupIdx + 1] << std::endl;
+                // std::cout << "Dist from Pickup: " << asgn.distFromPickup << std::endl;
+                // std::cout << "Takes: " << schedArrTimesPVeh[pickupIdx + 1] - schedDepTimesPVeh[pickupIdx] << std::endl;
                 assert(schedArrTimesPVeh[pickupIdx + 1] - schedDepTimesPVeh[pickupIdx] == asgn.distFromPickup);
             }
         }
@@ -890,19 +892,19 @@ namespace karri {
             assert(transferIdxPVeh > 0);
             (void) pickupIdx;
             // Assert the distance to the tranfer
-            std::cout << "Sched Dep before Transfer: " << schedDepTimesPVeh[transferIdxPVeh - 1] << std::endl;
-            std::cout << "Sched Arr at Transfer: " << schedArrTimesPVeh[transferIdxPVeh] << std::endl;
-            std::cout << "Dist to Transfer: " << asgn.distToTransferPVeh << std::endl;
-            std::cout << "Takes: " << schedArrTimesPVeh[transferIdxPVeh] - schedDepTimesPVeh[transferIdxPVeh - 1] << std::endl;
+            // std::cout << "Sched Dep before Transfer: " << schedDepTimesPVeh[transferIdxPVeh - 1] << std::endl;
+            // std::cout << "Sched Arr at Transfer: " << schedArrTimesPVeh[transferIdxPVeh] << std::endl;
+            // std::cout << "Dist to Transfer: " << asgn.distToTransferPVeh << std::endl;
+            // std::cout << "Takes: " << schedArrTimesPVeh[transferIdxPVeh] - schedDepTimesPVeh[transferIdxPVeh - 1] << std::endl;
             assert(schedArrTimesPVeh[transferIdxPVeh] - schedDepTimesPVeh[transferIdxPVeh - 1] == asgn.distToTransferPVeh);
 
             // If the transfer is not als, assert the distance to the next stop
             if (transferIdxPVeh < numStopsPVeh - 1) {
                 // Transfer is not the last stop
                 // Assert the distance from the tranfer
-                std::cout << "Sched Dep at Transfer: " << schedDepTimesPVeh[transferIdxPVeh] << std::endl;
-                std::cout << "Sched Arr after Transfer: " << schedArrTimesPVeh[transferIdxPVeh + 1] << std::endl;
-                std::cout << "Dist to Transfer: " << asgn.distFromTransferPVeh << std::endl;
+                // std::cout << "Sched Dep at Transfer: " << schedDepTimesPVeh[transferIdxPVeh] << std::endl;
+                // std::cout << "Sched Arr after Transfer: " << schedArrTimesPVeh[transferIdxPVeh + 1] << std::endl;
+                // std::cout << "Dist to Transfer: " << asgn.distFromTransferPVeh << std::endl;
                 assert(schedArrTimesPVeh[transferIdxPVeh + 1] - schedDepTimesPVeh[transferIdxPVeh] == asgn.distFromTransferPVeh);
             }
         }
@@ -917,26 +919,26 @@ namespace karri {
             if (!bns) {
                 // Transfer is not first stop
                 assert(transferIdxDVeh > 1);
-                std::cout << "Sched Dep before Transfer: " << schedDepTimesDVeh[transferIdxDVeh - 1] << std::endl;
-                std::cout << "Sched Arr at Transfer: " << schedArrTimesDVeh[transferIdxDVeh] << std::endl;
-                std::cout << "Dist to Transfer: " << asgn.distToTransferDVeh << std::endl;
-                std::cout << "Takes: " << schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[transferIdxDVeh - 1] << std::endl;
+                // std::cout << "Sched Dep before Transfer: " << schedDepTimesDVeh[transferIdxDVeh - 1] << std::endl;
+                // std::cout << "Sched Arr at Transfer: " << schedArrTimesDVeh[transferIdxDVeh] << std::endl;
+                // std::cout << "Dist to Transfer: " << asgn.distToTransferDVeh << std::endl;
+                // std::cout << "Takes: " << schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[transferIdxDVeh - 1] << std::endl;
                 assert(schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[transferIdxDVeh - 1] == asgn.distToTransferDVeh);
             } else {
                 assert(transferIdxDVeh >= 0 && transferIdxDVeh <= 2);
-                std::cout << "Sched Dep before Transfer: " << schedDepTimesDVeh[0] << std::endl;
-                std::cout << "Sched Arr at Transfer: " << schedArrTimesDVeh[transferIdxDVeh] << std::endl;
-                std::cout << "Dist to Transfer: " << asgn.distToTransferDVeh << std::endl;
-                std::cout << "Takes: " << schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[transferIdxDVeh - 1] << std::endl;
+                // std::cout << "Sched Dep before Transfer: " << schedDepTimesDVeh[0] << std::endl;
+                // std::cout << "Sched Arr at Transfer: " << schedArrTimesDVeh[transferIdxDVeh] << std::endl;
+                // std::cout << "Dist to Transfer: " << asgn.distToTransferDVeh << std::endl;
+                // std::cout << "Takes: " << schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[transferIdxDVeh - 1] << std::endl;
                 assert(schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[0] == asgn.distToTransferDVeh);   
             }
 
             if (!paired) {
                 // Transfer does not drive directly to the dropoff
-                std::cout << "Sched Dep at Transfer: " << schedDepTimesDVeh[transferIdxDVeh] << std::endl;
-                std::cout << "Sched Arr after Transfer: " << schedArrTimesDVeh[transferIdxDVeh + 1] << std::endl;
-                std::cout << "Dist from Transfer: " << asgn.distFromTransferDVeh << std::endl;
-                std::cout << "Takes: " << schedArrTimesDVeh[transferIdxDVeh + 1] - schedDepTimesDVeh[transferIdxDVeh] << std::endl;
+                // std::cout << "Sched Dep at Transfer: " << schedDepTimesDVeh[transferIdxDVeh] << std::endl;
+                // std::cout << "Sched Arr after Transfer: " << schedArrTimesDVeh[transferIdxDVeh + 1] << std::endl;
+                // std::cout << "Dist from Transfer: " << asgn.distFromTransferDVeh << std::endl;
+                // std::cout << "Takes: " << schedArrTimesDVeh[transferIdxDVeh + 1] - schedDepTimesDVeh[transferIdxDVeh] << std::endl;
                 assert(schedArrTimesDVeh[transferIdxDVeh + 1] - schedDepTimesDVeh[transferIdxDVeh] == asgn.distFromTransferDVeh);
             }
             
@@ -946,19 +948,19 @@ namespace karri {
             assert(dropoffIdx > 0);
             (void) transferIdxDVeh;
             // Assert the distance to the dropoff
-            std::cout << "Sched Dep before Dropoff: " << schedDepTimesDVeh[dropoffIdx - 1] << std::endl;
-            std::cout << "Sched Arr at Dropoff: " << schedArrTimesDVeh[dropoffIdx] << std::endl;
-            std::cout << "Dist to Dropoff: " << asgn.distToDropoff << std::endl;
-            std::cout << "Takes: " << schedArrTimesDVeh[dropoffIdx] - schedDepTimesDVeh[dropoffIdx - 1] << std::endl;
+            // std::cout << "Sched Dep before Dropoff: " << schedDepTimesDVeh[dropoffIdx - 1] << std::endl;
+            // std::cout << "Sched Arr at Dropoff: " << schedArrTimesDVeh[dropoffIdx] << std::endl;
+            // std::cout << "Dist to Dropoff: " << asgn.distToDropoff << std::endl;
+            // std::cout << "Takes: " << schedArrTimesDVeh[dropoffIdx] - schedDepTimesDVeh[dropoffIdx - 1] << std::endl;
             assert(schedArrTimesDVeh[dropoffIdx] - schedDepTimesDVeh[dropoffIdx - 1] == asgn.distToDropoff);
 
             // If the dropoff is not als, assert the distance to the next stop
             if (dropoffIdx < numStopsDVeh - 1) {
                 // Dropoff is not the last stop
                 // Assert the distance from the dropoff
-                std::cout << "Sched Dep at Dropoff: " << schedDepTimesDVeh[dropoffIdx] << std::endl;
-                std::cout << "Sched Arr after Dropoff: " << schedArrTimesDVeh[dropoffIdx + 1] << std::endl;
-                std::cout << "Dist to Dropoff: " << asgn.distFromTransferDVeh << std::endl;
+                // std::cout << "Sched Dep at Dropoff: " << schedDepTimesDVeh[dropoffIdx] << std::endl;
+                // std::cout << "Sched Arr after Dropoff: " << schedArrTimesDVeh[dropoffIdx + 1] << std::endl;
+                // std::cout << "Dist to Dropoff: " << asgn.distFromTransferDVeh << std::endl;
                 assert(schedArrTimesDVeh[dropoffIdx + 1] - schedDepTimesDVeh[dropoffIdx] == asgn.distFromDropoff);
             }
         }
@@ -978,8 +980,6 @@ namespace karri {
                 ++dropoffIdx;
             }
 
-            printStopLocations(asgn.dVeh->vehicleId); // TODO Test
-
             const bool transferBNS = asgn.transferIdxDVeh == 0;
             const bool transferAsNewStop = asgn.transferIdxDVeh != transferIdxDVeh;
             const int transferLaterShifted = transferIdxDVeh - asgn.transferIdxDVeh;
@@ -994,7 +994,8 @@ namespace karri {
             assert(schedDepTimesDVeh[transferIdxDVeh] == asgn.depAtTransfer);
 
             // Assert that the arrival at the dropoff is corrent
-            assert(schedArrTimesDVeh[dropoffIdx] == asgn.arrAtDropoff);
+            const int schedArrAtDropoff = schedArrTimesDVeh[dropoffIdx];
+            assert(schedArrAtDropoff == asgn.arrAtDropoff);
 
             // Assert that the trip time of the dVeh is corret
             const int waitingTimeAtTransfer = schedDepTimesDVeh[transferIdxDVeh] - asgn.arrAtTransferPoint;
@@ -1007,7 +1008,7 @@ namespace karri {
             if (dropoffAsNewStop)
                 assertDropoffNew(asgn, schedDepTimesDVeh, schedArrTimesDVeh, transferIdxDVeh, dropoffIdx, numStopsDVeh);
 
-            std::cout << "Route asserted DVeh!\n";
+            // std::cout << "Route asserted DVeh!\n";
         }
 
         // Scheduled stop interface for event simulation
@@ -1082,7 +1083,7 @@ namespace karri {
             }
         }
 
-        void propagateSchedArrAndDepForward(const int fromIdx, const int toIdx) { // TODO Das hier nochmal besprechen
+        void propagateSchedArrAndDepForward(const int fromIdx, const int toIdx) {
             int distPrevToCurrent = 0;
             
             for (int l = fromIdx; l <= toIdx; ++l) {

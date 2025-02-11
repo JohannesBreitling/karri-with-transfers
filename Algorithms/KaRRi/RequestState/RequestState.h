@@ -112,9 +112,6 @@ namespace karri {
         }
 
         int getMaxDepTimeAtTransfer(const AssignmentWithTransfer &asgn) const {
-            // TODO Hier muss man eventuell nochmal schauen, ist die max wait time hard constraint oder nicht?
-            // assert(asgn.waitTimeAtPickup <= InputConfig::getInstance().maxWaitTime);
-
             int delta = InputConfig::getInstance().maxWaitTime - asgn.waitTimeAtPickup;
             return asgn.arrAtTransferPoint + std::max(0, delta);
         }
@@ -130,6 +127,7 @@ namespace karri {
         void tryAssignment(AssignmentWithTransfer &asgn) {
             assert(asgn.pVeh->vehicleId >= 0 && asgn.dVeh->vehicleId >= 0 && asgn.pVeh->vehicleId != asgn.dVeh->vehicleId && asgn.pickup && asgn.dropoff);
             assert(asgn.distFromPickup >= 0 && asgn.distToPickup >= 0 && asgn.distToTransferPVeh >= 0 && asgn.distFromTransferPVeh >= 0 && asgn.distToTransferDVeh >= 0 && asgn.distFromTransferDVeh >= 0 && asgn.distToDropoff >= 0 && asgn.distFromDropoff >= 0);
+            assert(asgn.pickup->loc != asgn.transfer.loc && asgn.dropoff->loc != asgn.transfer.loc);
 
             // Calculate the cost of the assignment and try to update the best known assignment if the assignment is finished
             RequestCost cost;
