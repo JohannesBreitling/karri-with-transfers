@@ -153,7 +153,10 @@ namespace karri {
         int arrAtDropoff;
     
         bool transferAtStopPVeh;
+        bool dropoffAtStop;
         int initalPickupDetour;
+        int initalTransferDetour;
+        int initialDropoffDetour;
     };
 
 }

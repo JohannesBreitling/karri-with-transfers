@@ -160,13 +160,16 @@ namespace karri {
             const auto actualDepTimeAtTransfer = getActualDepTimeAtTranfer(asgn, context, routeState);
             asgn.depAtTransfer = actualDepTimeAtTransfer;
             const auto initialTransferDetour = calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context, routeState);
+            asgn.initalTransferDetour = initialTransferDetour;
             assert(initialTransferDetour >= 0);
 
             int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.transferIdxDVeh, asgn.dropoffIdx, initialTransferDetour, routeState);
             const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
+            asgn.dropoffAtStop = dropoffAtExistingStop;
 
             const auto initialDropoffDetour = calcInitialDropoffDetour(asgn, dropoffAtExistingStop, routeState);
             assert(asgn.transferIdxDVeh == asgn.dropoffIdx || initialDropoffDetour >= 0);
+            asgn.initialDropoffDetour = initialDropoffDetour;
 
             const auto detourRightAfterDropoff = calcDetourRightAfterDropoff(asgn, initialTransferDetour,
                                                                              initialDropoffDetour, routeState);

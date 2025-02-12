@@ -40,9 +40,6 @@ class TransferALSDVehFinder {
 
         assert(postponedAssignments.size() == 0);
         findAssignmentsWithDropoffALS();
-
-        if (postponedAssignments.size() > 0)
-            std::cout << "Pp: " << postponedAssignments.size() << std::endl;
     }
 
     void init() {
@@ -110,12 +107,13 @@ class TransferALSDVehFinder {
 
                                 asgn.distToPickup = pickup.distToPDLoc;
                                 asgn.distFromPickup = pickup.distFromPDLocToNextStop;
-
                                 asgn.distToDropoff = distancesToDropoff[i - 1];
                                 asgn.distFromDropoff = 0;
 
                                 asgn.distToTransferPVeh = 0;
-                                asgn.distFromTransferPVeh = 0;
+                                const int lengthOfLeg = i < numStopsPVeh - 1 ? routeState.schedArrTimesFor(pVehId)[i + 1] - routeState.schedDepTimesFor(pVehId)[i] : 0;
+                                assert(lengthOfLeg > 0 || i == numStopsPVeh - 1);
+                                asgn.distFromTransferPVeh = lengthOfLeg;
                                 asgn.distToTransferDVeh = distancesToTransfer[i - 1];
                                 asgn.distFromTransferDVeh = 0;
     
@@ -193,7 +191,9 @@ class TransferALSDVehFinder {
                                 asgn.distFromDropoff = 0;
 
                                 asgn.distToTransferPVeh = 0;
-                                asgn.distFromTransferPVeh = 0;
+                                const int lengthOfLeg = i < numStopsPVeh - 1 ? routeState.schedArrTimesFor(pVehId)[i + 1] - routeState.schedDepTimesFor(pVehId)[i] : 0;
+                                assert(lengthOfLeg > 0 || i == numStopsPVeh - 1);
+                                asgn.distFromTransferPVeh = lengthOfLeg;
                                 asgn.distToTransferDVeh = distancesToTransfer[i - 1];
                                 asgn.distFromTransferDVeh = 0;
     

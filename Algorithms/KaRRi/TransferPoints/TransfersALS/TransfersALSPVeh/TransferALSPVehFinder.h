@@ -204,7 +204,9 @@ namespace karri {
                         asgn.distToTransferPVeh = distancePVehToTransfer;
                         asgn.distFromTransferPVeh = 0;
                         asgn.distToTransferDVeh = 0;
-                        asgn.distFromTransferDVeh = 0;
+                        const int lengthOfLeg = i < numStopsDVeh - 1 ? routeState.schedArrTimesFor(dVehId)[i + 1] - routeState.schedDepTimesFor(dVehId)[i] : 0;
+                        assert(lengthOfLeg > 0 || i == numStopsDVeh - 1);
+                        asgn.distFromTransferDVeh = lengthOfLeg;
                         asgn.pickupType = AFTER_LAST_STOP;
                         asgn.dropoffType = ORDINARY;
                         asgn.transferTypePVeh = AFTER_LAST_STOP;
@@ -276,7 +278,9 @@ namespace karri {
                         asgn.distToTransferPVeh = distancePVehToTransfer;
                         asgn.distFromTransferPVeh = 0;
                         asgn.distToTransferDVeh = 0;
-                        asgn.distFromTransferDVeh = 0;
+                        const int lengthOfLeg = i < numStopsDVeh - 1 ? routeState.schedArrTimesFor(dVehId)[i + 1] - routeState.schedDepTimesFor(dVehId)[i] : 0;
+                        assert(lengthOfLeg > 0 || i == numStopsDVeh - 1);
+                        asgn.distFromTransferDVeh = lengthOfLeg;
 
                         asgn.distToDropoff = dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
                         asgn.distFromDropoff = 0;
@@ -354,7 +358,9 @@ namespace karri {
                         asgn.distToTransferPVeh = distancePVehToTransfer;
                         asgn.distFromTransferPVeh = 0;
                         asgn.distToTransferDVeh = 0;
-                        asgn.distFromTransferDVeh = 0;
+                        const int lengthOfLeg = i < numStopsDVeh - 1 ? routeState.schedArrTimesFor(dVehId)[i + 1] - routeState.schedDepTimesFor(dVehId)[i] : 0;
+                        assert(lengthOfLeg > 0 || i == numStopsDVeh - 1);
+                        asgn.distFromTransferDVeh = lengthOfLeg;
                         asgn.pickupType = pickup->stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
                         asgn.dropoffType = ORDINARY;
                         asgn.transferTypePVeh = AFTER_LAST_STOP;
@@ -435,7 +441,9 @@ namespace karri {
                         asgn.distToTransferPVeh = distancePVehToTransfer;
                         asgn.distFromTransferPVeh = 0;
                         asgn.distToTransferDVeh = 0;
-                        asgn.distFromTransferDVeh = 0;
+                        const int lengthOfLeg = i < numStopsDVeh - 1 ? routeState.schedArrTimesFor(dVehId)[i + 1] - routeState.schedDepTimesFor(dVehId)[i] : 0;
+                        assert(lengthOfLeg > 0 || i == numStopsDVeh - 1);
+                        asgn.distFromTransferDVeh = lengthOfLeg;
 
                         asgn.distToDropoff = dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
                         asgn.distFromDropoff = 0;
