@@ -143,6 +143,7 @@ namespace karri {
 
             if (asgn.isFinished()) {
                 assert(asgn.depAtPickup < asgn.arrAtTransferPoint || asgn.distToTransferPVeh == 0);
+                asgn.maxDepAtPickup = getMaxDepTimeAtPickup();
                 bestAssignmentWithTransfer = AssignmentWithTransfer(asgn);
                 bestCostWithTransfer = cost.total;
             } else {

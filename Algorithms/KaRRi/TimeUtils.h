@@ -51,7 +51,7 @@ namespace karri::time_utils {
     }
 
     static INLINE bool isMakingStop(const int vehId, const int now, const RouteState &routeState) {
-        return routeState.schedDepTimesFor(vehId)[0] > now || routeState.numStopsOf(vehId) == 1;  // TODO Hier wurde auch geändert mit numStops == 1
+        return routeState.schedDepTimesFor(vehId)[0] > now /* || routeState.numStopsOf(vehId) == 1 */;  // TODO Hier nochmal beobachten
     }
 
     static INLINE bool isPickupAtExistingStop(const PDLoc &pickup, const int vehId, const int now, const int stopIndex,
@@ -540,7 +540,7 @@ namespace karri::time_utils {
         const auto &maxArrTimes = routeState.maxArrTimesFor(vehId);
         const auto &occupancies = routeState.occupanciesFor(vehId);
 
-        assert(dropoffIndex >= 0 && pickupIndex >= 0 && "isAnyHardConstraintViolated");
+        assert(dropoffIndex >= 0 && pickupIndex >= 0);
 
         // If departure time at the last stop (which may be the time of issuing this request if the vehicle is currently
         // idling) is moved past the end of the service time by the total detour, the assignment violates the service
@@ -554,7 +554,7 @@ namespace karri::time_utils {
         if (pickupIndex + 1 == numStops)
             return false;
 
-        assert(pickupIndex + 1 < numStops && "isAnyHardConstraintViolated");
+        assert(pickupIndex + 1 < numStops);
 
         // If the pickup detour moves the planned arrival time at the stop after the pickup past the latest permissible
         // arrival time, this assignment violates some trip time or wait time hard constraint.
@@ -574,7 +574,7 @@ namespace karri::time_utils {
         if (dropoffIndex + 1 == numStops)
             return false;
 
-        assert(dropoffIndex + 1 < numStops && "isAnyHardConstraintViolated");
+        assert(dropoffIndex + 1 < numStops);
 
         // If the total detour moves the planned arrival time at the stop after the dropoff past the latest permissible
         // arrival time, this assignment violates some trip time or wait time constraint.

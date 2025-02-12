@@ -157,6 +157,8 @@ namespace karri {
         int initalPickupDetour;
         int initalTransferDetour;
         int initialDropoffDetour;
+
+        int maxDepAtPickup;
     };
 
 }
