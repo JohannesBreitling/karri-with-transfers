@@ -804,11 +804,11 @@ namespace karri {
             }
 
             const bool pickupBNS = asgn.pickupIdx == 0;
-            if (pickupBNS && pickupIdx < numStopsPVeh - 1 && stopLocationsPVeh[pickupIdx] == stopLocationsPVeh[pickupIdx + 1]) { // TODO Das mal hier beobachten
+            if (pickupBNS && pickupIdx < numStopsPVeh - 1 && stopLocationsPVeh[pickupIdx] == stopLocationsPVeh[pickupIdx + 1]) {
                 ++pickupIdx;
             }
 
-            assert(pickupIdx > 0 || (stopLocationsPVeh[pickupIdx] == asgn.pickup->loc && schedDepTimesPVeh[pickupIdx] >= asgn.requestTime));
+            assert(stopLocationsPVeh[pickupIdx] != asgn.pickup->loc || pickupIdx > 0 || schedDepTimesPVeh[pickupIdx] >= asgn.requestTime);
 
             const bool pickupAsNewStop = asgn.pickupIdx != pickupIdx;
             const int pickupLaterShifted = pickupIdx - asgn.pickupIdx;
@@ -873,7 +873,7 @@ namespace karri {
             }
 
             const bool transferBNS = asgn.transferIdxDVeh == 0;
-            if (transferBNS && transferIdxDVeh < numStopsDVeh - 1 && stopLocationsDVeh[transferIdxDVeh] == stopLocationsDVeh[transferIdxDVeh + 1]) { // TODO Das mal hier beobachten
+            if (transferBNS && transferIdxDVeh < numStopsDVeh - 1 && stopLocationsDVeh[transferIdxDVeh] == stopLocationsDVeh[transferIdxDVeh + 1]) {
                 ++transferIdxDVeh;
             }
 
