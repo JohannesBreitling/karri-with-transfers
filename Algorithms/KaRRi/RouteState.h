@@ -810,14 +810,13 @@ namespace karri {
 
             assert(pickupIdx > 0 || (stopLocationsPVeh[pickupIdx] == asgn.pickup->loc && schedDepTimesPVeh[pickupIdx] >= asgn.requestTime));
 
-            int transferIdxPVeh = pickupIdx + 1;
+            const bool pickupAsNewStop = asgn.pickupIdx != pickupIdx;
+            const int pickupLaterShifted = pickupIdx - asgn.pickupIdx;
+            int transferIdxPVeh = std::max(pickupIdx + 1, asgn.transferIdxPVeh + pickupLaterShifted);
             while (stopLocationsPVeh[transferIdxPVeh] != asgn.transfer.loc) {
                 ++transferIdxPVeh;
             }
             
-            
-            const bool pickupAsNewStop = asgn.pickupIdx != pickupIdx;
-            const int pickupLaterShifted = pickupIdx - asgn.pickupIdx;
             const int correctedTransferIdx = asgn.transferIdxPVeh + pickupLaterShifted;
             const bool transferAsNewStop = correctedTransferIdx != transferIdxPVeh;
 
@@ -878,13 +877,13 @@ namespace karri {
                 ++transferIdxDVeh;
             }
 
-            int dropoffIdx = transferIdxDVeh + 1;
+            const int transferLaterShifted = transferIdxDVeh - asgn.transferIdxDVeh;
+            int dropoffIdx = std::max(transferIdxDVeh + 1, asgn.dropoffIdx + transferLaterShifted);
             while (stopLocationsDVeh[dropoffIdx] != asgn.dropoff->loc) {
                 ++dropoffIdx;
             }
 
             const bool transferAsNewStop = asgn.transferIdxDVeh != transferIdxDVeh;
-            const int transferLaterShifted = transferIdxDVeh - asgn.transferIdxDVeh;
             const int correctedDropoffIdx = asgn.dropoffIdx + transferLaterShifted;
             const bool dropoffAsNewStop = correctedDropoffIdx != dropoffIdx;
 

@@ -251,7 +251,8 @@ namespace karri {
             RequestCost pickupVehCost;
 
             assert(asgn.pVeh && asgn.pickup);
-            assert(!(asgn.distToPickup == INFTY || asgn.distFromPickup == INFTY || asgn.distToTransferPVeh == INFTY || asgn.distFromTransferPVeh == INFTY));
+            if (asgn.distToPickup == INFTY || asgn.distFromPickup == INFTY || asgn.distToTransferPVeh == INFTY || asgn.distFromTransferPVeh == INFTY)
+                return;
             
             if (unfinished) {
                 pickupVehCost = calc.calcPartialCostForPVehLowerBound<true>(asgn, requestState);

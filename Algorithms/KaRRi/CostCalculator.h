@@ -145,6 +145,11 @@ namespace karri {
                 }
             }
 
+            if (asgn.costPVeh.total >= INFTY) {
+                asgn.cost = RequestCost::INFTY_COST();
+                return asgn.cost;
+            }
+
             assert(asgn.dropoff);
 
             if (!asgn.dropoff || asgn.distToDropoff == INFTY || asgn.distFromDropoff == INFTY)  {
@@ -197,25 +202,31 @@ namespace karri {
 
         template<bool checkHardConstraints, bool recomputePVeh, typename RequestContext>
         RequestCost calcBaseLowerBound(AssignmentWithTransfer &asgn, const RequestContext &context) const {
-            bool unfinishedPVeh = asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed;
+            const bool unfinishedPVeh = asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed;
 
-            if (recomputePVeh && unfinishedPVeh) {
+            if (unfinishedPVeh) {
                 calcPartialCostForPVehLowerBound<checkHardConstraints>(asgn, context);
             }
 
-            if (recomputePVeh && !unfinishedPVeh) {
+            if (!unfinishedPVeh) {
                 calcPartialCostForPVeh<checkHardConstraints>(asgn, context);
+            }
+
+            if (asgn.costPVeh.total >= INFTY) {
+                asgn.cost = RequestCost::INFTY_COST();
+                return asgn.cost;
             }
             
             assert(asgn.dropoff);
+            assert(asgn.costPVeh.walkingCost >= 0 && asgn.costPVeh.tripCost >= 0 && asgn.costPVeh.waitTimeViolationCost >= 0 && asgn.costPVeh.changeInTripCostsOfOthers >= 0 && asgn.costPVeh.vehCost >= 0);
 
             if (!asgn.dropoff) {
-                asgn.cost.total = INFTY;
+                asgn.cost = RequestCost::INFTY_COST();
                 return asgn.cost;
             }
 
-            if (asgn.distToDropoff == INFTY || asgn.distFromDropoff == INFTY)  {
-                asgn.cost.total = INFTY;
+            if (asgn.distToDropoff == INFTY || asgn.distFromDropoff == INFTY || asgn.costPVeh.total >= INFTY) {
+                asgn.cost = RequestCost::INFTY_COST();
                 return asgn.cost;
             }
 
@@ -227,7 +238,7 @@ namespace karri {
             const auto actualDepTimeAtTransfer = getActualDepTimeAtTranfer(asgn, context, routeState);
             const auto initialTransferDetour = std::max(calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context, routeState), 0);
 
-            int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.transferIdxDVeh, asgn.dropoffIdx, initialTransferDetour, routeState);
+            int addedTripTime = std::max(calcAddedTripTimeInInterval(vehId, asgn.transferIdxDVeh, asgn.dropoffIdx, initialTransferDetour, routeState), 0);
             const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
 
             const auto initialDropoffDetour = std::max(calcInitialDropoffDetour(asgn, dropoffAtExistingStop, routeState), 0);
@@ -239,10 +250,10 @@ namespace karri {
                                                                                         asgn.dropoffIdx,
                                                                                         numStops - 1,
                                                                                         detourRightAfterDropoff,
-                                                                                        routeState), 0); 
+                                                                                        routeState), 0);
 
             if (checkHardConstraints && isAnyHardConstraintViolatedDVeh(asgn, context, initialTransferDetour, detourRightAfterDropoff, residualDetourAtEnd, dropoffAtExistingStop, routeState)) {
-                asgn.cost.total = INFTY;
+                asgn.cost = RequestCost::INFTY_COST();
                 return asgn.cost;
             }
  
@@ -253,7 +264,6 @@ namespace karri {
 
         template<typename RequestContext>
         RequestCost recomputePVeh(AssignmentWithTransfer &asgn, RequestContext &context) const {
-            assert(asgn.isFinished());
             return calcPartialCostForPVeh<true>(asgn, context);
         }
 
@@ -310,6 +320,7 @@ namespace karri {
             }
             
             addedTripTime += calcAddedTripTimeAffectedByPickupAndTransfer(asgn, detourRightAfterTransfer, routeState);
+            assert(addedTripTime >= 0);
 
             return calcCostPVeh(asgn, context, initialPickupDetour, residualDetourAtEnd, actualDepTimeAtPickup, transferAtExistingStop, addedTripTime);
         }
@@ -320,13 +331,14 @@ namespace karri {
             
             assert(asgn.pVeh && asgn.pickup);
             if (!asgn.pVeh || !asgn.pickup) {
-                asgn.cost.total = INFTY;
+                asgn.costPVeh = RequestCost::INFTY_COST();
+                asgn.cost = RequestCost::INFTY_COST();
                 return asgn.cost;
             }
 
-            if (asgn.distToPickup == INFTY || asgn.distFromPickup == INFTY ||
-                asgn.distToTransferPVeh == INFTY || asgn.distFromTransferPVeh == INFTY) {
-                asgn.cost.total = INFTY;
+            if (asgn.distToPickup == INFTY || asgn.distFromPickup == INFTY || asgn.distToTransferPVeh == INFTY || asgn.distFromTransferPVeh == INFTY) {
+                asgn.costPVeh = RequestCost::INFTY_COST();
+                asgn.cost = RequestCost::INFTY_COST();
                 return asgn.cost;
             }
             
@@ -335,7 +347,8 @@ namespace karri {
             const auto numStops = routeState.numStopsOf(vehId);
             const auto actualDepTimeAtPickup = getActualDepTimeAtPickup(asgn, context, routeState);
             const auto initialPickupDetour = std::max(calcInitialPickupDetour(asgn, actualDepTimeAtPickup, context, routeState), 0);
-            int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.pickupIdx, asgn.transferIdxPVeh, initialPickupDetour, routeState);
+            int addedTripTime = std::max(calcAddedTripTimeInInterval(vehId, asgn.pickupIdx, asgn.transferIdxPVeh, initialPickupDetour, routeState), 0);
+
 
             bool transferAtExistingStop = false;
 
@@ -358,7 +371,8 @@ namespace karri {
             if (checkHardConstraints && isAnyHardConstraintViolatedPVeh(asgn, context, initialPickupDetour,
                                                                     detourRightAfterTransfer, residualDetourAtEnd,
                                                                     transferAtExistingStop, routeState)) {
-                asgn.cost.total = INFTY;
+                asgn.costPVeh = RequestCost::INFTY_COST();
+                asgn.cost = RequestCost::INFTY_COST();
                 return asgn.cost;
             }
             
@@ -890,11 +904,10 @@ namespace karri {
                      const int residualDetourAtEnd, const int depTimeAtPickup,
                      const bool transferAtExistingStop, const int addedTripTimeForExistingPassengers) const {
 
-            // std::cout << "calcCostPVeh" << std::endl;
-        
             asgn.cost = {0, 0, 0, 0, 0, 0};
             
             if (!asgn.pVeh || !asgn.pickup) {
+                asgn.costPVeh = RequestCost::INFTY_COST();
                 asgn.cost = RequestCost::INFTY_COST();
                 return asgn.cost;
             }
@@ -917,7 +930,9 @@ namespace karri {
             const auto tripCostPVeh = F::calcTripCost(tripTimePVeh, context);
             asgn.waitTimeAtPickup = depTimeAtPickup - context.originalRequest.requestTime;
             const auto waitTimeViolationCost = F::calcWaitViolationCost(depTimeAtPickup, context);
+            assert(addedTripTimeForExistingPassengers >= 0);
             const auto changeInTripCostsOfOthers = F::calcChangeInTripCostsOfExistingPassengers(addedTripTimeForExistingPassengers);
+            assert(changeInTripCostsOfOthers >= 0);
             const auto vehCostPVeh = F::calcVehicleCost(residualDetourAtEnd);
 
             RequestCost costPVeh;

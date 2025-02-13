@@ -24,7 +24,7 @@ namespace karri {
                 cost.waitTimeViolationCost = INFTY;
                 cost.changeInTripCostsOfOthers = INFTY;
                 cost.vehCost = INFTY;
-                cost.error = false;
+                cost.walkingCost = INFTY;
 
                 return cost;
             }

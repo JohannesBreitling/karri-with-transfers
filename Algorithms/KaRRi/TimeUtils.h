@@ -450,8 +450,6 @@ namespace karri::time_utils {
                                 const RouteState &routeState) {
 
         assert(detourAtFromIndex >= 0);
-        if (detourAtFromIndex < 0) // TODO Fixen, manchmal ist die detour kleiner 0
-            return 0;
         
         if (detourAtFromIndex == 0 || fromIndex == toIndex) {
             return 0;
