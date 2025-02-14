@@ -397,11 +397,11 @@ namespace karri {
             bool pickupInsertedAsNewStop = false;
             bool transferInsertedAsNewStop = false;
 
-            const bool pickupNotInsertedAsNewStopCond = (pickupIdx > 0 || schedDepTimes[start] > now /* || numStopsOf(vehId) == 1*/) && pickup.loc == stopLocations[start + pickupIdx]; // TODO Hier nochmal beobachten
+            const bool pickupNotInsertedAsNewStopCond = (pickupIdx > 0 || schedDepTimes[start] > now) && pickup.loc == stopLocations[start + pickupIdx];
             if (pickupNotInsertedAsNewStopCond) {
-                assert(start + pickupIdx == end - 1
-                    || pickupIdx == transferIdx
-                    || asgn.distFromPickup == schedArrTimes[start + pickupIdx + 1] - schedDepTimes[start + pickupIdx]);
+                assert(start + pickupIdx == end - 1 // Pickup is at the last stop
+                    || pickupIdx == transferIdx // Pickup paired
+                    || asgn.distFromPickup == schedArrTimes[start + pickupIdx + 1] - schedDepTimes[start + pickupIdx]); // Distance from pickup is the distance to the next stop
 
                 // Pickup at existing stop
                 // For pickup at existing stop we don't count another stopTime. The vehicle can depart at the earliest
@@ -439,13 +439,14 @@ namespace karri {
             if (pickupIdx != transferIdx) {
                 // Propagate changes to minArrTime/minDepTime forward from inserted pickup stop until dropoff stop
                 assert(asgn.distFromPickup > 0);
-                propagateSchedArrAndDepForward(start + pickupIdx + 1, start + transferIdx, asgn.distFromPickup); // TODO Hier könnte der Fehler darin liegen, dass wir eigentlich start + pickupIdx brauchen...
+                propagateSchedArrAndDepForward(start + pickupIdx + 1, start + transferIdx, asgn.distFromPickup);
             }
 
             const int actualStopLocationTransfer = stopLocations[start + transferIdx];
             const bool conditionTransferNotNewStop = pickup.loc != transfer.loc && transfer.loc == actualStopLocationTransfer;
             if (conditionTransferNotNewStop) {
-                maxArrTimes[start + transferIdx] = std::min(maxArrTimes[start + transferIdx], requestState.getMaxArrTimeAtTransfer(asgn));
+                assert(schedDepTimes[start + transferIdx] > asgn.arrAtTransferPoint);
+                maxArrTimes[start + transferIdx] = std::min(maxArrTimes[start + transferIdx], asgn.arrAtTransferPoint); // TODO Hier nochmal schauen (geändert von requestState.getMaxArrTimeAtTransfer(asgn))
             } else {
                 // Insert transfer as new stop
                 ++transferIdx;
@@ -543,8 +544,6 @@ namespace karri {
         template<typename RequestStateT>
         std::pair<int, int>
         insertDVeh(const AssignmentWithTransfer &asgn, const RequestStateT &requestState) {
-            // printStopLocations(asgn.dVeh->vehicleId); // TODO
-
             const auto vehId = asgn.dVeh->vehicleId;
             const auto transfer = asgn.transfer;
             const auto &dropoff = *asgn.dropoff;
@@ -563,9 +562,8 @@ namespace karri {
             bool transferInsertedAsNewStop = false;
             bool dropoffInsertedAsNewStop = false;
 
-            const int stopLocationTransfer = stopLocations[start + transferIdx];
-            const bool conditionTransferAsNewStop = (transferIdx > 0 || schedDepTimes[start] > now /*|| numStopsOf(vehId) == 1*/) && transfer.loc == stopLocationTransfer; // TODO Hier nochmal beobachten
-            if (conditionTransferAsNewStop) {
+
+            if ((transferIdx > 0 || schedDepTimes[start] > now) && transfer.loc == stopLocations[start + transferIdx]) {
                 assert(start + transferIdx == end - 1 || transferIdx == dropoffIdx || asgn.distFromTransferDVeh == schedArrTimes[start + transferIdx + 1] - schedDepTimes[start + transferIdx]);
 
                 // Pickup at existing stop
@@ -800,7 +798,7 @@ namespace karri {
             // Find the pickup and transfer indices
             int pickupIdx = asgn.pickupIdx;
             const bool pickupBNS = asgn.pickupIdx == 0;
-            while (stopLocationsPVeh[pickupIdx] != asgn.pickup->loc && schedDepTimesPVeh[pickupIdx] < asgn.requestTime) {
+            while (stopLocationsPVeh[pickupIdx] != asgn.pickup->loc || schedDepTimesPVeh[pickupIdx] <= asgn.requestTime) {
                 pickupIdx++;
             }
 
@@ -870,7 +868,7 @@ namespace karri {
             // Find the pickup and transfer indices
             int transferIdxDVeh = asgn.transferIdxDVeh;
             const bool transferBNS = asgn.transferIdxDVeh == 0;
-            while (stopLocationsDVeh[transferIdxDVeh] != asgn.transfer.loc && schedDepTimesDVeh[transferIdxDVeh] < asgn.arrAtTransferPoint) {
+            while (stopLocationsDVeh[transferIdxDVeh] != asgn.transfer.loc || schedDepTimesDVeh[transferIdxDVeh] <= asgn.requestTime) {
                 ++transferIdxDVeh;
             }
 
