@@ -189,15 +189,6 @@ namespace karri::Transfers {
             distances.setCurBatchIdx(firstPickupId / K);
             search.run(pickupTails, travelTimes);
 
-            // TODO
-            /* for (const int vehId : vehiclesSeenForPickups) {
-                const auto distancesForBatch = distances.getDistancesForCurBatch(vehId);
-
-                for (int i = 0; i < K; i++) {
-                    assert(distancesForBatch[i] >= 0);
-                }
-            } */
-
             // totalNumEdgeRelaxations += search.getNumEdgeRelaxations();
             // totalNumVerticesSettled += search.getNumVerticesSettled();
             // totalNumEntriesScanned += search.getNumEntriesScanned();

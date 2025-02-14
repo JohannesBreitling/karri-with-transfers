@@ -927,7 +927,7 @@ namespace karri {
             asgn.tripTimePVeh = tripTime;
 
             const auto walkingCostPVeh = F::calcWalkingCost(asgn.pickup->walkingDist, InputConfig::getInstance().pickupRadius);
-            const auto tripCostPVeh = F::calcTripCost(tripTimePVeh, context);
+            const auto tripCostPVeh = F::calcTripCost(tripTime, context);
             asgn.waitTimeAtPickup = depTimeAtPickup - context.originalRequest.requestTime;
             const auto waitTimeViolationCost = F::calcWaitViolationCost(depTimeAtPickup, context);
             assert(addedTripTimeForExistingPassengers >= 0);
