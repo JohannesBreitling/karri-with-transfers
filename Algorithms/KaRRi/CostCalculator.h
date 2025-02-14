@@ -923,8 +923,8 @@ namespace karri {
             (void) pickupAtExistingStop;
             
             assert(asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed || asgn.pickupIdx != asgn.transferIdxPVeh || transferAtExistingStop || asgn.arrAtTransferPoint != asgn.depAtPickup);
-            const int tripTimePVeh = arrTimeAtTransfer - context.originalRequest.requestTime + asgn.pickup->walkingDist;
-            asgn.tripTimePVeh = tripTimePVeh;
+            const int tripTime = arrTimeAtTransfer - context.originalRequest.requestTime;
+            asgn.tripTimePVeh = tripTime;
 
             const auto walkingCostPVeh = F::calcWalkingCost(asgn.pickup->walkingDist, InputConfig::getInstance().pickupRadius);
             const auto tripCostPVeh = F::calcTripCost(tripTimePVeh, context);
