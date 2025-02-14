@@ -299,7 +299,7 @@ namespace karri {
                 if (newAssignment.dropoff->loc == newAssignment.transfer.loc)
                     continue;
 
-                requestState.tryAssignment(newAssignment);
+                tryAssignment(newAssignment);
             }
         }
 
@@ -339,7 +339,7 @@ namespace karri {
                 if (dropoffIsAtStop(newAssignment.dVeh, dropoffPDLoc->loc) >= 0 && dropoff.stopIndex != dropoffIsAtStop(newAssignment.dVeh, dropoffPDLoc->loc))
                     continue; 
 
-                requestState.tryAssignment(newAssignment);
+                tryAssignment(newAssignment);
             }
         }
 
@@ -364,7 +364,7 @@ namespace karri {
 
                 if (newAssignment.dropoff->loc == newAssignment.transfer.loc)
                     continue;
-                requestState.tryAssignment(newAssignment);
+                tryAssignment(newAssignment);
             }
         }
 
@@ -411,7 +411,7 @@ namespace karri {
 
                     toCalculate.push_back(asgn);
                 } else {
-                    requestState.tryAssignment(asgn);
+                    tryAssignment(asgn);
                     continue;
                 }
             }
@@ -460,7 +460,7 @@ namespace karri {
                     
                     toCalculate.push_back(asgn);
                 } else {
-                    requestState.tryAssignment(asgn);
+                    tryAssignment(asgn);
                     continue;
                 }
             }
@@ -502,7 +502,7 @@ namespace karri {
 
                     toCalculate.push_back(asgn);
                 } else {
-                    requestState.tryAssignment(asgn);
+                    tryAssignment(asgn);
                 }   
             }
 
@@ -540,9 +540,30 @@ namespace karri {
 
                 // Try the assignments with the calculated distances
                 assert(asgn.isFinished());
-                requestState.tryAssignment(asgn);
+                tryAssignment(asgn);
             }
         }
+
+
+        void tryAssignment(AssignmentWithTransfer &asgn) {
+            const auto stopLocationsPVeh = routeState.stopLocationsFor(asgn.pVeh->vehicleId);
+            const auto stopLocationsDVeh = routeState.stopLocationsFor(asgn.dVeh->vehicleId);
+            const int numStopsPVeh = routeState.numStopsOf(asgn.pVeh->vehicleId);
+            const int numStopsDVeh = routeState.numStopsOf(asgn.dVeh->vehicleId);
+            const int pickupIdx = asgn.pickupIdx;
+            const int transferIdxPVeh = asgn.transferIdxPVeh;
+            const int transferIdxDVeh = asgn.transferIdxDVeh;
+            const int dropoffIdx = asgn.dropoffIdx;
+
+            if ((pickupIdx + 1 < numStopsPVeh && asgn.pickup->loc == stopLocationsPVeh[pickupIdx + 1])
+             || (transferIdxPVeh + 1 < numStopsPVeh && asgn.transfer.loc == stopLocationsPVeh[transferIdxPVeh + 1])
+             || (transferIdxDVeh + 1 < numStopsDVeh && asgn.transfer.loc == stopLocationsDVeh[transferIdxDVeh + 1])
+             || (dropoffIdx + 1 < numStopsDVeh && asgn.dropoff->loc == stopLocationsDVeh[dropoffIdx + 1]))
+                return;
+
+            requestState.tryAssignment(asgn);
+        }
+
 
         std::vector<int> constructPVehSet() {
             std::vector<bool> markedVehs(fleet.size(), false);
@@ -678,12 +699,6 @@ namespace karri {
             }
 
             return -1;
-        }
-
-        void assertAssignment(const AssignmentWithTransfer &asgn) {
-            std::cout << "Asserting the assignment!" << std::endl;
-
-            assertTransferPointCalculation(asgn.transfer);
         }
 
         void assertTransferPointCalculation(const TransferPoint tp) {

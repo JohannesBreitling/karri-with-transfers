@@ -799,14 +799,15 @@ namespace karri {
             
             // Find the pickup and transfer indices
             int pickupIdx = asgn.pickupIdx;
-            while (stopLocationsPVeh[pickupIdx] != asgn.pickup->loc) {
+            const bool pickupBNS = asgn.pickupIdx == 0;
+            while (stopLocationsPVeh[pickupIdx] != asgn.pickup->loc && schedDepTimesPVeh[pickupIdx] < asgn.requestTime) {
                 pickupIdx++;
             }
 
-            const bool pickupBNS = asgn.pickupIdx == 0;
+            /*
             if (pickupBNS && pickupIdx < numStopsPVeh - 1 && stopLocationsPVeh[pickupIdx] == stopLocationsPVeh[pickupIdx + 1]) {
                 ++pickupIdx;
-            }
+            }*/
 
             assert(stopLocationsPVeh[pickupIdx] != asgn.pickup->loc || pickupIdx > 0 || schedDepTimesPVeh[pickupIdx] >= asgn.requestTime);
 
@@ -868,14 +869,15 @@ namespace karri {
             
             // Find the pickup and transfer indices
             int transferIdxDVeh = asgn.transferIdxDVeh;
-            while (stopLocationsDVeh[transferIdxDVeh] != asgn.transfer.loc) {
+            const bool transferBNS = asgn.transferIdxDVeh == 0;
+            while (stopLocationsDVeh[transferIdxDVeh] != asgn.transfer.loc && schedDepTimesDVeh[transferIdxDVeh] < asgn.arrAtTransferPoint) {
                 ++transferIdxDVeh;
             }
 
-            const bool transferBNS = asgn.transferIdxDVeh == 0;
+            /*
             if (transferBNS && transferIdxDVeh < numStopsDVeh - 1 && stopLocationsDVeh[transferIdxDVeh] == stopLocationsDVeh[transferIdxDVeh + 1]) {
                 ++transferIdxDVeh;
-            }
+            }*/
 
             const int transferLaterShifted = transferIdxDVeh - asgn.transferIdxDVeh;
             int dropoffIdx = std::max(transferIdxDVeh + 1, asgn.dropoffIdx + transferLaterShifted);
