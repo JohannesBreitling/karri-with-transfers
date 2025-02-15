@@ -425,13 +425,26 @@ namespace karri {
 
             for (auto asgn : toCalculate) {
                 if (asgn.pickupPairedLowerBoundUsed) {
-                    currentlyCalculating.push_back(asgn);
                     int sourceRank = vehCh.rank(inputGraph.edgeHead(asgn.pickup->loc));
                     int targetRank = vehCh.rank(inputGraph.edgeTail(asgn.transfer.loc));
                     int offset = inputGraph.travelTime(asgn.transfer.loc);
-                    sources.push_back(sourceRank);
-                    targets.push_back(targetRank);
-                    offsets.push_back(offset);
+                    vehChQuery.run(sourceRank, targetRank);
+                    const int distance = vehChQuery.getDistance() + offset;
+                    asgn.distToTransferPVeh = distance;
+                    asgn.pickupPairedLowerBoundUsed = false;
+
+                    // Try the assignments with the calculated distances
+                    if (!asgn.isFinished()) {
+                        total = calc.calcBaseLowerBound<true, true>(asgn, requestState);
+
+                        if (total.total > requestState.getBestCost())
+                            continue;
+                        
+                        toCalculate.push_back(asgn);
+                    } else {
+                        tryAssignment(asgn);
+                        continue;
+                    }
                 } else {
                     temp.push_back(asgn);
                 }
@@ -440,31 +453,6 @@ namespace karri {
             toCalculate.clear();
             toCalculate = temp;
             temp.clear();
-
-            // Calculate the direct distances between pickup and transfer
-            std::vector<int> distances;
-            if (currentlyCalculating.size() > 0)
-                distances = vehChQuery.runManyToMany(sources, targets, offsets);
-
-            for (int i = 0; i < currentlyCalculating.size(); i++) {
-                auto asgn = currentlyCalculating[i];
-                asgn.distToTransferPVeh = distances[i];
-                asgn.pickupPairedLowerBoundUsed = false;
-
-                // Try the assignments with the calculated distances
-                if (!asgn.isFinished()) {
-                    total = calc.calcBaseLowerBound<true, true>(asgn, requestState);
-
-                    if (total.total > requestState.getBestCost())
-                        continue;
-                    
-                    toCalculate.push_back(asgn);
-                } else {
-                    tryAssignment(asgn);
-                    continue;
-                }
-            }
-
             currentlyCalculating.clear();
             // Calculate the dropoffs with postponed bns distance
             for (auto asgn : toCalculate) {
@@ -520,22 +508,10 @@ namespace karri {
                 int sourceRank = vehCh.rank(inputGraph.edgeHead(asgn.transfer.loc));
                 int targetRank = vehCh.rank(inputGraph.edgeTail(asgn.dropoff->loc));
                 int offset = inputGraph.travelTime(asgn.dropoff->loc);
-                sources.push_back(sourceRank);
-                targets.push_back(targetRank);
-                offsets.push_back(offset);
-            }
-
-            toCalculate.clear();
-            toCalculate = temp;
-            temp.clear();
-
-            distances.clear();
-            if (currentlyCalculating.size() > 0)
-                distances = vehChQuery.runManyToMany(sources, targets, offsets);
-
-            for (int i = 0; i < currentlyCalculating.size(); i++) {
-                auto asgn = currentlyCalculating[i];
-                asgn.distToDropoff = distances[i];
+                
+                vehChQuery.run(sourceRank, targetRank);
+                const int distance = vehChQuery.getDistance() + offset;
+                asgn.distToDropoff = distance;
                 asgn.dropoffPairedLowerBoundUsed = false;
 
                 // Try the assignments with the calculated distances

@@ -97,8 +97,11 @@ class CHQuery {
     return search.runAnyShortestPath(sources, targets);
   }
 
+  // TODO Seems to not work right...
   std::vector<int> runManyToMany(const std::vector<int> sources, const std::vector<int> targets, const std::vector<int> offsets) {
     std::vector<int> distances = std::vector<int>{};
+
+    assert(sources.size() == targets.size() && targets.size() == offsets.size());
 
     for (int i = 0; i < targets.size(); i+= K) {
       // Construct sources / target arrays for the search of K simultaneous searches
@@ -130,10 +133,12 @@ class CHQuery {
       run(sourcesSearch, targetsSearch);
       const auto distancesSearch = getAllDistances();
 
-      for (int j = 0; j < K; j++) {
+      for (int j = 0; j < std::min(K, elementsLeft); j++) {
         distances.push_back(distancesSearch[j] + offsets[i + j]);
       }
     }
+
+    assert(sources.size() == distances.size());
 
     return distances;
   }
