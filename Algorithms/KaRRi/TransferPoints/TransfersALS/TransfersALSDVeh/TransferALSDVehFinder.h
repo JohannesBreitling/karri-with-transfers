@@ -63,6 +63,7 @@ class TransferALSDVehFinder {
             for (const auto dVehId : dVehIds) {
                 const auto *dVeh = &fleet[dVehId];
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
+                const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
                 
                 // Pickup BNS
                 for (const auto pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
@@ -105,6 +106,11 @@ class TransferALSDVehFinder {
                                 asgn.pickup = pickupPDLoc;
                                 asgn.dropoff = &dropoff;
 
+                                asgn.pickupIdx = pickup.stopIndex;
+                                asgn.dropoffIdx = numStopsDVeh - 1;
+                                asgn.transferIdxPVeh = i;
+                                asgn.transferIdxDVeh = numStopsDVeh - 1;
+
                                 asgn.distToPickup = pickup.distToPDLoc;
                                 asgn.distFromPickup = pickup.distFromPDLocToNextStop;
                                 asgn.distToDropoff = distancesToDropoff[i - 1];
@@ -113,15 +119,11 @@ class TransferALSDVehFinder {
                                 asgn.distToTransferPVeh = 0;
                                 const int lengthOfLeg = i < numStopsPVeh - 1 ? routeState.schedArrTimesFor(pVehId)[i + 1] - routeState.schedDepTimesFor(pVehId)[i] : 0;
                                 assert(lengthOfLeg > 0 || i == numStopsPVeh - 1);
-                                asgn.distFromTransferPVeh = lengthOfLeg;
-                                asgn.distToTransferDVeh = distancesToTransfer[i - 1];
+                                asgn.distFromTransferPVeh = asgn.pickupIdx == asgn.transferIdxPVeh ? 0 : lengthOfLeg;
+                                const bool transferAtLastStop = asgn.transfer.loc == stopLocationsDVeh[numStopsDVeh - 1];
+                                asgn.distToTransferDVeh = transferAtLastStop ? 0 : distancesToTransfer[i - 1];
                                 asgn.distFromTransferDVeh = 0;
     
-                                asgn.pickupIdx = pickup.stopIndex;
-                                asgn.dropoffIdx = numStopsDVeh - 1;
-                                asgn.transferIdxPVeh = i;
-                                asgn.transferIdxDVeh = numStopsDVeh - 1;
-
                                 asgn.pickupType = BEFORE_NEXT_STOP;
                                 asgn.transferTypePVeh = ORDINARY;
                                 asgn.transferTypeDVeh = AFTER_LAST_STOP;
@@ -185,6 +187,11 @@ class TransferALSDVehFinder {
                                 asgn.pickup = pickupPDLoc;
                                 asgn.dropoff = &dropoff;
 
+                                asgn.pickupIdx = pickup.stopIndex;
+                                asgn.dropoffIdx = numStopsDVeh - 1;
+                                asgn.transferIdxPVeh = i;
+                                asgn.transferIdxDVeh = numStopsDVeh - 1;
+
                                 asgn.distToPickup = pickup.distToPDLoc;
                                 asgn.distFromPickup = pickup.distFromPDLocToNextStop;
                                 asgn.distToDropoff = distancesToDropoff[i - 1];
@@ -193,14 +200,10 @@ class TransferALSDVehFinder {
                                 asgn.distToTransferPVeh = 0;
                                 const int lengthOfLeg = i < numStopsPVeh - 1 ? routeState.schedArrTimesFor(pVehId)[i + 1] - routeState.schedDepTimesFor(pVehId)[i] : 0;
                                 assert(lengthOfLeg > 0 || i == numStopsPVeh - 1);
-                                asgn.distFromTransferPVeh = lengthOfLeg;
-                                asgn.distToTransferDVeh = distancesToTransfer[i - 1];
+                                asgn.distFromTransferPVeh = asgn.pickupIdx == asgn.transferIdxPVeh ? 0 : lengthOfLeg;
+                                const bool transferAtLastStop = asgn.transfer.loc == stopLocationsDVeh[numStopsDVeh - 1];
+                                asgn.distToTransferDVeh = transferAtLastStop ? 0 : distancesToTransfer[i - 1];
                                 asgn.distFromTransferDVeh = 0;
-    
-                                asgn.pickupIdx = pickup.stopIndex;
-                                asgn.dropoffIdx = numStopsDVeh - 1;
-                                asgn.transferIdxPVeh = i;
-                                asgn.transferIdxDVeh = numStopsDVeh - 1;
 
                                 asgn.pickupType = ORDINARY;
                                 asgn.transferTypePVeh = ORDINARY;
@@ -225,6 +228,14 @@ class TransferALSDVehFinder {
         }
 
         void tryAssignment(AssignmentWithTransfer &asgn) {
+            // Skip unecessary assignments
+            const int numStopsPVeh = routeState.numStopsOf(asgn.pVeh->vehicleId);
+            const auto stopLocationsPVeh = routeState.stopLocationsFor(asgn.pVeh->vehicleId);
+            
+            if ((asgn.pickupIdx < numStopsPVeh - 1 && asgn.pickup->loc == stopLocationsPVeh[asgn.pickupIdx + 1])
+             || (asgn.transferIdxPVeh < numStopsPVeh - 1 && asgn.transfer.loc == stopLocationsPVeh[asgn.transferIdxPVeh + 1]))
+                return;
+
             if (asgn.pickupIdx == 0) {
                 // Pickup BNS
                 if (searches.knowsDistance(asgn.pVeh->vehicleId, asgn.pickup->id)) {

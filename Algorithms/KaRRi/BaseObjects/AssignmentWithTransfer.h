@@ -45,7 +45,10 @@ namespace karri {
 
         // using RelevantPDLoc = RelevantPDLocs::RelevantPDLoc;
 
-        AssignmentWithTransfer() {}
+        AssignmentWithTransfer() {
+            cost = RequestCost::INFTY_COST();
+            costPVeh = RequestCost::INFTY_COST();
+        }
 
         AssignmentWithTransfer(const Vehicle *pVehArg, const Vehicle *dVehArg, const TransferPoint tpArg) {
             pVeh = pVehArg;

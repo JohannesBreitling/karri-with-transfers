@@ -37,7 +37,7 @@
 
 namespace karri {
 
-    template <typename StrategyT, typename InputGraphT, typename VehCHEnvT, typename CurVehLocToPickupSearchesT, typename DijLabelSet, typename OrdinaryTransferFinderT, typename TransferALSPVehFinderT, typename TransferALSDVehFinderT>
+    template <typename OrdinaryTransferFinderT, typename TransferALSPVehFinderT, typename TransferALSDVehFinderT, typename InsertionAsserterT>
     class AssignmentsWithTransferFinder {
 
     public:
@@ -45,42 +45,21 @@ namespace karri {
             OrdinaryTransferFinderT &ordinaryTransfers,
             TransferALSPVehFinderT &transfersALSPVeh,
             TransferALSDVehFinderT &transfersALSDVeh,
-            StrategyT strategy,
-            const Fleet &fleet, const RouteState &routeState,
             RequestState &requestState,
-            const InputGraphT &inputGraph,
-            const VehCHEnvT &vehChEnv,
-            CostCalculator &calc,
-            PickupVehicles &pVehs,
-            DropoffVehicles &dVehs,
-            TransferPointFinder<StrategyT> &tpFinder,
-            std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints,
-            CurVehLocToPickupSearchesT &searches)
+            InsertionAsserterT &asserter)
                             : ordinaryTransfers(ordinaryTransfers),
                               transfersALSPVeh(transfersALSPVeh),
                               transfersALSDVeh(transfersALSDVeh),
-                              strategy(strategy),
-                              fleet(fleet),
-                              routeState(routeState),
                               requestState(requestState),
-                              inputGraph(inputGraph),
-                              vehCh(vehChEnv.getCH()),
-                              vehChQuery(vehChEnv.template getFullCHQuery<>()),
-                              calc(calc),
-                              pVehs(pVehs), dVehs(dVehs),
-                              pickupDropoffPairs(std::vector<std::tuple<Vehicle, Vehicle>>{}),
-                              tpFinder(tpFinder),
-                              transferPoints(transferPoints),
-                              searches(searches) {}
+                              asserter(asserter) {}
 
         void init() {
-            pickupDropoffPairs = std::vector<std::tuple<Vehicle, Vehicle>>{};
-            transferPoints = std::map<std::tuple<int, int>, std::vector<TransferPoint>>{};
+            // no op
         }
 
         // TODO Stats wie die Verteilung der Verbesserung der Kosten liegen und so
         // TODO Im Aufschrieb, SPP gut ausarbeiten, um das Framework gut zu erklären, um eventuelle Follow Ups zu erleichtern 
-        // Method to find the best assignment with exactly one transfer, using the best found cost without transfer to prune solutions
+        // Method to find the best assignment with exactly one transfer
         void findBestAssignment() {
             Timer totalTimer;
 
@@ -109,6 +88,9 @@ namespace karri {
             // Then the pickup vehicle drives to one of the stops of the dropoff vehicle, where the transfer is done
             transfersALSDVeh.findAssignments();
 
+            //* Test the best assignment found
+            assert(asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
+
             return;
 
 
@@ -127,40 +109,13 @@ namespace karri {
 
     private:
 
-        void printRequestCost(RequestCost cost) {
-            std::cout << "TOTAL: " << cost.total << ", Walking: " << cost.walkingCost << ", Wait: " << cost.waitTimeViolationCost << ", Trip: " << cost.tripCost << ", Change: " << cost.changeInTripCostsOfOthers << ", Veh: " << cost.vehCost << std::endl;
-        }
-
-        using VehCHQuery = typename VehCHEnvT::template FullCHQuery<>;
-
         OrdinaryTransferFinderT &ordinaryTransfers;
         TransferALSPVehFinderT &transfersALSPVeh;
         TransferALSDVehFinderT &transfersALSDVeh;
 
-        StrategyT &strategy;
-        const Fleet &fleet;
-        const RouteState &routeState;
         RequestState &requestState;
-        const InputGraphT &inputGraph;
-        const CH &vehCh;
-        VehCHQuery vehChQuery;
 
-        CostCalculator &calc;
-        PickupVehicles &pVehs;
-        DropoffVehicles &dVehs;
-        std::vector<std::tuple<Vehicle, Vehicle>> pickupDropoffPairs;
-        TransferPointFinder<StrategyT> &tpFinder;
-        // Stores all transferpoints between two given stop pairs
-        std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints;
-        std::vector<Pickup> ordPickups;
-        std::vector<Dropoff> ordDropoffs;
-        std::vector<Pickup> bnsPickups;
-        std::vector<Dropoff> bnsDropoffs;
-        std::vector<Pickup> alsPickups;
-        std::vector<Dropoff> alsDropoffs;
-
-        CurVehLocToPickupSearchesT &searches;
-
+        InsertionAsserterT &asserter;
         // int64_t numAssignmentsTried = 0;
         // int64_t numPartialsTried = 0;
         // int64_t numAssignmentsWithUnkownPairedDistanceTried = 0;

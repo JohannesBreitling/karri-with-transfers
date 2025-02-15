@@ -193,6 +193,12 @@ namespace karri {
                         // Build the assignment
                         AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
 
+                        asgn.pickupIdx = numStopsPVeh - 1;
+                        asgn.dropoffIdx = dropoff.stopIndex;
+                        asgn.transferIdxPVeh = numStopsPVeh - 1;
+                        asgn.transferIdxDVeh = i;
+
+
                         const auto *dropoffPDLoc = &requestState.dropoffs[dropoff.pdId];
                         asgn.pickup = pickup;
                         asgn.dropoff = dropoffPDLoc;
@@ -206,16 +212,11 @@ namespace karri {
                         asgn.distToTransferDVeh = 0;
                         const int lengthOfLeg = i < numStopsDVeh - 1 ? routeState.schedArrTimesFor(dVehId)[i + 1] - routeState.schedDepTimesFor(dVehId)[i] : 0;
                         assert(lengthOfLeg > 0 || i == numStopsDVeh - 1);
-                        asgn.distFromTransferDVeh = lengthOfLeg;
+                        asgn.distFromTransferDVeh = asgn.transferIdxDVeh == asgn.dropoffIdx ? 0 : lengthOfLeg;
                         asgn.pickupType = AFTER_LAST_STOP;
                         asgn.dropoffType = ORDINARY;
                         asgn.transferTypePVeh = AFTER_LAST_STOP;
                         asgn.transferTypeDVeh = ORDINARY;
-
-                        asgn.pickupIdx = numStopsPVeh - 1;
-                        asgn.dropoffIdx = dropoff.stopIndex;
-                        asgn.transferIdxPVeh = numStopsPVeh - 1;
-                        asgn.transferIdxDVeh = i;
 
                         // If the pickup or dropoff conincides with the transfer, we skip the assignment
                         if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
@@ -272,6 +273,11 @@ namespace karri {
                         asgn.pickup = pickup;
                         asgn.dropoff = &dropoff;
 
+                        asgn.pickupIdx = numStopsPVeh - 1;
+                        asgn.dropoffIdx = numStopsDVeh - 1;
+                        asgn.transferIdxPVeh = numStopsPVeh - 1;
+                        asgn.transferIdxDVeh = i;
+
                         asgn.distToPickup = distanceToPickup;
                         asgn.distFromPickup = 0;
 
@@ -280,7 +286,7 @@ namespace karri {
                         asgn.distToTransferDVeh = 0;
                         const int lengthOfLeg = i < numStopsDVeh - 1 ? routeState.schedArrTimesFor(dVehId)[i + 1] - routeState.schedDepTimesFor(dVehId)[i] : 0;
                         assert(lengthOfLeg > 0 || i == numStopsDVeh - 1);
-                        asgn.distFromTransferDVeh = lengthOfLeg;
+                        asgn.distFromTransferDVeh = asgn.transferIdxDVeh == asgn.dropoffIdx ? 0 : lengthOfLeg;
 
                         asgn.distToDropoff = dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
                         asgn.distFromDropoff = 0;
@@ -288,11 +294,6 @@ namespace karri {
                         asgn.dropoffType = AFTER_LAST_STOP;
                         asgn.transferTypePVeh = AFTER_LAST_STOP;
                         asgn.transferTypeDVeh = ORDINARY;
-
-                        asgn.pickupIdx = numStopsPVeh - 1;
-                        asgn.dropoffIdx = numStopsDVeh - 1;
-                        asgn.transferIdxPVeh = numStopsPVeh - 1;
-                        asgn.transferIdxDVeh = i;
 
                         // If the pickup or dropoff conincides with the transfer, we skip the assignment
                         if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
@@ -352,6 +353,11 @@ namespace karri {
                         asgn.distToDropoff = dropoff.distToPDLoc;
                         asgn.distFromDropoff = dropoff.distFromPDLocToNextStop;
 
+                        asgn.pickupIdx = pickup->stopIndex;
+                        asgn.dropoffIdx = dropoff.stopIndex;
+                        asgn.transferIdxPVeh = numStopsPVeh - 1;
+                        asgn.transferIdxDVeh = i;
+
                         asgn.pickupBNSLowerBoundUsed = bnsLowerBoundUsed;
                         asgn.distToPickup = distanceToPickup;
 
@@ -360,16 +366,11 @@ namespace karri {
                         asgn.distToTransferDVeh = 0;
                         const int lengthOfLeg = i < numStopsDVeh - 1 ? routeState.schedArrTimesFor(dVehId)[i + 1] - routeState.schedDepTimesFor(dVehId)[i] : 0;
                         assert(lengthOfLeg > 0 || i == numStopsDVeh - 1);
-                        asgn.distFromTransferDVeh = lengthOfLeg;
+                        asgn.distFromTransferDVeh = asgn.transferIdxDVeh == asgn.dropoffIdx ? 0 : lengthOfLeg;
                         asgn.pickupType = pickup->stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
                         asgn.dropoffType = ORDINARY;
                         asgn.transferTypePVeh = AFTER_LAST_STOP;
                         asgn.transferTypeDVeh = ORDINARY;
-
-                        asgn.pickupIdx = pickup->stopIndex;
-                        asgn.dropoffIdx = dropoff.stopIndex;
-                        asgn.transferIdxPVeh = numStopsPVeh - 1;
-                        asgn.transferIdxDVeh = i;
 
                         // If the pickup or dropoff conincides with the transfer, we skip the assignment
                         if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
@@ -435,6 +436,11 @@ namespace karri {
                         asgn.dropoff = &dropoff;
                         asgn.distFromPickup = pickup->distFromPDLocToNextStop;
 
+                        asgn.pickupIdx = pickup->stopIndex;
+                        asgn.dropoffIdx = numStopsDVeh - 1;
+                        asgn.transferIdxPVeh = numStopsPVeh - 1;
+                        asgn.transferIdxDVeh = i;
+
                         asgn.pickupBNSLowerBoundUsed = bnsLowerBoundUsed;
                         asgn.distToPickup = distanceToPickup;
 
@@ -443,7 +449,7 @@ namespace karri {
                         asgn.distToTransferDVeh = 0;
                         const int lengthOfLeg = i < numStopsDVeh - 1 ? routeState.schedArrTimesFor(dVehId)[i + 1] - routeState.schedDepTimesFor(dVehId)[i] : 0;
                         assert(lengthOfLeg > 0 || i == numStopsDVeh - 1);
-                        asgn.distFromTransferDVeh = lengthOfLeg;
+                        asgn.distFromTransferDVeh = asgn.transferIdxDVeh == asgn.dropoffIdx ? 0 : lengthOfLeg;
 
                         asgn.distToDropoff = dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
                         asgn.distFromDropoff = 0;
@@ -451,11 +457,6 @@ namespace karri {
                         asgn.pickupType = pickup->stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
                         asgn.transferTypePVeh = AFTER_LAST_STOP;
                         asgn.transferTypeDVeh = ORDINARY;
-
-                        asgn.pickupIdx = pickup->stopIndex;
-                        asgn.dropoffIdx = numStopsDVeh - 1;
-                        asgn.transferIdxPVeh = numStopsPVeh - 1;
-                        asgn.transferIdxDVeh = i;
 
                         // If the pickup or dropoff conincides with the transfer, we skip the assignment
                         if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
@@ -466,6 +467,21 @@ namespace karri {
                     }
                 }
             }
+        }
+
+        void tryAssignment(AssignmentWithTransfer &asgn) {
+            // Skip unecessary assignments
+            const int numStopsPVeh = routeState.numStopsOf(asgn.pVeh->vehicleId);
+            const int numStopsDVeh = routeState.numStopsOf(asgn.dVeh->vehicleId);
+            const auto stopLocationsPVeh = routeState.stopLocationsFor(asgn.pVeh->vehicleId);
+            const auto stopLocationsDVeh = routeState.stopLocationsFor(asgn.dVeh->vehicleId);
+
+            if ((asgn.pickupIdx < numStopsPVeh - 1 && asgn.pickup->loc == stopLocationsPVeh[asgn.pickupIdx + 1])
+             || (asgn.transferIdxDVeh < numStopsDVeh - 1 && asgn.transfer.loc == stopLocationsDVeh[asgn.transferIdxDVeh + 1])
+             || (asgn.dropoffIdx < numStopsDVeh - 1 && asgn.dropoff->loc == stopLocationsDVeh[asgn.dropoffIdx + 1]))
+                return;
+
+            requestState.tryAssignment(asgn);
         }
 
         void finishAssignments(const Vehicle *pVeh) {
@@ -486,7 +502,7 @@ namespace karri {
 
                 assert(asgn.isFinished());
  
-                requestState.tryAssignment(asgn);
+                tryAssignment(asgn);
             }
         }
 

@@ -38,7 +38,7 @@
 
 namespace karri {
 
-// Holds information relating to a specific request like its pickups and dropoffs and the best known assignment.
+    // Holds information relating to a specific request like its pickups and dropoffs and the best known assignment.
     struct RequestState {
 
         RequestState(const CostCalculator &calculator, std::vector<AssignmentWithTransfer> &postponedAssignments)
@@ -258,6 +258,5 @@ namespace karri {
         int bestCostWithTransfer;
         bool notUsingVehicleIsBest;
         int notUsingVehicleDist;
-        
     };
 }

@@ -52,6 +52,9 @@
 #include "Algorithms/KaRRi/EllipticBCH/EllipticBucketsEnvironment.h"
 #include "Algorithms/KaRRi/EllipticBCH/EllipticBCHSearches.h"
 #include "Algorithms/KaRRi/CostCalculator.h"
+
+#include "Algorithms/KaRRi/TransferPoints/InsertionAsserter.h"
+
 #include "Algorithms/KaRRi/RequestState/RequestState.h"
 #include "Algorithms/KaRRi/RequestState/RelevantPDLocs.h"
 #include "Algorithms/KaRRi/PDDistanceQueries/PDDistances.h"
@@ -427,6 +430,7 @@ int main(int argc, char *argv[]) {
         CostCalculator calc(routeState);
         
         std::vector<AssignmentWithTransfer> postponedAssignments = std::vector<AssignmentWithTransfer>{};
+
         RequestState reqState(calc, postponedAssignments);
 
         // Construct Elliptic BCH bucket environment:
@@ -618,9 +622,11 @@ int main(int argc, char *argv[]) {
         using TransferALSDVehFinderImpl = TransferALSDVehFinder<TransferStrategyALSImpl, TransfersDropoffALSStrategy, CurVehLocToPickupSearchesImpl>;
         TransferALSDVehFinderImpl transferALSDVehInsertions = TransferALSDVehFinderImpl(transferALSStrategy, transferDropoffALSStrategy, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, postponedAssignments, fleet, routeState, reqState, calc);
         
-        using LowerBoundPairedLabelSet = BasicLabelSet<1, ParentInfo::NO_PARENT_INFO>;
-        using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<TransferPointStrategy, VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, LowerBoundPairedLabelSet, OrdinaryTransferInsertionsImpl, TransferALSPVehFinderImpl, TransferALSDVehFinderImpl>;
-        AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(ordinaryTransferInsertions, transferALSPVehInsertions, transferALSDVehInsertions, transferPointStrategy, fleet, routeState, reqState, vehicleInputGraph, *vehChEnv, calc, pVehs, dVehs, transferPointFinder, transferPoints, curVehLocToPickupSearches);
+        using TransferAsserterImpl = InsertionAsserter<VehicleInputGraph, VehCHEnv>;
+        TransferAsserterImpl asserter(routeState, vehicleInputGraph, *vehChEnv);
+        
+        using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<OrdinaryTransferInsertionsImpl, TransferALSPVehFinderImpl, TransferALSDVehFinderImpl, TransferAsserterImpl>;
+        AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(ordinaryTransferInsertions, transferALSPVehInsertions, transferALSDVehInsertions, reqState, asserter);
 
         using InsertionFinderImpl = AssignmentFinder<RequestStateInitializerImpl,
                 EllipticBCHSearchesImpl,

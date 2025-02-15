@@ -550,15 +550,11 @@ namespace karri {
             const auto stopLocationsDVeh = routeState.stopLocationsFor(asgn.dVeh->vehicleId);
             const int numStopsPVeh = routeState.numStopsOf(asgn.pVeh->vehicleId);
             const int numStopsDVeh = routeState.numStopsOf(asgn.dVeh->vehicleId);
-            const int pickupIdx = asgn.pickupIdx;
-            const int transferIdxPVeh = asgn.transferIdxPVeh;
-            const int transferIdxDVeh = asgn.transferIdxDVeh;
-            const int dropoffIdx = asgn.dropoffIdx;
 
-            if ((pickupIdx + 1 < numStopsPVeh && asgn.pickup->loc == stopLocationsPVeh[pickupIdx + 1])
-             || (transferIdxPVeh + 1 < numStopsPVeh && asgn.transfer.loc == stopLocationsPVeh[transferIdxPVeh + 1])
-             || (transferIdxDVeh + 1 < numStopsDVeh && asgn.transfer.loc == stopLocationsDVeh[transferIdxDVeh + 1])
-             || (dropoffIdx + 1 < numStopsDVeh && asgn.dropoff->loc == stopLocationsDVeh[dropoffIdx + 1]))
+            if ((asgn.pickupIdx < numStopsPVeh - 1 && asgn.pickup->loc == stopLocationsPVeh[asgn.pickupIdx + 1])
+             || (asgn.transferIdxPVeh < numStopsPVeh - 1 && asgn.transfer.loc == stopLocationsPVeh[asgn.transferIdxPVeh + 1])
+             || (asgn.transferIdxDVeh < numStopsDVeh - 1 && asgn.transfer.loc == stopLocationsDVeh[asgn.transferIdxDVeh + 1])
+             || (asgn.dropoffIdx < numStopsDVeh - 1 && asgn.dropoff->loc == stopLocationsDVeh[asgn.dropoffIdx + 1]))
                 return;
 
             requestState.tryAssignment(asgn);
