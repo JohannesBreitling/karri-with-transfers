@@ -227,7 +227,7 @@ namespace karri {
                             continue; 
 
                         // Try the finished assignment with ORD dropoff
-                        requestState.tryAssignment(asgn);
+                        tryAssignment(asgn);
                     }
                 }
             }
@@ -300,7 +300,7 @@ namespace karri {
                             continue;
 
                         // Try the finished assignment with ORD dropoff
-                        requestState.tryAssignment(asgn);
+                        tryAssignment(asgn);
                     }
                 }
             }
@@ -381,7 +381,7 @@ namespace karri {
                             continue;
 
                         // Try the finished assignment with ORD dropoff
-                        requestState.tryAssignment(asgn);
+                        tryAssignment(asgn);
                     }
                 }
             }
@@ -463,7 +463,7 @@ namespace karri {
                             continue;
 
                         // Try the finished assignment with ORD dropoff
-                        requestState.tryAssignment(asgn);
+                        tryAssignment(asgn);
                     }
                 }
             }

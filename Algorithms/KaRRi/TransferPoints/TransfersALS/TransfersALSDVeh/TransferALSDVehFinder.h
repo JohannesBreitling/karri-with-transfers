@@ -266,7 +266,7 @@ class TransferALSDVehFinder {
 
                 assert(asgn.isFinished());
  
-                requestState.tryAssignment(asgn);
+                tryAssignment(asgn);
             }
 
             postponedAssignments.clear();
