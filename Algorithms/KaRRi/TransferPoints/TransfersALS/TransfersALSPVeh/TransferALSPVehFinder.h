@@ -5,7 +5,7 @@
 
 namespace karri {
 
-    template<typename TransferALSStrategyT, typename TransfersPickupALSStrategyT, typename TransfersDropoffALSStrategyT, typename CurVehLocToPickupSearchesT>
+    template<typename TransferALSStrategyT, typename TransfersPickupALSStrategyT, typename TransfersDropoffALSStrategyT, typename CurVehLocToPickupSearchesT, typename InsertionAsserterT>
     class TransferALSPVehFinder {
         
     // The pVeh drives the detour to the transfer point
@@ -28,7 +28,8 @@ namespace karri {
             const Fleet &fleet,
             const RouteState &routeState,
             RequestState &requestState,
-            CostCalculator &calc
+            CostCalculator &calc,
+            InsertionAsserterT &asserter
         ) : strategy(strategy),
             pickupALSStrategy(pickupALSStrategy),
             dropoffALSStrategy(dropoffALSStrategy),
@@ -40,7 +41,8 @@ namespace karri {
             fleet(fleet),
             routeState(routeState),
             requestState(requestState),
-            calc(calc) {}
+            calc(calc),
+            asserter(asserter) {}
 
         void findAssignments() {
             // Reset the last stop distances
@@ -148,13 +150,17 @@ namespace karri {
                 return;
 
             for (const auto pVehId : pVehIds) {
-                const auto *pVeh = &fleet[pVehId]; 
+                const auto *pVeh = &fleet[pVehId];
+                const int numStopsPVeh = routeState.numStopsOf(pVehId);
+                const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
 
                 for (const auto &pickup : requestState.pickups) {
                     // Get the distance from the last stop of the pVeh to the pickup
+                    const bool pickupAtLastStop = pickup.loc == stopLocationsPVeh[numStopsPVeh - 1];
                     const auto distanceToPickup = pickupALSStrategy.getDistanceToPickup(pVehId, pickup.id);
-                    tryDropoffORDForPickupALS(pVeh, &pickup, distanceToPickup);
-                    tryDropoffALSForPickupALS(pVeh, &pickup, distanceToPickup);
+                    assert(distanceToPickup == asserter.assertLastStopDistance(pVehId, pickup.loc));
+                    tryDropoffORDForPickupALS(pVeh, &pickup, pickupAtLastStop ? 0 : distanceToPickup);
+                    tryDropoffALSForPickupALS(pVeh, &pickup, pickupAtLastStop ? 0 : distanceToPickup);
                 }
             }
         }
@@ -206,11 +212,11 @@ namespace karri {
                         const bool pickupAtLastStop = asgn.pickup->loc == stopLocationsPVeh[numStopsPVeh - 1];
                         asgn.distToPickup = pickupAtLastStop ? 0 : distanceToPickup;
                         asgn.distFromPickup = 0;
-                        const bool sameLoc = dropoffPDLoc->loc == stopLocationsDVeh[asgn.dropoffIdx];
-                        asgn.distToDropoff = sameLoc ? 0 : dropoff.distToPDLoc;;
+                        const bool sameLoc = asgn.transferIdxDVeh != asgn.dropoffIdx && dropoffPDLoc->loc == stopLocationsDVeh[asgn.dropoffIdx];
+                        asgn.distToDropoff = sameLoc ? 0 : dropoff.distToPDLoc;
                         asgn.distFromDropoff = dropoff.distFromPDLocToNextStop;
 
-                        const bool sameLocTransfer = asgn.transfer.loc == stopLocationsPVeh[asgn.pickupIdx];
+                        const bool sameLocTransfer = asgn.pickupIdx != asgn.transferIdxPVeh && asgn.transfer.loc == stopLocationsPVeh[asgn.transferIdxPVeh];
                         asgn.distToTransferPVeh = sameLocTransfer ? 0 : distancePVehToTransfer;
                         asgn.distFromTransferPVeh = 0;
                         asgn.distToTransferDVeh = 0;
@@ -287,7 +293,7 @@ namespace karri {
                         asgn.distToPickup = pickupAtLastStop ? 0 : distanceToPickup;
                         asgn.distFromPickup = 0;
 
-                        const bool sameLoc = asgn.transfer.loc == stopLocationsPVeh[asgn.pickupIdx];
+                        const bool sameLoc = asgn.pickupIdx != asgn.transferIdxPVeh && asgn.transfer.loc == stopLocationsPVeh[asgn.transferIdxPVeh];
                         asgn.distToTransferPVeh = sameLoc ? 0 : distancePVehToTransfer;
                         asgn.distFromTransferPVeh = 0;
                         asgn.distToTransferDVeh = 0;
@@ -295,8 +301,10 @@ namespace karri {
                         assert(lengthOfLeg > 0 || i == numStopsDVeh - 1);
                         asgn.distFromTransferDVeh = asgn.transferIdxDVeh == asgn.dropoffIdx ? 0 : lengthOfLeg;
 
-                        const bool sameLocDropoff = dropoff.loc == stopLocationsDVeh[asgn.dropoffIdx];
-                        asgn.distToDropoff = sameLocDropoff ? 0 : dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
+                        const bool sameLocDropoff = asgn.transferIdxDVeh != asgn.dropoffIdx && dropoff.loc == stopLocationsDVeh[asgn.dropoffIdx];
+                        const int distanceToDropoff = dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
+                        assert(sameLocDropoff || distanceToDropoff == asserter.assertLastStopDistance(dVehId, dropoff.loc));
+                        asgn.distToDropoff = sameLocDropoff ? 0 : distanceToDropoff;
                         asgn.distFromDropoff = 0;
                         asgn.pickupType = AFTER_LAST_STOP;
                         asgn.dropoffType = AFTER_LAST_STOP;
@@ -364,7 +372,7 @@ namespace karri {
                         asgn.pickup = pickupPDLoc;
                         asgn.dropoff = dropoffPDLoc;
                         asgn.distFromPickup = pickup->distFromPDLocToNextStop;
-                        const bool sameLoc = dropoffPDLoc->loc == stopLocationsDVeh[asgn.dropoffIdx];
+                        const bool sameLoc = asgn.transferIdxDVeh != asgn.dropoffIdx && dropoffPDLoc->loc == stopLocationsDVeh[asgn.dropoffIdx];
                         asgn.distToDropoff = sameLoc ? 0 : dropoff.distToPDLoc;
                         asgn.distFromDropoff = dropoff.distFromPDLocToNextStop;
 
@@ -372,7 +380,7 @@ namespace karri {
                         const bool pickupAtLastStop = pickupPDLoc->loc == stopLocationsPVeh[numStopsPVeh - 1];
                         asgn.distToPickup = pickupAtLastStop ? 0 : distanceToPickup;
 
-                        const bool sameLocPickup = asgn.transfer.loc == stopLocationsPVeh[asgn.pickupIdx];
+                        const bool sameLocPickup = asgn.pickupIdx != asgn.transferIdxPVeh && asgn.transfer.loc == stopLocationsPVeh[asgn.transferIdxPVeh];
                         asgn.distToTransferPVeh = sameLocPickup ? 0 : distancePVehToTransfer;
                         asgn.distFromTransferPVeh = 0;
                         asgn.distToTransferDVeh = 0;
@@ -458,7 +466,7 @@ namespace karri {
                         const bool pickupAtLastStop = pickupPDLoc->loc == stopLocationsPVeh[numStopsPVeh - 1];
                         asgn.distToPickup = pickupAtLastStop ? 0 : distanceToPickup;
 
-                        const bool sameLoc = asgn.transfer.loc == stopLocationsPVeh[asgn.pickupIdx];
+                        const bool sameLoc = asgn.pickupIdx != asgn.transferIdxPVeh && asgn.transfer.loc == stopLocationsPVeh[asgn.transferIdxPVeh];
                         asgn.distToTransferPVeh = sameLoc ? 0 : distancePVehToTransfer;
                         asgn.distFromTransferPVeh = 0;
                         asgn.distToTransferDVeh = 0;
@@ -466,8 +474,10 @@ namespace karri {
                         assert(lengthOfLeg > 0 || i == numStopsDVeh - 1);
                         asgn.distFromTransferDVeh = asgn.transferIdxDVeh == asgn.dropoffIdx ? 0 : lengthOfLeg;
 
-                        const bool sameLocDropoff = dropoff.loc == stopLocationsDVeh[asgn.dropoffIdx];
-                        asgn.distToDropoff = sameLocDropoff ? 0 : dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
+                        const bool sameLocDropoff = asgn.transferIdxDVeh != asgn.dropoffIdx && dropoff.loc == stopLocationsDVeh[asgn.dropoffIdx];
+                        const int distanceToDropoff = dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
+                        asgn.distToDropoff = sameLocDropoff ? 0 : distanceToDropoff;
+                        assert(sameLocDropoff || distanceToDropoff == asserter.assertLastStopDistance(dVehId, dropoff.loc));
                         asgn.distFromDropoff = 0;
                         asgn.dropoffType = AFTER_LAST_STOP;
                         asgn.pickupType = pickup->stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
@@ -550,6 +560,7 @@ namespace karri {
         const RouteState &routeState;
         RequestState &requestState;
         CostCalculator &calc;
+        InsertionAsserterT &asserter;
         
 
         // Stores for each pickup vehicle, the distances to all possible stops of dropoff vehicles

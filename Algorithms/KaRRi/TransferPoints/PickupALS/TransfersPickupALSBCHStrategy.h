@@ -65,6 +65,8 @@ namespace karri::Transfers {
                                                   const DistanceLabel &minDistancesToPickups) const {
                 assert(strat.requestState.minDirectPDDist < INFTY);
 
+                return ~((arrTimesAtPickups < INFTY) & (minDistancesToPickups < INFTY));
+                
                 if (strat.upperBoundCost >= INFTY) {
                     // If current best is INFTY, only indices i with arrTimesAtPickups[i] >= INFTY or
                     // minDistancesToPickups[i] >= INFTY are worse than the current best.

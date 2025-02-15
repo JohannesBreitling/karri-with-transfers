@@ -3,7 +3,7 @@
 
 namespace karri {
 
-template<typename TransferALSStrategyT, typename TransfersDropoffALSStrategyT, typename CurVehLocToPickupSearchesT>
+template<typename TransferALSStrategyT, typename TransfersDropoffALSStrategyT, typename CurVehLocToPickupSearchesT, typename InsertionAsserterT>
 class TransferALSDVehFinder {
     
     // The dVeh drives the detour to the transfer point
@@ -21,7 +21,8 @@ class TransferALSDVehFinder {
             const Fleet &fleet,
             const RouteState &routeState,
             RequestState &requestState,
-            CostCalculator &calc
+            CostCalculator &calc,
+            InsertionAsserterT &asserter
         ) : strategy(strategy),
             dropoffALSStrategy(dropoffALSStrategy),
             searches(searches),
@@ -31,7 +32,8 @@ class TransferALSDVehFinder {
             fleet(fleet),
             routeState(routeState),
             requestState(requestState),
-            calc(calc) {}
+            calc(calc),
+            asserter(asserter) {}
 
     void findAssignments() {
         auto &stats = requestState.stats().transferALSDVehStats;
@@ -287,6 +289,8 @@ class TransferALSDVehFinder {
         RequestState &requestState;
 
         CostCalculator &calc;
+
+        InsertionAsserterT &asserter;
 
         int64_t numPossibleDropoffVehs;
         int64_t numPossiblePickupVehs;

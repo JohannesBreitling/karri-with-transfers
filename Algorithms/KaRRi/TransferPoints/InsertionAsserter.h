@@ -27,6 +27,13 @@ namespace karri {
             return true;
         }
         
+        int assertLastStopDistance(const int vehId, const int loc) {
+            const int numStops = routeState.numStopsOf(vehId);
+            const auto stopLocations = routeState.stopLocationsFor(vehId);
+            
+            const int lastStop = stopLocations[numStops - 1];
+            return getDistanceBetweenLocations(lastStop, loc);
+        }
     
 
 
@@ -46,7 +53,7 @@ namespace karri {
             if (asgn.pickupIdx > 0) {
                 const int distToPickup = stopBeforePickup != pickup ? getDistanceBetweenLocations(stopBeforePickup, pickup) : 0;
                 assert(distToPickup == asgn.distToPickup);
-            }            
+            }
             
             if (asgn.pickupIdx != asgn.transferIdxPVeh && asgn.pickupIdx < numStopsPVeh - 1) {
                 // Pickup not als

@@ -4,7 +4,7 @@
 
 namespace karri {
 
-    template<typename TransferPointFinderT, typename TransfersDropoffALSStrategyT, typename InputGraphT, typename VehCHEnvT, typename CurVehLocToPickupSearchesT>
+    template<typename TransferPointFinderT, typename TransfersDropoffALSStrategyT, typename InputGraphT, typename VehCHEnvT, typename CurVehLocToPickupSearchesT, typename InsertionAsserterT>
     class OrdinaryTransferFinder {
         
     // Both vehicles can drive a detour to the transfer point, but none drives the detour ALS
@@ -27,6 +27,7 @@ namespace karri {
             const RouteState &routeState,
             RequestState &requestState,
             CostCalculator &calc,
+            InsertionAsserterT &asserter,
             std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints
         ) : tpFinder(tpFinder),
             dropoffALSStrategy(dropoffALSStrategy),
@@ -43,6 +44,7 @@ namespace karri {
             routeState(routeState),
             requestState(requestState),
             calc(calc),
+            asserter(asserter),
             transferPoints(transferPoints),
             dVehIdsALS(Subset(0)) {}
         
@@ -786,6 +788,7 @@ namespace karri {
         RequestState &requestState;
 
         CostCalculator &calc;
+        InsertionAsserterT &asserter;
 
         std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints;
         

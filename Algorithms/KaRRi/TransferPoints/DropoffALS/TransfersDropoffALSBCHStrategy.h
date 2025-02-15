@@ -60,9 +60,11 @@ namespace karri::Transfers {
             // assignment than the best known.
             LabelMask doesDistanceNotAdmitBestAsgn(const DistanceLabel /*&distancesToDropoffs*/,
                                                    const bool /*considerWalkingDists*/) const {
+                return strat.upperBoundCost < INFTY;  // No actual pruning because of the transfer
+                
                 const DistanceLabel costLowerBound = calc.template calcKVehicleIndependentCostLowerBoundsForDALSWithKnownMinDistToDropoff<LabelSet>(
                         0, /* distancesToDropoffs */ 0, 0, strat.requestState);
-                return strat.upperBoundCost < costLowerBound;  // No actual pruning because of the transfer
+                return strat.upperBoundCost < costLowerBound;
             }
 
             // Returns whether a given arrival time and minimum distance from a vehicle's last stop to the dropoff cannot
