@@ -77,21 +77,21 @@ class TransferALSDVehFinder {
                     const auto numStopsPVeh = routeState.numStopsOf(pVehId);
                     const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
 
-                    // Calculate the distances from the last stop of the dVeh to all stops of the pVeh
+                    //* Calculate the distances from the last stop of the dVeh to all stops of the pVeh
                     const auto distancesToTransfer = strategy.calculateDistancesFromLastStopToAllStops(*dVeh, *pVeh);
                 
                     for (const auto &dropoff : requestState.dropoffs) {
                         const auto distancesToDropoff = strategy.calculateDistancesFromAllStopsToLocation(*pVeh, dropoff.loc);
 
+                        assert(numStopsPVeh - 1 == distancesToTransfer.size());
+                        assert(numStopsPVeh - 1 == distancesToDropoff.size());
+
                         for (const auto &pickup : relBNSPickups.relevantSpotsFor(pVehId)) {
+                            assert(pickup.stopIndex == 0);
                             const auto *pickupPDLoc = &requestState.pickups[pickup.pdId];
 
-                            for (int i = 1; i < numStopsPVeh; i++) {
-                                assert(pickup.stopIndex == 0);
-                                const int distancesToTransferSize = distancesToTransfer.size();
-                                (void) distancesToTransferSize;
-                                assert(numStopsPVeh - 1 == distancesToTransferSize);
-                                assert(numStopsPVeh - 1 == distancesToDropoff.size());
+                            for (int i = 1; i < numStopsPVeh; i++) { // We start at i = 1 because at the first stop the transfer is only possible if the vehcle is currently waiting for another passenger, so we neglect this case
+                                const bool transferAtLastStop = stopLocationsPVeh[i] == stopLocationsDVeh[numStopsDVeh - 1];    
                                 
                                 // Construct the transfer point
                                 TransferPoint tp = TransferPoint(stopLocationsPVeh[i], pVeh, dVeh);
@@ -119,10 +119,10 @@ class TransferALSDVehFinder {
                                 asgn.distFromDropoff = 0;
 
                                 asgn.distToTransferPVeh = 0;
+                                assert(asgn.pickupIdx != asgn.transferIdxPVeh); // In the pickup bns case we do not have a paired assignment
                                 const int lengthOfLeg = i < numStopsPVeh - 1 ? routeState.schedArrTimesFor(pVehId)[i + 1] - routeState.schedDepTimesFor(pVehId)[i] : 0;
-                                assert(lengthOfLeg > 0 || i == numStopsPVeh - 1);
-                                asgn.distFromTransferPVeh = asgn.pickupIdx == asgn.transferIdxPVeh ? 0 : lengthOfLeg;
-                                const bool transferAtLastStop = asgn.transfer.loc == stopLocationsDVeh[numStopsDVeh - 1];
+                                asgn.distFromTransferPVeh = lengthOfLeg;
+                                
                                 asgn.distToTransferDVeh = transferAtLastStop ? 0 : distancesToTransfer[i - 1];
                                 asgn.distFromTransferDVeh = 0;
     
@@ -130,10 +130,6 @@ class TransferALSDVehFinder {
                                 asgn.transferTypePVeh = ORDINARY;
                                 asgn.transferTypeDVeh = AFTER_LAST_STOP;
                                 asgn.dropoffType = AFTER_LAST_STOP;
-
-                                // Skip the assignment if the pickup is in the same leg as the transfer, because then we would drive back to the stop before the pickup to perform the transfer
-                                if (asgn.pickupIdx == asgn.transferIdxPVeh)
-                                    continue;
 
                                 // If the pickup or dropoff conincides with the transfer, we skip the assignment
                                 if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
@@ -170,14 +166,18 @@ class TransferALSDVehFinder {
                         for (const auto &pickup : relORDPickups.relevantSpotsFor(pVehId)) {
                             const auto *pickupPDLoc = &requestState.pickups[pickup.pdId];
 
-                            for (int i = pickup.stopIndex; i < numStopsPVeh; i++) {
-                                assert(numStopsPVeh - 1 == distancesToTransfer.size());
-                                assert(numStopsPVeh - 1 == distancesToDropoff.size());
+                            assert(numStopsPVeh - 1 == distancesToTransfer.size());
+                            assert(numStopsPVeh - 1 == distancesToDropoff.size());
+
+                            for (int i = pickup.stopIndex + 1; i < numStopsPVeh; i++) {
+                                assert(pickup.stopIndex > 0);
+                                const bool transferAtLastStop = stopLocationsPVeh[i] == stopLocationsDVeh[numStopsDVeh - 1];
+                                assert(pickup.stopIndex != i);
                                 
                                 // Construct the transfer point
                                 TransferPoint tp = TransferPoint(stopLocationsPVeh[i], pVeh, dVeh);                                
                                 tp.distancePVehToTransfer = 0;
-                                tp.distancePVehFromTransfer = 0;
+                                tp.distancePVehFromTransfer = 0;                                
                                 tp.distanceDVehToTransfer = distancesToTransfer[i - 1];
                                 tp.distanceDVehFromTransfer = 0;
 
@@ -201,9 +201,7 @@ class TransferALSDVehFinder {
 
                                 asgn.distToTransferPVeh = 0;
                                 const int lengthOfLeg = i < numStopsPVeh - 1 ? routeState.schedArrTimesFor(pVehId)[i + 1] - routeState.schedDepTimesFor(pVehId)[i] : 0;
-                                assert(lengthOfLeg > 0 || i == numStopsPVeh - 1);
-                                asgn.distFromTransferPVeh = asgn.pickupIdx == asgn.transferIdxPVeh ? 0 : lengthOfLeg;
-                                const bool transferAtLastStop = asgn.transfer.loc == stopLocationsDVeh[numStopsDVeh - 1];
+                                asgn.distFromTransferPVeh = lengthOfLeg;
                                 asgn.distToTransferDVeh = transferAtLastStop ? 0 : distancesToTransfer[i - 1];
                                 asgn.distFromTransferDVeh = 0;
 
@@ -211,10 +209,6 @@ class TransferALSDVehFinder {
                                 asgn.transferTypePVeh = ORDINARY;
                                 asgn.transferTypeDVeh = AFTER_LAST_STOP;
                                 asgn.dropoffType = AFTER_LAST_STOP;
-
-                                // Skip the assignment if the pickup is in the same leg as the transfer, because then we would drive back to the stop before the pickup to perform the transfer
-                                if (asgn.pickupIdx == asgn.transferIdxPVeh)
-                                    continue;
 
                                 // If the pickup or dropoff conincides with the transfer, we skip the assignment
                                 if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
@@ -234,6 +228,7 @@ class TransferALSDVehFinder {
             const int numStopsPVeh = routeState.numStopsOf(asgn.pVeh->vehicleId);
             const auto stopLocationsPVeh = routeState.stopLocationsFor(asgn.pVeh->vehicleId);
             
+            // If the pickup, transfer coincide with the next stop, we also skip the assignment
             if ((asgn.pickupIdx < numStopsPVeh - 1 && asgn.pickup->loc == stopLocationsPVeh[asgn.pickupIdx + 1])
              || (asgn.transferIdxPVeh < numStopsPVeh - 1 && asgn.transfer.loc == stopLocationsPVeh[asgn.transferIdxPVeh + 1]))
                 return;
