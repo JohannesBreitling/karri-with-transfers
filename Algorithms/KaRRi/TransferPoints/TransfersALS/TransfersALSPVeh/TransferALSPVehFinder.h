@@ -466,9 +466,9 @@ namespace karri {
             const int numStopsPVeh = routeState.numStopsOf(asgn.pVeh->vehicleId); 
             const int numStopsDVeh = routeState.numStopsOf(asgn.dVeh->vehicleId);
 
-            const auto schedDepTimesPVeh = routeState.schedArrTimesFor(asgn.pVeh->vehicleId);
+            const auto schedDepTimesPVeh = routeState.schedDepTimesFor(asgn.pVeh->vehicleId);
             const auto schedArrTimesPVeh = routeState.schedArrTimesFor(asgn.pVeh->vehicleId);
-            const auto schedDepTimesDVeh = routeState.schedArrTimesFor(asgn.dVeh->vehicleId); 
+            const auto schedDepTimesDVeh = routeState.schedDepTimesFor(asgn.dVeh->vehicleId); 
             const auto schedArrTimesDVeh = routeState.schedArrTimesFor(asgn.dVeh->vehicleId);
 
             const int legPickup = pickupIdx < numStopsPVeh - 1 ? schedArrTimesPVeh[pickupIdx + 1] - schedDepTimesPVeh[pickupIdx] : 0;
@@ -499,7 +499,7 @@ namespace karri {
             if (pairedPVeh || pickupAfterLastStop)
                 asgn.distFromPickup = 0;
 
-            if (pickupAfterLastStop)
+            if (pickupAfterLastStop && !pickupAtStop)
                 asgn.distToPickup = alsDistancePVeh;
 
             if (pairedPVeh)
@@ -539,7 +539,7 @@ namespace karri {
             if (pairedDVeh || transferAfterLastStopDVeh)
                 asgn.distFromTransferDVeh = 0;
 
-            if (transferAfterLastStopDVeh)
+            if (transferAfterLastStopDVeh && !transferAtStopDVeh)
                 asgn.distToTransferDVeh = alsDistanceDVeh;
 
             if (pairedDVeh)
