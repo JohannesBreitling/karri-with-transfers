@@ -76,17 +76,17 @@ namespace karri {
             // * TRANSFER AFTER LAST STOP (PVeh)
             // The pickup vehicle picks up the user either bns, ord or als
             // Then the pickup vehicle drives to one of the stops of the dropoff vehicle, where the transfer is done
-            transfersALSPVeh.findAssignments();
+            //* transfersALSPVeh.findAssignments();
             
             // * TRANSFER AFTER LAST STOP (PVeh)
             // The pickup vehicle picks up the user either bns, ord or als
             // Then the pickup vehicle drives to one of the stops of the dropoff vehicle, where the transfer is done
-            //! ordinaryTransfers.findAssignments();
+            ordinaryTransfers.findAssignments();
             
             // * TRANSFER AFTER LAST STOP (PVeh)
             // The pickup vehicle picks up the user either bns, ord or als
             // Then the pickup vehicle drives to one of the stops of the dropoff vehicle, where the transfer is done
-            //* transfersALSDVeh.findAssignments(); // TODO Rausfinden ob das richtig ist, dass da nichts gefunden wird...
+            //* transfersALSDVeh.findAssignments();
 
             //* Test the best assignment found
             assert(asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));

@@ -92,15 +92,6 @@ namespace karri {
                         return;
                     
                     for (auto &asgn : promisingPartials) {
-                        // Transfer BNS in dropoff vehicle
-                        if (asgn.transferIdxDVeh == 0) {
-                            if (searches.knowsDistanceTransfer(asgn.dVeh->vehicleId, asgn.transfer.loc)) {
-                                asgn.distToTransferDVeh = searches.getDistanceTransfer(asgn.dVeh->vehicleId, asgn.transfer.loc);
-                            } else {
-                                asgn.dropoffBNSLowerBoundUsed = true;
-                            }
-                        }
-
                         tryDropoffBNS(asgn);
                         tryDropoffORD(asgn);
                         tryDropoffALS(asgn);
@@ -177,6 +168,8 @@ namespace karri {
                         continue;
 
                     AssignmentWithTransfer asgn(pVeh, dVeh, tp, pickupPDLoc, pickup.stopIndex, pickup.distToPDLoc, pickup.distFromPDLocToNextStop, trIdxPVeh, trIdxDVeh);
+                    finishDistancesPVeh(asgn);
+
                     asgn.pickupType = ORDINARY;
                     asgn.transferTypePVeh = ORDINARY;
 
@@ -205,6 +198,8 @@ namespace karri {
                         continue;
 
                     AssignmentWithTransfer asgn(pVeh, dVeh, tp, pickupPDLoc, pickup.stopIndex, pickup.distToPDLoc, pickup.distFromPDLocToNextStop, trIdxPVeh, trIdxDVeh);
+                    finishDistancesPVeh(asgn);
+                    
                     asgn.pickupType = BEFORE_NEXT_STOP;
                     asgn.transferTypePVeh = trIdxPVeh == 0 ? BEFORE_NEXT_STOP : ORDINARY;
                     
@@ -230,23 +225,6 @@ namespace karri {
 
         void tryPartialAssignment(AssignmentWithTransfer &asgn) {
             numPartialsTried++;
-            if (asgn.pickupIdx == asgn.transferIdxPVeh) {
-                // Paired Assignment (pVeh)
-                
-                // Try the lower bound for the paired assignment
-                asgn.distFromPickup = 0;
-                asgn.distToTransferPVeh = pairedLowerBoundPT;
-                asgn.pickupPairedLowerBoundUsed = true;
-            }
-
-            if (asgn.pickupIdx == 0) {
-                // Assignment with pickup BNS
-                if (searches.knowsDistance(asgn.pVeh->vehicleId, asgn.pickup->id)) {
-                    asgn.distToPickup = searches.getDistance(asgn.pVeh->vehicleId, asgn.pickup->id);
-                } else {
-                    asgn.pickupBNSLowerBoundUsed = true;
-                }
-            }
 
             const bool unfinished = asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed;
             // Check the cost of the partial assignment with transfer where pickup vehicle, dropoff vehicle, pickup and transfer point (therefore also both transfer stop indices) are set
@@ -282,21 +260,14 @@ namespace karri {
                 
                 AssignmentWithTransfer newAssignment(asgn);
                 newAssignment.dropoff = &requestState.dropoffs[dropoff.pdId];
-                newAssignment.distToDropoff = dropoff.distToPDLoc;
-                newAssignment.dropoffType = BEFORE_NEXT_STOP;
-
-                newAssignment.distFromDropoff = dropoff.distFromPDLocToNextStop;
-                assert(dropoff.distFromPDLocToNextStop > 0 || dropoff.distToPDLoc == 0);
-                assert(asgn.distFromDropoff > 0 || asgn.distToDropoff == 0);
                 newAssignment.dropoffIdx = dropoff.stopIndex;
+                
+                newAssignment.distToDropoff = dropoff.distToPDLoc;
+                newAssignment.distFromDropoff = dropoff.distFromPDLocToNextStop;
+                finishDistancesDVeh(newAssignment, 0);
+                
+                newAssignment.dropoffType = BEFORE_NEXT_STOP;
                 newAssignment.transferTypeDVeh = BEFORE_NEXT_STOP;
-
-                if (newAssignment.transferIdxDVeh == newAssignment.dropoffIdx) {
-                    // Transfer and dropoff are inserted in the same leg (paired)
-                    newAssignment.dropoffPairedLowerBoundUsed = true;
-                    newAssignment.distFromTransferDVeh = 0;
-                    newAssignment.distToDropoff = pairedLowerBoundTD;
-                }
 
                 if (newAssignment.dropoff->loc == newAssignment.transfer.loc)
                     continue;
@@ -318,28 +289,18 @@ namespace karri {
                     continue;
 
                 AssignmentWithTransfer newAssignment(asgn);
+                newAssignment.dropoffIdx = dropoff.stopIndex;
                 newAssignment.dropoff = dropoffPDLoc;
+
                 newAssignment.distToDropoff = dropoff.distToPDLoc;
                 newAssignment.distFromDropoff = dropoff.distFromPDLocToNextStop;
-                assert(dropoff.distFromPDLocToNextStop > 0 || dropoff.distToPDLoc == 0);
-                assert(asgn.distFromDropoff > 0 || asgn.distToDropoff == 0);
-                newAssignment.dropoffIdx = dropoff.stopIndex;
+                finishDistancesDVeh(newAssignment, 0);
+
                 newAssignment.dropoffType = ORDINARY;
                 newAssignment.transferTypeDVeh = newAssignment.transferIdxDVeh == 0 ? BEFORE_NEXT_STOP : ORDINARY;
 
-                if (newAssignment.transferIdxDVeh == newAssignment.dropoffIdx) {
-                    // Transfer and dropoff are inserted in the same leg (paired)
-                    newAssignment.dropoffPairedLowerBoundUsed = true;
-                    newAssignment.distFromTransferDVeh = 0;
-                    newAssignment.distToDropoff = pairedLowerBoundTD;
-                }
-
                 if (newAssignment.dropoff->loc == newAssignment.transfer.loc)
                     continue;
-
-                // If the dropoff coincides with a stop, we skip the assignment if the dropoff will be inserted in a different leg
-                if (dropoffIsAtStop(newAssignment.dVeh, dropoffPDLoc->loc) >= 0 && dropoff.stopIndex != dropoffIsAtStop(newAssignment.dVeh, dropoffPDLoc->loc))
-                    continue; 
 
                 tryAssignment(newAssignment);
             }
@@ -351,21 +312,23 @@ namespace karri {
             
             for (const auto &dropoff : requestState.dropoffs) {
                 int distanceToDropoff = dropoffALSStrategy.getDistanceToDropoff(asgn.dVeh->vehicleId, dropoff.id);
-                if (distanceToDropoff == INFTY)
+                if (distanceToDropoff >= INFTY)
                     continue;
 
                 if (dropoff.loc == asgn.transfer.loc)
                     continue;
+                
                 AssignmentWithTransfer newAssignment(asgn);
+                newAssignment.dropoffIdx = routeState.numStopsOf(asgn.dVeh->vehicleId) - 1;
                 newAssignment.dropoff = &dropoff;
+                
                 newAssignment.distToDropoff = distanceToDropoff;
                 newAssignment.distFromDropoff = 0;
-                newAssignment.dropoffIdx = routeState.numStopsOf(asgn.dVeh->vehicleId) - 1;
+                finishDistancesDVeh(newAssignment, distanceToDropoff);
+                
                 newAssignment.dropoffType = AFTER_LAST_STOP;
                 newAssignment.transferTypeDVeh = newAssignment.transferIdxDVeh == 0 ? BEFORE_NEXT_STOP : ORDINARY;
-
-                if (newAssignment.dropoff->loc == newAssignment.transfer.loc)
-                    continue;
+                
                 tryAssignment(newAssignment);
             }
         }
@@ -522,6 +485,130 @@ namespace karri {
             }
         }
 
+        void finishDistancesPVeh(AssignmentWithTransfer &asgn) {
+            const auto stopLocations = routeState.stopLocationsFor(asgn.pVeh->vehicleId);
+            const int numStops = routeState.numStopsOf(asgn.pVeh->vehicleId);
+
+            const auto schedDepTimes = routeState.schedDepTimesFor(asgn.pVeh->vehicleId);
+            const auto schedArrTimes = routeState.schedArrTimesFor(asgn.pVeh->vehicleId);
+            
+            const int pickupIdx = asgn.pickupIdx;
+            const int transferIdx = asgn.transferIdxPVeh;
+
+            assert(pickupIdx < numStops - 1);
+            
+            const int pickup = asgn.pickup->loc;
+            const int transfer = asgn.transfer.loc;
+
+            const bool bns = pickupIdx == 0;
+            const bool paired = pickupIdx == transferIdx;
+            
+            const bool pickupAtStop = stopLocations[pickupIdx] == pickup;
+            const bool transferAtStop = stopLocations[transferIdx] == transfer;
+
+            const int legPickup = schedArrTimes[pickupIdx + 1] - schedDepTimes[pickupIdx];
+            const int legTransfer = schedArrTimes[transferIdx + 1] - schedDepTimes[transferIdx];
+
+            //* Pickup distances
+            if (pickupAtStop)
+                asgn.distToPickup = 0;
+
+            if (paired) {
+                // Paired Assignment (pVeh)
+                // Try the lower bound for the paired assignment
+                asgn.distFromPickup = 0;
+                asgn.pickupPairedLowerBoundUsed = true;
+            }
+            
+            if (pickupAtStop && !paired)
+                asgn.distFromPickup = legPickup;
+
+            if (bns) {
+                // Assignment with pickup BNS
+                if (searches.knowsDistance(asgn.pVeh->vehicleId, asgn.pickup->id)) {
+                    asgn.distToPickup = searches.getDistance(asgn.pVeh->vehicleId, asgn.pickup->id);
+                } else {
+                    asgn.pickupBNSLowerBoundUsed = true;
+                }
+            }
+
+            //* Transfer distances pVeh
+            if (paired) {
+                asgn.distToTransferPVeh = pairedLowerBoundPT;
+                asgn.pickupPairedLowerBoundUsed = true;
+            }
+
+            if (transferAtStop && !paired)
+                asgn.distToTransferPVeh = 0;
+
+            if (transferAtStop)
+                asgn.distFromTransferPVeh = legTransfer;
+
+        }
+
+        void finishDistancesDVeh(AssignmentWithTransfer &asgn, const int dropoffAlsDistance) {
+            const auto stopLocations = routeState.stopLocationsFor(asgn.dVeh->vehicleId);
+            const int numStops = routeState.numStopsOf(asgn.dVeh->vehicleId);
+
+            const auto schedDepTimes = routeState.schedDepTimesFor(asgn.dVeh->vehicleId);
+            const auto schedArrTimes = routeState.schedArrTimesFor(asgn.dVeh->vehicleId);
+
+            const int transferIdx = asgn.transferIdxDVeh;
+            const int dropoffIdx = asgn.dropoffIdx;
+
+            assert(transferIdx < numStops - 1);
+
+            const int transfer = asgn.transfer.loc;
+            const int dropoff = asgn.dropoff->loc;
+
+            const bool bns = transferIdx == 0;
+            const bool paired = transferIdx == dropoffIdx;
+            const bool dropoffALS = dropoffIdx == numStops - 1;
+
+            const bool transferAtStop = stopLocations[transferIdx] == transfer;
+            const bool dropoffAtStop = stopLocations[dropoffIdx] == dropoff;
+
+            const int legTransfer = schedArrTimes[transferIdx + 1] - schedDepTimes[transferIdx];
+            const int legDropoff = schedArrTimes[dropoffIdx + 1] - schedDepTimes[dropoffIdx];
+            
+            //* Transfer distances
+            if (transferAtStop)
+                asgn.distToTransferDVeh = 0;
+
+            if (paired) {
+                // Paired Assignment (dVeh)
+                // Try the lower bound for the paired assignment
+                asgn.distFromTransferDVeh = 0;
+                asgn.dropoffPairedLowerBoundUsed = true;
+            }
+            
+            if (transferAtStop && !paired)
+                asgn.distFromTransferDVeh = legTransfer;
+
+            if (bns) {
+                // Transfer bns in dropoff vehicle
+                if (searches.knowsDistanceTransfer(asgn.dVeh->vehicleId, asgn.transfer.loc)) {
+                    asgn.distToTransferDVeh = searches.getDistanceTransfer(asgn.dVeh->vehicleId, asgn.transfer.loc);
+                } else {
+                    asgn.dropoffBNSLowerBoundUsed = true;
+                }
+            }
+
+            //* Dropoff distances
+            if (paired) {
+                asgn.distToDropoff = pairedLowerBoundTD;
+                asgn.dropoffPairedLowerBoundUsed = true;
+            }
+
+            if (dropoffAtStop && !paired)
+                asgn.distToDropoff = 0;
+
+            if (dropoffALS)
+                asgn.distFromDropoff = dropoffAlsDistance;
+
+            if (dropoffAtStop)
+                asgn.distFromDropoff = legDropoff;
+        }
 
         void tryAssignment(AssignmentWithTransfer &asgn) {
             const auto stopLocationsPVeh = routeState.stopLocationsFor(asgn.pVeh->vehicleId);
