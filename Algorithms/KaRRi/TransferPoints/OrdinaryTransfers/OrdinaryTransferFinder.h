@@ -488,6 +488,7 @@ namespace karri {
         void finishDistancesPVeh(AssignmentWithTransfer &asgn) {
             const auto stopLocations = routeState.stopLocationsFor(asgn.pVeh->vehicleId);
             const int numStops = routeState.numStopsOf(asgn.pVeh->vehicleId);
+            unused(numStops);
 
             const auto schedDepTimes = routeState.schedDepTimesFor(asgn.pVeh->vehicleId);
             const auto schedArrTimes = routeState.schedArrTimesFor(asgn.pVeh->vehicleId);
