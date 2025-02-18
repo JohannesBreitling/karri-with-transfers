@@ -363,7 +363,7 @@ namespace karri {
                     if (e.distToTarget == 0) {
                         const int vehId = routeState.vehicleIdOf(e.targetId);
                         const int stopIdx = routeState.stopPositionOf(e.targetId);
-                        const auto &stopLoc = routeState.stopLocationsFor(vehId)[stopIdx];
+                        const int stopLoc = routeState.stopLocationsFor(vehId)[stopIdx]; // TODO Check if this is correct (removed the &)
                         if (stopLoc == pdLoc.loc) {
                             res.push_back({pdLoc.id, vehId, stopIdx});
                         }
