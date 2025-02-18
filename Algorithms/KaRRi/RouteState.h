@@ -786,7 +786,6 @@ namespace karri {
             const auto stopLocationsPVeh = stopLocationsFor(asgn.pVeh->vehicleId);
             const auto schedDepTimesPVeh = schedDepTimesFor(asgn.pVeh->vehicleId);
             const auto schedArrTimesPVeh = schedArrTimesFor(asgn.pVeh->vehicleId);
-            // const auto maxArrTimesPVeh = maxArrTimesFor(asgn.pVeh->vehicleId);
             
             // Find the pickup and transfer indices
             int pickupIdx = asgn.pickupIdx;
@@ -795,7 +794,8 @@ namespace karri {
                 pickupIdx++;
             }
 
-            assert(stopLocationsPVeh[pickupIdx] != asgn.pickup->loc || pickupIdx > 0 || schedDepTimesPVeh[pickupIdx] >= asgn.requestTime);
+            if(!(stopLocationsPVeh[pickupIdx] != asgn.pickup->loc || pickupIdx > 0 || schedDepTimesPVeh[pickupIdx] >= asgn.requestTime))
+                return false;
 
             const bool pickupAsNewStop = asgn.pickupIdx != pickupIdx;
             const int pickupLaterShifted = pickupIdx - asgn.pickupIdx;
@@ -807,40 +807,43 @@ namespace karri {
             const int correctedTransferIdx = asgn.transferIdxPVeh + pickupLaterShifted;
             const bool transferAsNewStop = correctedTransferIdx != transferIdxPVeh;
 
-            assert(pickupBNS || pickupIdx == asgn.pickupIdx + pickupAsNewStop);
-            assert(correctedTransferIdx + transferAsNewStop == transferIdxPVeh);
+            if (!(pickupBNS || pickupIdx == asgn.pickupIdx + pickupAsNewStop))
+                return false;
+
+            if (!(correctedTransferIdx + transferAsNewStop == transferIdxPVeh))
+                return false;
+
             // Assert that the departure at the pickup is later than the arrival at the pickup
-            assert(schedDepTimesPVeh[pickupIdx] >= asgn.requestTime + asgn.pickup->walkingDist);
+            if (!(schedDepTimesPVeh[pickupIdx] >= asgn.requestTime + asgn.pickup->walkingDist))
+                return false;
+
             const int schedDepAtPickup = schedDepTimesPVeh[pickupIdx];
-            assert(schedDepAtPickup == asgn.depAtPickup);
+            if (!(schedDepAtPickup == asgn.depAtPickup))
+                return false;
 
             // Assert that it is recognized correctly, when a transfer is not a new stop
-            assert(asgn.transferAtStopPVeh == !transferAsNewStop);
+            if (!(asgn.transferAtStopPVeh == !transferAsNewStop))
+                return false;
             
-            if (pickupAsNewStop)
-                assertPickupNew(asgn, schedDepTimesPVeh, schedArrTimesPVeh, pickupIdx, transferIdxPVeh);
+            if (pickupAsNewStop && !assertPickupNew(asgn, schedDepTimesPVeh, schedArrTimesPVeh, pickupIdx, transferIdxPVeh))
+                return false;
 
-            if (transferAsNewStop)
-                assertTransferNewPVeh(asgn, schedDepTimesPVeh, schedArrTimesPVeh, transferIdxPVeh, numStopsPVeh);
+            if (transferAsNewStop && !assertTransferNewPVeh(asgn, schedDepTimesPVeh, schedArrTimesPVeh, transferIdxPVeh, numStopsPVeh))
+                return false;
 
             // Assert the the arrival at the transfer point (dropoff for passenger) is correct
-            if (transferIdxPVeh > 0 && transferAsNewStop) {
-                const int schedDepBeforeTransfer = schedDepTimesPVeh[transferIdxPVeh - 1];
-                assert(schedDepBeforeTransfer + asgn.distToTransferPVeh == asgn.arrAtTransferPoint);
+            if (transferIdxPVeh > 0 && transferAsNewStop && !(schedDepTimesPVeh[transferIdxPVeh - 1] + asgn.distToTransferPVeh == asgn.arrAtTransferPoint)) { 
+                return false;
             }
 
-            if (!transferAsNewStop) {
-                assert(schedArrTimesPVeh[transferIdxPVeh] == asgn.arrAtTransferPoint);
-            }
+            if (!transferAsNewStop && !(schedArrTimesPVeh[transferIdxPVeh] == asgn.arrAtTransferPoint))
+                return false;
 
-            const int schedArrAtTransfer = schedArrTimesPVeh[transferIdxPVeh];
-            assert(schedArrAtTransfer == asgn.arrAtTransferPoint);
-
-            assert(schedArrTimesPVeh[pickupIdx] + InputConfig::getInstance().stopTime <= schedDepTimesPVeh[pickupIdx]);
-            assert(schedArrTimesPVeh[transferIdxPVeh] + InputConfig::getInstance().stopTime <= schedDepTimesPVeh[transferIdxPVeh]);
-            // assert(maxArrTimesPVeh[pickupIdx] >= schedArrTimesPVeh[pickupIdx]);
-            // assert(maxArrTimesPVeh[transferIdxPVeh] >= schedArrTimesPVeh[transferIdxPVeh]);
-
+            if (!(schedArrTimesPVeh[transferIdxPVeh] == asgn.arrAtTransferPoint)
+             || !(schedArrTimesPVeh[pickupIdx] + InputConfig::getInstance().stopTime <= schedDepTimesPVeh[pickupIdx])
+             || !(schedArrTimesPVeh[transferIdxPVeh] + InputConfig::getInstance().stopTime <= schedDepTimesPVeh[transferIdxPVeh]))
+                return false;
+            
             return true;
         }
 
@@ -868,98 +871,105 @@ namespace karri {
             const int correctedDropoffIdx = asgn.dropoffIdx + transferLaterShifted;
             const bool dropoffAsNewStop = correctedDropoffIdx != dropoffIdx;
 
-            assert(transferBNS || transferIdxDVeh == asgn.transferIdxDVeh + transferAsNewStop);
-            assert(correctedDropoffIdx + dropoffAsNewStop == dropoffIdx);
-
-            // Assert that the scheduled departure at the transfer is later than the arrival at the transfer
             const int schedDepAtTransfer = schedDepTimesDVeh[transferIdxDVeh];
-            assert(schedDepAtTransfer >= asgn.arrAtTransferPoint);
-            assert(schedDepAtTransfer == asgn.depAtTransfer);
-
-            // Assert that the arrival at the dropoff is corrent
+             // Assert that the arrival at the dropoff is corrent
             const int schedArrAtDropoff = schedArrTimesDVeh[dropoffIdx];
 
-            assert(schedArrAtDropoff == asgn.arrAtDropoff);
+            if (!(transferBNS || transferIdxDVeh == asgn.transferIdxDVeh + transferAsNewStop)
+             || !(correctedDropoffIdx + dropoffAsNewStop == dropoffIdx)
+             // Assert that the scheduled departure at the transfer is later than the arrival at the transfer
+             || !(schedDepAtTransfer >= asgn.arrAtTransferPoint && schedDepAtTransfer == asgn.depAtTransfer)
+             || !(schedArrAtDropoff == asgn.arrAtDropoff))
+                return false;
 
             // Assert that the trip time of the dVeh is corret
             const int waitingTimeAtTransfer = schedDepTimesDVeh[transferIdxDVeh] - asgn.arrAtTransferPoint;
             const int actualTripTime = schedArrTimesDVeh[dropoffIdx] - schedDepTimesDVeh[transferIdxDVeh] + asgn.dropoff->walkingDist + waitingTimeAtTransfer;
-            assert(actualTripTime == asgn.tripTimeDVeh);
+            
+            
+            if (!(actualTripTime == asgn.tripTimeDVeh))
+                return false;
 
-            if (transferAsNewStop)
-                assertTransferNewDVeh(asgn, schedDepTimesDVeh, schedArrTimesDVeh, transferIdxDVeh, dropoffIdx);
+            if (transferAsNewStop && !assertTransferNewDVeh(asgn, schedDepTimesDVeh, schedArrTimesDVeh, transferIdxDVeh, dropoffIdx))
+                return false;
 
-            if (dropoffAsNewStop)
-                assertDropoffNew(asgn, schedDepTimesDVeh, schedArrTimesDVeh, dropoffIdx, numStopsDVeh);
+            if (dropoffAsNewStop && !assertDropoffNew(asgn, schedDepTimesDVeh, schedArrTimesDVeh, dropoffIdx, numStopsDVeh))
+                return false;
 
-            assert(schedArrTimesDVeh[transferIdxDVeh] + InputConfig::getInstance().stopTime <= schedDepTimesDVeh[transferIdxDVeh]);
-            assert(schedArrTimesDVeh[dropoffIdx] + InputConfig::getInstance().stopTime <= schedDepTimesDVeh[dropoffIdx]);
-            // assert(maxArrTimesDVeh[transferIdxDVeh] >= schedArrTimesDVeh[transferIdxDVeh]);
-            // assert(maxArrTimesDVeh[dropoffIdx] >= schedArrTimesDVeh[dropoffIdx]);
+            if (!(schedArrTimesDVeh[transferIdxDVeh] + InputConfig::getInstance().stopTime <= schedDepTimesDVeh[transferIdxDVeh])
+             || !(schedArrTimesDVeh[dropoffIdx] + InputConfig::getInstance().stopTime <= schedDepTimesDVeh[dropoffIdx]))
+                return false;
 
             return true;
         }
 
-        void assertPickupNew(const AssignmentWithTransfer &asgn, ConstantVectorRange<int> schedDepTimesPVeh, ConstantVectorRange<int> schedArrTimesPVeh, const int pickupIdx, const int transferIdxPVeh) {
+        bool assertPickupNew(const AssignmentWithTransfer &asgn, ConstantVectorRange<int> schedDepTimesPVeh, ConstantVectorRange<int> schedArrTimesPVeh, const int pickupIdx, const int transferIdxPVeh) {
             const bool bns = asgn.pickupIdx == 0;
             const bool paired = asgn.pickupIdx == asgn.transferIdxPVeh;
-            assert(!paired || pickupIdx + 1 == transferIdxPVeh);
 
-            if (!bns) {
+            if (!(!paired || pickupIdx + 1 == transferIdxPVeh))
+                return false;
+
+            if (!bns && !(pickupIdx > 1 || schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[pickupIdx - 1] == asgn.distToPickup)) {
                 // Pickup is not first stop
-                assert(pickupIdx > 1);
-                assert(schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[pickupIdx - 1] == asgn.distToPickup);
-            } else {
-                assert(pickupIdx >= 0 && pickupIdx <= 2);
-                assert(schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[0] == asgn.distToPickup);   
+                return false;
+            } else if (!(pickupIdx >= 0 && pickupIdx <= 2) || !(schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[0] == asgn.distToPickup)) {
+                return false;
             }
 
-            if (!paired) {
-                assert(schedArrTimesPVeh[pickupIdx + 1] - schedDepTimesPVeh[pickupIdx] == asgn.distFromPickup);
+            if (!paired && !(schedArrTimesPVeh[pickupIdx + 1] - schedDepTimesPVeh[pickupIdx] == asgn.distFromPickup)) {
+                return false;
             }
+
+            return true;
         }
 
-        void assertTransferNewPVeh(const AssignmentWithTransfer &asgn, ConstantVectorRange<int> schedDepTimesPVeh, ConstantVectorRange<int> schedArrTimesPVeh, const int transferIdxPVeh, const int numStopsPVeh) {
-            assert(transferIdxPVeh > 0);
-            assert(schedArrTimesPVeh[transferIdxPVeh] - schedDepTimesPVeh[transferIdxPVeh - 1] == asgn.distToTransferPVeh);
-
+        bool assertTransferNewPVeh(const AssignmentWithTransfer &asgn, ConstantVectorRange<int> schedDepTimesPVeh, ConstantVectorRange<int> schedArrTimesPVeh, const int transferIdxPVeh, const int numStopsPVeh) {
+            if (!(transferIdxPVeh > 0)
+             || !(schedArrTimesPVeh[transferIdxPVeh] - schedDepTimesPVeh[transferIdxPVeh - 1] == asgn.distToTransferPVeh))
+                return false;
+            
             // If the transfer is not als, assert the distance to the next stop
-            if (transferIdxPVeh < numStopsPVeh - 1) {
-                assert(schedArrTimesPVeh[transferIdxPVeh + 1] - schedDepTimesPVeh[transferIdxPVeh] == asgn.distFromTransferPVeh);
-            }
+            if (transferIdxPVeh < numStopsPVeh - 1
+            && !(schedArrTimesPVeh[transferIdxPVeh + 1] - schedDepTimesPVeh[transferIdxPVeh] == asgn.distFromTransferPVeh))
+                return false;
+
+            return true;
         }
 
-        void assertTransferNewDVeh(const AssignmentWithTransfer &asgn, ConstantVectorRange<int> schedDepTimesDVeh, ConstantVectorRange<int> schedArrTimesDVeh, const int transferIdxDVeh, const int dropoffIdx) {
+        bool assertTransferNewDVeh(const AssignmentWithTransfer &asgn, ConstantVectorRange<int> schedDepTimesDVeh, ConstantVectorRange<int> schedArrTimesDVeh, const int transferIdxDVeh, const int dropoffIdx) {
             const bool bns = asgn.transferIdxDVeh == 0;
             const bool paired = asgn.transferIdxDVeh == asgn.dropoffIdx;
-            assert(!paired || transferIdxDVeh + 1 == dropoffIdx);
-
-            if (!bns) {
-                // Transfer is not first stop
-                assert(transferIdxDVeh > 1);
-                assert(schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[transferIdxDVeh - 1] == asgn.distToTransferDVeh);
-            } else {
-                assert(transferIdxDVeh >= 0 && transferIdxDVeh <= 2);
-                assert(schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[0] == asgn.distToTransferDVeh);   
-            }
-
-            if (!paired) {
-                assert(schedArrTimesDVeh[transferIdxDVeh + 1] - schedDepTimesDVeh[transferIdxDVeh] == asgn.distFromTransferDVeh);
-            }
             
+            if (!(!paired || transferIdxDVeh + 1 == dropoffIdx))
+                return false;
+            
+            if (!bns && (!(transferIdxDVeh > 1) || !(schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[transferIdxDVeh - 1] == asgn.distToTransferDVeh)))
+                return false;
+
+            if (bns && (!(transferIdxDVeh >= 0 && transferIdxDVeh <= 2) || !(schedArrTimesDVeh[transferIdxDVeh] - schedDepTimesDVeh[0] == asgn.distToTransferDVeh)))
+                return false;
+
+            if (!paired && !(schedArrTimesDVeh[transferIdxDVeh + 1] - schedDepTimesDVeh[transferIdxDVeh] == asgn.distFromTransferDVeh))
+                return false;
+
+            return true;
         }
 
-        void assertDropoffNew(const AssignmentWithTransfer &asgn, ConstantVectorRange<int> schedDepTimesDVeh, ConstantVectorRange<int> schedArrTimesDVeh, const int dropoffIdx, const int numStopsDVeh) {
-            assert(dropoffIdx > 0);
-            // Assert the distance to the dropoff
-            assert(schedArrTimesDVeh[dropoffIdx] - schedDepTimesDVeh[dropoffIdx - 1] == asgn.distToDropoff);
+        bool assertDropoffNew(const AssignmentWithTransfer &asgn, ConstantVectorRange<int> schedDepTimesDVeh, ConstantVectorRange<int> schedArrTimesDVeh, const int dropoffIdx, const int numStopsDVeh) {
+            if (!(dropoffIdx > 0)
+             // Assert the distance to the dropoff
+             || !(schedArrTimesDVeh[dropoffIdx] - schedDepTimesDVeh[dropoffIdx - 1] == asgn.distToDropoff))
+                return false;
 
             // If the dropoff is not als, assert the distance to the next stop
-            if (dropoffIdx < numStopsDVeh - 1) {
+            if (dropoffIdx < numStopsDVeh - 1 && !(schedArrTimesDVeh[dropoffIdx + 1] - schedDepTimesDVeh[dropoffIdx] == asgn.distFromDropoff)) {
                 // Dropoff is not the last stop
                 // Assert the distance from the dropoff
-                assert(schedArrTimesDVeh[dropoffIdx + 1] - schedDepTimesDVeh[dropoffIdx] == asgn.distFromDropoff);
+                return false;
             }
+
+            return true;
         }
 
         // Scheduled stop interface for event simulation

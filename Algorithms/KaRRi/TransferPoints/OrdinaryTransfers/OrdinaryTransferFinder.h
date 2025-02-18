@@ -569,7 +569,7 @@ namespace karri {
             const bool dropoffAtStop = stopLocations[dropoffIdx] == dropoff;
 
             const int legTransfer = schedArrTimes[transferIdx + 1] - schedDepTimes[transferIdx];
-            const int legDropoff = schedArrTimes[dropoffIdx + 1] - schedDepTimes[dropoffIdx];
+            const int legDropoff = dropoffIdx < numStops - 1 ? schedArrTimes[dropoffIdx + 1] - schedDepTimes[dropoffIdx] : 0;
             
             //* Transfer distances
             if (transferAtStop)
@@ -749,17 +749,6 @@ namespace karri {
             const int lb = vehChQuery.runAnyShortestPath(sourceRanks, targetRanks);
             
             return lb;
-        }
-
-        // If the dropoff coincides with a stop, we return the index of the stop
-        // Otherwise -1 is returned
-        int dropoffIsAtStop(const Vehicle* dVeh, const int dropoffLoc) {
-            for (int i = 0; i < routeState.numStopsOf(dVeh->vehicleId); i++) {
-                if (routeState.stopLocationsFor(dVeh->vehicleId)[i] == dropoffLoc)
-                    return i;
-            }
-
-            return -1;
         }
 
         bool assertTransferPointCalculation(const TransferPoint tp) {
