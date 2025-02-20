@@ -123,7 +123,28 @@ namespace karri {
             }
 
 
-            //* Log the cost data 
+            //* Log the cost data
+            const auto &costWOT = reqState.getCostObjectWithoutTransfer();
+            const auto &costWT = reqState.getCostObjectWithTransfer();
+
+            auto &costStats = reqState.stats().costStats;
+
+            costStats.totalWOT = costWOT.total;
+            costStats.walkingCostWOT = costWOT.walkingCost;
+            costStats.tripCostWOT = costWOT.tripCost;
+            costStats.waitTimeViolationCostWOT = costWOT.waitTimeViolationCost;
+            costStats.changeInTripCostsOfOthersWOT = costWOT.changeInTripCostsOfOthers;
+            costStats.vehCostWOT = costWOT.vehCost;
+
+            costStats.totalWT = costWT.total;
+            costStats.walkingCostWT = costWT.walkingCost;
+            costStats.tripCostWT = costWT.tripCost;
+            costStats.waitTimeViolationCostWT = costWT.waitTimeViolationCost;
+            costStats.changeInTripCostsOfOthersWT = costWT.changeInTripCostsOfOthers;
+            costStats.vehCostWT = costWT.vehCost;
+            costStats.inftyWOT = costWOT.total >= INFTY;
+            costStats.inftyWT = costWT.total >= INFTY;
+            costStats.transferImproves = costWT.total < costWOT.total;
             
             return reqState;
         }

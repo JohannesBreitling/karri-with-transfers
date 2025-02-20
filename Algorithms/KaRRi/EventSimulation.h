@@ -314,8 +314,7 @@ namespace karri {
             int id, key;
             requestEvents.deleteMin(id, key);
             assert(reqId == id && occTime == key);
-
-            // TODO Ist das ausreichend??        
+ 
             requestState[reqId] = ASSIGNED_TO_VEH;
             requestData[reqId].arrAtTransferPoint = occTime;
 
@@ -394,9 +393,6 @@ namespace karri {
             // Now differentiate if the solution with or without transfer is best
             if (asgnFinderResponse.improvementThroughTransfer()) {
                 const auto asgn = asgnFinderResponse.getBestAssignmentWithTransfer();
-                
-                std::cout << "EVENT SIMULATION : applyAssignmentWithTransfer !" << std::endl;
-                
                 applyAssignmentWithTransfer(asgn, reqId);
                 return;
             }

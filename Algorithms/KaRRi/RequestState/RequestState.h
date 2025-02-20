@@ -158,6 +158,18 @@ namespace karri {
             return bestCostWithTransfer < bestCost;
         }
 
+        const RequestCost getCostObjectWithoutTransfer() const {
+            return bestCostObjectWOT;
+        }
+
+        const RequestCost getCostObjectWithTransfer() const {
+            return bestCostObjectWT;
+        }
+
+        const int &getBestCostWithTransfer() const {
+            return bestCostWithTransfer;
+        }
+
         const int &getBestCost() const {
             return std::min(bestCost, bestCostWithTransfer);
         }

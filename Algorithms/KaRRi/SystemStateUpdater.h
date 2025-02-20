@@ -75,6 +75,35 @@ namespace karri {
                                                                        "veh_dep_time_at_stop_before_dropoff, "
                                                                        "not_using_vehicle, "
                                                                        "cost\n")),
+                  bestAssignmentsWithTransferLogger(LogManager<LoggerT>::getLogger("bestassignmentswithtransfer.csv",
+                                                                        "request_id, "
+                                                                        "request_time, "
+                                                                        "direct_od_dist, "
+                                                                        "pickup_vehicle_id, "
+                                                                        "dropoff_vehicle_id, "
+                                                                        "pickup_insertion_point, "
+                                                                        "transfer_pveh_insertion_point, "
+                                                                        "transfer_dveh_insertion_point, "
+                                                                        "dropoff_insertion_point, "
+                                                                        "dist_to_pickup, "
+                                                                        "dist_from_pickup, "
+                                                                        "dist_to_transfer_pveh, "
+                                                                        "dist_from_transfer_pveh, "
+                                                                        "dist_to_transfer_dveh, "
+                                                                        "dist_from_transfer_dveh, "
+                                                                        "dist_to_dropoff, "
+                                                                        "dist_from_dropoff, "
+                                                                        "pickup_id, "
+                                                                        "pickup_walking_dist, "
+                                                                        "dropoff_id, "
+                                                                        "dropoff_walking_dist, "
+                                                                        "num_stops_pveh, "
+                                                                        "num_stops_dveh, "
+                                                                        "veh_dep_time_at_stop_before_pickup, "
+                                                                        "veh_dep_time_at_stop_before_transfer_pveh, "
+                                                                        "veh_dep_time_at_stop_before_transfer_dveh, "
+                                                                        "veh_dep_time_at_stop_before_dropoff, "
+                                                                        "cost\n")),
                   overallPerfLogger(
                           LogManager<LoggerT>::getLogger(stats::DispatchingPerformanceStats::LOGGER_NAME,
                                                          "request_id, " +
@@ -120,7 +149,7 @@ namespace karri {
                                                                   "request_id, " +
                                                                   std::string(
                                                                           stats::AssignmentsWithTransferPerformanceStats::LOGGER_COLS))),
-                  assignmentCostLogger(LogManager<LoggerT>::getLogger(stats::AssignmentsWithTransferPerformanceStats::LOGGER_NAME,
+                  assignmentsCostLogger(LogManager<LoggerT>::getLogger(stats::AssignmentCostStats::LOGGER_NAME,
                                                                   "request_id, " +
                                                                   std::string(
                                                                           stats::AssignmentCostStats::LOGGER_COLS))) {}
@@ -267,16 +296,30 @@ namespace karri {
                     << requestState.originalRequest.requestId << ", "
                     << requestState.originalRequest.requestTime << ", "
                     << requestState.originalReqDirectDist << ", ";
+            
+            bestAssignmentsWithTransferLogger
+                    << requestState.originalRequest.requestId << ", "
+                    << requestState.originalRequest.requestTime << ", "
+                    << requestState.originalReqDirectDist << ", ";
+
+            assignmentsCostLogger << requestState.originalRequest.requestId << ", "
+                                  << requestState.stats().costStats.getLoggerRow() << "\n";
 
             if (requestState.getBestCost() == INFTY) {
                 bestAssignmentsLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
+                bestAssignmentsWithTransferLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
                 return;
             }
 
             if (requestState.isNotUsingVehicleBest()) {
                 bestAssignmentsLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, true, "
                                       << requestState.getBestCost() << "\n";
+                bestAssignmentsWithTransferLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
                 return;
+            }
+
+            if (requestState.getBestCostWithTransfer() >= INFTY) {
+                bestAssignmentsWithTransferLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
             }
 
             const auto &bestAsgn = requestState.getBestAssignment();
@@ -306,8 +349,54 @@ namespace karri {
                     << "false, "
                     << requestState.getBestCost() << "\n";
             
-            assignmentCostLogger << requestState.originalRequest.requestId << ", "
-                                 << requestState.stats().costStats.getLoggerRow() << "\n";
+            
+            if (requestState.getBestCostWithTransfer() >= INFTY)
+                return;
+            
+            const auto &bestAsgnWT = requestState.getBestAssignmentWithTransfer();
+            const int pVehId = bestAsgnWT.pVeh->vehicleId;
+            const int dVehId = bestAsgnWT.dVeh->vehicleId;
+            const int pickupIdx = bestAsgnWT.pickupIdx;
+            const int transferIdxPVeh = bestAsgnWT.transferIdxPVeh;
+            const int transferIdxDVeh = bestAsgnWT.transferIdxDVeh;
+            const int dropoffIdx = bestAsgnWT.dropoffIdx;
+
+            const auto &numStopsPVeh = routeState.numStopsOf(pVehId);
+            const auto &numStopsDVeh = routeState.numStopsOf(dVehId);
+            const auto &vehDepTimeBeforePickupWT = getVehDepTimeAtStopForRequest(pVehId, pickupIdx,
+                                                                               requestState, routeState);
+            const auto &vehDepTimeBeforeTransferPVeh = getVehDepTimeAtStopForRequest(pVehId, transferIdxPVeh,
+                                                                               requestState, routeState);
+            const auto &vehDepTimeBeforeTransferDVeh = getVehDepTimeAtStopForRequest(dVehId, transferIdxDVeh,
+                                                                               requestState, routeState);
+            const auto &vehDepTimeBeforeDropoffWT = getVehDepTimeAtStopForRequest(dVehId, dropoffIdx,
+                                                                               requestState, routeState);
+            bestAssignmentsLogger
+                    << pVehId << ", "
+                    << dVehId << ", "
+                    << pickupIdx << ", "
+                    << transferIdxPVeh << ", "
+                    << transferIdxDVeh << ", "
+                    << dropoffIdx << ", "
+                    << bestAsgnWT.distToPickup << ", "
+                    << bestAsgnWT.distFromPickup << ", "
+                    << bestAsgnWT.distToTransferPVeh << ", "
+                    << bestAsgnWT.distFromTransferPVeh << ", "
+                    << bestAsgnWT.distToTransferDVeh << ", "
+                    << bestAsgnWT.distFromTransferDVeh << ", "
+                    << bestAsgnWT.distToDropoff << ", "
+                    << bestAsgnWT.pickup->id << ", "
+                    << bestAsgnWT.pickup->walkingDist << ", "
+                    << bestAsgnWT.dropoff->id << ", "
+                    << bestAsgnWT.dropoff->walkingDist << ", "
+                    << bestAsgnWT.distFromDropoff << ", "
+                    << numStopsPVeh << ", "
+                    << numStopsDVeh << ", "
+                    << vehDepTimeBeforePickupWT << ", "
+                    << vehDepTimeBeforeTransferPVeh << ", "
+                    << vehDepTimeBeforeTransferDVeh << ", "
+                    << vehDepTimeBeforeDropoffWT << ", "
+                    << bestAsgnWT.cost.total << "\n";
         }
 
         void writePerformanceLogs() {
@@ -562,6 +651,7 @@ namespace karri {
 
         // Performance Loggers
         LoggerT &bestAssignmentsLogger;
+        LoggerT &bestAssignmentsWithTransferLogger;
         LoggerT &overallPerfLogger;
         LoggerT &initializationPerfLogger;
         LoggerT &ellipticBchPerfLogger;
@@ -572,8 +662,8 @@ namespace karri {
         LoggerT &dalsPerfLogger;
         LoggerT &updatePerfLogger;
 
-        LoggerT &assignmentCostLogger;
         LoggerT &transferPerfLogger;
+        LoggerT &assignmentsCostLogger;
 
     };
 }

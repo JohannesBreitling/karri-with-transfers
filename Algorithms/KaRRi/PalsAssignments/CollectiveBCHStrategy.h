@@ -131,6 +131,7 @@ namespace karri::PickupAfterLastStopStrategies {
 
 
             const int &minCost = minCostSearch.getBestCostWithoutConstraints();
+            unused(minCost);
             const auto &asgn = minCostSearch.getBestAssignment();
             if (!asgn.vehicle)
                 return;
