@@ -45,7 +45,7 @@ class TransferALSDVehFinder {
     }
 
     void init() {
-        // TODO Initialize stats    
+        triedAssignments = 0;
     }
 
     private:
@@ -243,6 +243,7 @@ class TransferALSDVehFinder {
             }
 
             requestState.tryAssignment(asgn);
+            triedAssignments++;
         }
 
         void finishAssignments(const Vehicle *pVeh) {
@@ -287,12 +288,25 @@ class TransferALSDVehFinder {
 
         InsertionAsserterT &asserter;
 
-        int64_t numPossibleDropoffVehs;
-        int64_t numPossiblePickupVehs;
-        int64_t numORDPVehs;
-        int64_t numBNSPVehs;
-        int64_t numORDPickups;
-        int64_t numBNSPickups;
+        int64_t numDropoffVehicles;
+        int64_t numPickupVehicles;
+        
+
+        // Stats for the dropoff als assignment stats
+        int64_t totalNumEdgeRelaxations;
+        int64_t totalNumVerticesSettled;
+        int64_t totalNumEntriesScanned;
+
+        // Stats for the search to the transfer stop
+        int64_t totalNumEdgeRelaxationsTransfer;
+        int64_t totalNumVerticesSettledTransfer;
+        // int64_t totalNumEntriesScannedTransfer;
+
+
+        
+        int64_t triedAssignments;
+        
+        
 
 };
 

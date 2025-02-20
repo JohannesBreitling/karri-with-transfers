@@ -351,7 +351,7 @@ namespace karri::DropoffAfterLastStopStrategies {
                             const auto lowerBoundCost = calculator.calcWithoutHardConstraints(asgn, requestState);
                             // If the cost lower bound is worse than the best known cost, this pickup/dropoff
                             // combination is not relevant.
-                            if (lowerBoundCost > requestState.getBestCost())
+                            if (lowerBoundCost.total > requestState.getBestCost())
                                 continue;
 
                             // Otherwise, calculate the exact distance from the vehicle's location to the pickup.
@@ -424,7 +424,7 @@ namespace karri::DropoffAfterLastStopStrategies {
 
                 const auto &constraintBreaker = constraintBreakers[cur];
                 const auto lowerBoundCost = calculator.calcWithoutHardConstraints(constraintBreaker, requestState);
-                if (lowerBoundCost > requestState.getBestCost()) {
+                if (lowerBoundCost.total > requestState.getBestCost()) {
                     // Lower bound is worse than best known => actual cost is worse than best known => remove
                     ++nextGoodOffset;
                 } else {

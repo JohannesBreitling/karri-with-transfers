@@ -295,7 +295,7 @@ namespace karri {
 
             const auto &request = requests[reqId];
             const auto &asgnFinderResponse = assignmentFinder.findBestAssignment(request);
-            systemStateUpdater.writeBestAssignmentToLogger(); // TODO Achtung, wir müssen hier noch das Ergebnis anpassen, falls es ein besseres AssignmentWithTransfer vorhanden ist
+            systemStateUpdater.writeBestAssignmentToLogger();
 
             if (asgnFinderResponse.improvementThroughTransfer()) {
                 applyAssignmentWithTransfer(asgnFinderResponse.getBestAssignmentWithTransfer(), reqId);

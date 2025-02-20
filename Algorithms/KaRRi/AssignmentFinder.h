@@ -118,16 +118,13 @@ namespace karri {
             assignmentsWithTransfer.findBestAssignment();
             
             // * Output the solution with the best costs
-            if (reqState.transferImproves()) {
-                // std::cout << "--------------------------------" << std::endl;
-                // std::cout << "Improvement because of transfer!" << std::endl;
-                // std::cout << "Request " << reqState.originalRequest.requestId << std::endl;
-                // std::cout << "Best Cost w/o Transfer: " << bestCostWithoutTransfer << std::endl;
-                // std::cout << "New Best Cost: " << reqState.getBestCost() << std::endl;
-                // std::cout << "--------------------------------" << std::endl;
+            if (reqState.improvementThroughTransfer()) {
                 std::cout << "Improvement   Req: " << reqState.originalRequest.requestId << "   Old: " << bestCostWithoutTransfer << "   New: " << reqState.getBestCost() << "   Delta: " << (bestCostWithoutTransfer - reqState.getBestCost()) << "   Improvement: " << 100 - (reqState.getBestCost() * 100 / bestCostWithoutTransfer) << "%" << std::endl;
             }
-                
+
+
+            //* Log the cost data 
+            
             return reqState;
         }
 

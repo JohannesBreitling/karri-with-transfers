@@ -57,26 +57,26 @@ namespace karri {
                   stopTime(InputConfig::getInstance().stopTime) {}
 
         template<typename RequestContext>
-        int calc(const Assignment &asgn, const RequestContext &context) const {
+        RequestCost calc(const Assignment &asgn, const RequestContext &context) const {
             return calcBase<true>(asgn, context);
         }
 
         template<typename RequestContext>
-        int calcWithoutHardConstraints(const Assignment &asgn, const RequestContext &context) const {
+        RequestCost calcWithoutHardConstraints(const Assignment &asgn, const RequestContext &context) const {
             return calcBase<false>(asgn, context);
         }
 
         // Calculates the objective value for a given assignment.
         template<bool checkHardConstraints, typename RequestContext>
-        int calcBase(const Assignment &asgn, const RequestContext &context) const {
+        RequestCost calcBase(const Assignment &asgn, const RequestContext &context) const {
             using namespace time_utils;
             assert(asgn.vehicle && asgn.pickup && asgn.dropoff);
             if (!asgn.vehicle || !asgn.pickup || !asgn.dropoff)
-                return INFTY;
+                return RequestCost::INFTY_COST();
 
             if (asgn.distToPickup == INFTY || asgn.distFromPickup == INFTY ||
                 asgn.distToDropoff == INFTY || asgn.distFromDropoff == INFTY)
-                return INFTY;
+                return RequestCost::INFTY_COST();
             const int vehId = asgn.vehicle->vehicleId;
             const auto numStops = routeState.numStopsOf(asgn.vehicle->vehicleId);
             const auto actualDepTimeAtPickup = getActualDepTimeAtPickup(asgn, context, routeState);
@@ -98,7 +98,7 @@ namespace karri {
             if (checkHardConstraints && isAnyHardConstraintViolated(asgn, context, initialPickupDetour,
                                                                     detourRightAfterDropoff, residualDetourAtEnd,
                                                                     dropoffAtExistingStop, routeState))
-                return INFTY;
+                return RequestCost::INFTY_COST();
 
             addedTripTime += calcAddedTripTimeAffectedByPickupAndDropoff(asgn, detourRightAfterDropoff, routeState);
 
@@ -873,12 +873,12 @@ namespace karri {
     private:
 
         template<typename RequestContext>
-        int calcCost(const Assignment &asgn,
+        RequestCost calcCost(const Assignment &asgn,
                      const RequestContext &context, const int initialPickupDetour,
                      const int residualDetourAtEnd, const int depTimeAtPickup,
                      const bool dropoffAtExistingStop, const int addedTripTimeForExistingPassengers) const {
             if (!asgn.vehicle || !asgn.pickup || !asgn.dropoff)
-                return INFTY;
+                return RequestCost::INFTY_COST();
 
             using namespace time_utils;
             const auto arrTimeAtDropoff = getArrTimeAtDropoff(depTimeAtPickup, asgn, initialPickupDetour,
@@ -894,8 +894,15 @@ namespace karri {
                     addedTripTimeForExistingPassengers);
             const auto vehCost = F::calcVehicleCost(residualDetourAtEnd);
 
-            return vehCost + walkingCost + tripCost + waitTimeViolationCost + changeInTripCostsOfOthers;
+            RequestCost cost;
+            cost.walkingCost = walkingCost;
+            cost.tripCost = tripCost;
+            cost.waitTimeViolationCost = waitTimeViolationCost;
+            cost.changeInTripCostsOfOthers = changeInTripCostsOfOthers;
+            cost.vehCost = vehCost;
+            cost.total = vehCost + walkingCost + tripCost + waitTimeViolationCost + changeInTripCostsOfOthers;
 
+            return cost;
         }
 
         template<typename RequestContext>

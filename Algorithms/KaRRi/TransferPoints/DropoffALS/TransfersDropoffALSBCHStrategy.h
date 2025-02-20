@@ -182,9 +182,9 @@ namespace karri::Transfers {
             lastStopDistances.setCurBatchIdx(batchIdx);
             search.run(dropoffTails, travelTimes);
 
-            // totalNumEdgeRelaxations += search.getNumEdgeRelaxations();
-            // totalNumVerticesSettled += search.getNumVerticesSettled();
-            // totalNumEntriesScanned += search.getNumEntriesScanned();
+            totalNumEdgeRelaxations += search.getNumEdgeRelaxations();
+            totalNumVerticesSettled += search.getNumVerticesSettled();
+            totalNumEntriesScanned += search.getNumEntriesScanned();
         }
 
 

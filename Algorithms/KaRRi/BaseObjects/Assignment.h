@@ -29,6 +29,7 @@
 
 #include "Vehicle.h"
 #include "Request.h"
+#include "RequestCost.h"
 
 namespace karri {
 
@@ -78,6 +79,8 @@ namespace karri {
         const Vehicle *vehicle = nullptr;
         const PDLoc *pickup = nullptr;
         const PDLoc *dropoff = nullptr;
+
+        RequestCost cost;
 
         int pickupStopIdx = INVALID_INDEX; // Pickup is inserted at or after stop with index pickupStopIdx in route of vehicle
         int dropoffStopIdx = INVALID_INDEX; // Dropoff is inserted at or after stop with index dropoffStopIdx in route of vehicle

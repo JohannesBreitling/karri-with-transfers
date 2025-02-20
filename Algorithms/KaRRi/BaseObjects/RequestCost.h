@@ -14,8 +14,6 @@ namespace karri {
             int changeInTripCostsOfOthers;
             int vehCost;
 
-            bool error = false;
-
             static RequestCost INFTY_COST() {
                 RequestCost cost;
 

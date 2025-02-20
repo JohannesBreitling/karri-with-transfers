@@ -148,17 +148,13 @@ namespace karri {
                 asgn.maxDepAtPickup = getMaxDepTimeAtPickup();
                 bestAssignmentWithTransfer = AssignmentWithTransfer(asgn);
                 bestCostWithTransfer = cost.total;
+                bestCostObjectWT = cost;
             } else {
                 postponedAssignments.push_back(asgn);
             }
         }
         
-        bool transferImproves() {
-            return bestCostWithTransfer < bestCost;
-        }
-        
         bool improvementThroughTransfer() const {
-            // return false;
             return bestCostWithTransfer < bestCost;
         }
 
@@ -179,14 +175,15 @@ namespace karri {
             return tryAssignmentWithKnownCost(asgn, cost);
         }
 
-        bool tryAssignmentWithKnownCost(const Assignment &asgn, const int cost) {
-            assert(calculator.calc(asgn, *this) == cost);
+        bool tryAssignmentWithKnownCost(const Assignment &asgn, const RequestCost cost) {
+            assert(calculator.calc(asgn, *this).total == cost.total);
 
-            if (cost < INFTY && (cost < bestCost || (cost == bestCost &&
+            if (cost.total < INFTY && (cost.total < bestCost || (cost.total == bestCost &&
                                     breakCostTie(asgn, bestAssignment)))) {
 
                 bestAssignment = asgn;
-                bestCost = cost;
+                bestCost = cost.total;
+                bestCostObjectWOT = cost;
                 notUsingVehicleIsBest = false;
                 notUsingVehicleDist = INFTY;
                 return true;
@@ -237,6 +234,9 @@ namespace karri {
             bestCostWithTransfer = INFTY;
             notUsingVehicleIsBest = false;
             notUsingVehicleDist = INFTY;
+
+            bestCostObjectWOT = RequestCost::INFTY_COST();
+            bestCostObjectWT = RequestCost::INFTY_COST();
         }
 
     private:
@@ -256,6 +256,10 @@ namespace karri {
 
         int bestCost;
         int bestCostWithTransfer;
+
+        RequestCost bestCostObjectWT;
+        RequestCost bestCostObjectWOT;
+
         bool notUsingVehicleIsBest;
         int notUsingVehicleDist;
     };

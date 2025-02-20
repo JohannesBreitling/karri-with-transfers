@@ -140,8 +140,9 @@ namespace karri::PickupAfterLastStopStrategies {
             if (!isServiceTimeConstraintViolated(*asgn.vehicle, requestState, totalDetour, routeState)) {
                 // If assignment found by collective search adheres to service time constraint, we have found the
                 // best PALS assignment.
-                assert(calculator.calc(asgn, requestState) == minCost);
-                requestState.tryAssignmentWithKnownCost(asgn, minCost);
+                const auto cost = calculator.calc(asgn, requestState);
+                assert(cost.total == minCost);
+                requestState.tryAssignmentWithKnownCost(asgn, cost);
 
                 const auto tryAssignmentsTime = timer.elapsed<std::chrono::nanoseconds>();
                 stats.tryAssignmentsTime += tryAssignmentsTime;

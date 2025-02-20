@@ -630,17 +630,17 @@ namespace karri::PickupAfterLastStopStrategies {
             const auto costIgnoringHardConstraints = calculator.calcWithoutHardConstraints(asgn, requestState);
 
             assert(bestCostWithoutConstraints <= upperBoundCostWithConstraints);
-            if (costIgnoringHardConstraints > bestCostWithoutConstraints)
+            if (costIgnoringHardConstraints.total > bestCostWithoutConstraints)
                 return;
 
-            if (costIgnoringHardConstraints == bestCostWithoutConstraints) {
+            if (costIgnoringHardConstraints.total == bestCostWithoutConstraints) {
                 if (!breakCostTie(asgn, bestAsgn))
                     return;
             }
 
             // If the cost is better than the best known cost for the vehicle or if the costs are equal and the
             // determinism argument decides so, update the best pair to this pair.
-            bestCostWithoutConstraints = costIgnoringHardConstraints;
+            bestCostWithoutConstraints = costIgnoringHardConstraints.total;
             bestAsgn = asgn;
 
             // fullDistToPickup is an upper bound on the actual distance from the last stop of this vehicle to this
@@ -648,7 +648,7 @@ namespace karri::PickupAfterLastStopStrategies {
             // actual cost of an assignment with this vehicle, pickup and dropoff. This is also an upper bound on
             // the cost of the best assignment. We can use this upper bound to prune the search.
             const auto costWithHardConstraints = calculator.calc(asgn, requestState);
-            upperBoundCostWithConstraints = std::min(upperBoundCostWithConstraints, costWithHardConstraints);
+            upperBoundCostWithConstraints = std::min(upperBoundCostWithConstraints, costWithHardConstraints.total);
         }
 
         const InputGraphT &inputGraph;

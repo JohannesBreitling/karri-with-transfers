@@ -487,6 +487,93 @@ namespace karri::stats {
 
 
 
+    struct AssignmentCostStats {
+        int64_t totalWOT;
+        int64_t walkingCostWOT;
+        int64_t tripCostWOT;
+        int64_t waitTimeViolationCostWOT;
+        int64_t changeInTripCostsOfOthersWOT;
+        int64_t vehCostWOT;
+
+        int64_t totalWT;
+        int64_t walkingCostWT;
+        int64_t tripCostWT;
+        int64_t waitTimeViolationCostWT;
+        int64_t changeInTripCostsOfOthersWT;
+        int64_t vehCostWT;
+
+        bool transferImproves;
+        bool inftyWOT;
+        bool inftyWT;
+
+        void clear() {
+            totalWOT = 0;
+            walkingCostWOT = 0;
+            tripCostWOT = 0;
+            waitTimeViolationCostWOT = 0;
+            changeInTripCostsOfOthersWOT = 0;
+            vehCostWOT = 0;
+
+            totalWT = 0;
+            walkingCostWT = 0;
+            tripCostWT = 0;
+            waitTimeViolationCostWT = 0;
+            changeInTripCostsOfOthersWT = 0;
+            vehCostWT = 0;
+
+            transferImproves = false;
+            inftyWOT = true;
+            inftyWT = true;
+        }
+
+
+
+
+
+
+
+        static constexpr auto LOGGER_NAME = "assignmentcost.csv";
+        static constexpr auto LOGGER_COLS =
+                "total_no_transfer,"
+                "walking_cost_no_transfer,"
+                "tripCost_no_transfer,"
+                "waitTimeViolationCost_no_transfer,"
+                "changeInTripCostsOfOthers_no_transfer,"
+                "vehCost_no_transfer,"
+                "total_transfer,"
+                "walking_cost_transfer,"
+                "tripCost_transfer,"
+                "waitTimeViolationCost_transfer,"
+                "changeInTripCostsOfOthers_transfer,"
+                "vehCost_transfer,"
+                "infty_no_transfer,"
+                "infty_transfer,"
+                "transfer_improves\n";
+
+
+        std::string getLoggerRow() const {
+            std::stringstream ss;
+            ss << totalWOT << ", "
+               << walkingCostWOT << ", "
+               << tripCostWOT << ", "
+               << waitTimeViolationCostWOT << ", "
+               << changeInTripCostsOfOthersWOT << ", "
+               << vehCostWOT << ", "
+               << totalWT << ", "
+               << walkingCostWT << ", "
+               << tripCostWT << ", "
+               << waitTimeViolationCostWT << ", "
+               << changeInTripCostsOfOthersWT << ", "
+               << vehCostWT << ", "
+               << inftyWOT << ", "
+               << inftyWT << ", "
+               << transferImproves;
+            return ss.str();
+        }
+    };
+
+
+
 
 
     struct PalsAssignmentsPerformanceStats {
@@ -774,6 +861,8 @@ namespace karri::stats {
 
         AssignmentsWithTransferPerformanceStats transferStats;
 
+        AssignmentCostStats costStats;
+
         int64_t getTotalTime() const {
             return initializationStats.getTotalTime() +
                    ellipticBchStats.getTotalTime() +
@@ -797,6 +886,7 @@ namespace karri::stats {
             dalsAssignmentsStats.clear();
             updateStats.clear();
             transferStats.clear();
+            costStats.clear();
         }
 
         static constexpr auto LOGGER_NAME = "perf_overall.csv";

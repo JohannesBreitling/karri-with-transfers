@@ -119,7 +119,11 @@ namespace karri {
                   transferPerfLogger(LogManager<LoggerT>::getLogger(stats::AssignmentsWithTransferPerformanceStats::LOGGER_NAME,
                                                                   "request_id, " +
                                                                   std::string(
-                                                                          stats::AssignmentsWithTransferPerformanceStats::LOGGER_COLS))) {}
+                                                                          stats::AssignmentsWithTransferPerformanceStats::LOGGER_COLS))),
+                  assignmentCostLogger(LogManager<LoggerT>::getLogger(stats::AssignmentsWithTransferPerformanceStats::LOGGER_NAME,
+                                                                  "request_id, " +
+                                                                  std::string(
+                                                                          stats::AssignmentCostStats::LOGGER_COLS))) {}
 
 
         void insertBestAssignmentWithTransfer(const AssignmentWithTransfer &asgn, int &pickupStopId, int &transferStopIdPVeh, int &transferStopIdDVeh, int &dropoffStopId) {
@@ -301,6 +305,9 @@ namespace karri {
                     << vehDepTimeBeforeDropoff << ", "
                     << "false, "
                     << requestState.getBestCost() << "\n";
+            
+            assignmentCostLogger << requestState.originalRequest.requestId << ", "
+                                 << requestState.stats().costStats.getLoggerRow() << "\n";
         }
 
         void writePerformanceLogs() {
@@ -564,6 +571,8 @@ namespace karri {
         LoggerT &palsPerfLogger;
         LoggerT &dalsPerfLogger;
         LoggerT &updatePerfLogger;
+
+        LoggerT &assignmentCostLogger;
         LoggerT &transferPerfLogger;
 
     };
