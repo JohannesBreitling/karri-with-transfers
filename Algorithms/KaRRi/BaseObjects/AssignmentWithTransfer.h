@@ -132,7 +132,6 @@ namespace karri {
 
         RequestCost costPVeh; // Cost of the trip until the passenger arrives at the transfer point
         int waitTimeAtPickup; // Wait time at pickup
-        int arrAtTransferPoint; // Arrival time of pVeh at transfer point
 
         // For statistics
         enum INS_TYPES pickupType = NOT_SET;
@@ -141,17 +140,13 @@ namespace karri {
         enum INS_TYPES transferTypeDVeh = NOT_SET;
         enum INS_TYPES dropoffType = NOT_SET;
 
-        // bool pickupInsertedAsNewStop = false;
-        // bool transferInsertedAsNewStopPVeh = false;
-        // bool transferInsertedAsNewStopDVeh = false;
-        // bool dropoffInsertedAsNewStop = false;
-
         int tripTimePVeh;
         int tripTimeDVeh;
 
         // Used to test the insertions of the assignments
         int requestTime;
         int depAtPickup;
+        int arrAtTransferPoint;
         int depAtTransfer;
         int arrAtDropoff;
     

@@ -42,6 +42,8 @@ requestPath=$inputDir/Requests/${instanceName}-${requests}.csv
 currentTime=$(date "+%Y.%m.%d-%H:%M")
 karriOutputDir=$outputBaseDir/karri-with-transfers/${scriptName}_${instanceName}_v-${vehicles}_r-${requests}_${currentTime}/
 mkdir -p $karriOutputDir
+mkdir -p $karriOutputDir/wt
+mkdir -p $karriOutputDir/wot
 
 # Baue KaRRi nach $karriSourceDir/Build/Release.
 # Konfiguriere KaRRi CMake compile time parameter.
@@ -61,9 +63,12 @@ cmake --build $karriBinaryDir --target karri -j 16
 # Lasse KaRRi mit Transfers laufen
 # Run pedestrian/KaRRi, radius 0, wait time 300
 echo $karriBinaryDir
-echo $vehCh
-echo $vehiclePath
-echo $requestPath
+# echo $vehCh
+# echo $vehiclePath
+# echo $requestPath
 
-echo "Running run..."
-$karriBinaryDir/Launchers/karri -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDir/${instanceName}_v-${vehicles}_r-${requests}
+printf "Running without transfers...\n"
+$karriBinaryDir/Launchers/karri -trans 0 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDir/wot/${instanceName}
+
+printf "\nRunning with transfers...\n"
+$karriBinaryDir/Launchers/karri -trans 1 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDir/wt/${instanceName}

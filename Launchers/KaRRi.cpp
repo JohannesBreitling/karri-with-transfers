@@ -179,6 +179,7 @@ int main(int argc, char *argv[]) {
         if (inputConfig.maxNumPickups == 0) inputConfig.maxNumPickups = INFTY;
         if (inputConfig.maxNumDropoffs == 0) inputConfig.maxNumDropoffs = INFTY;
         inputConfig.alpha = clp.getValue<double>("a", 1.7);
+        inputConfig.includeTransfers = clp.getValue<int>("trans", 1);
         inputConfig.beta = clp.getValue<int>("b", 120) * 10;
         const auto vehicleNetworkFileName = clp.getValue<std::string>("veh-g");
         const auto passengerNetworkFileName = clp.getValue<std::string>("psg-g");
