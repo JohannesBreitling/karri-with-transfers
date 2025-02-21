@@ -371,7 +371,7 @@ namespace karri {
                                                                                requestState, routeState);
             const auto &vehDepTimeBeforeDropoffWT = getVehDepTimeAtStopForRequest(dVehId, dropoffIdx,
                                                                                requestState, routeState);
-            bestAssignmentsLogger
+            bestAssignmentsWithTransferLogger
                     << pVehId << ", "
                     << dVehId << ", "
                     << pickupIdx << ", "

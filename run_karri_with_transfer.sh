@@ -66,4 +66,4 @@ echo $vehiclePath
 echo $requestPath
 
 echo "Running run..."
-$karriBinaryDir/Launchers/karri -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDir/${instanceName}_v-${vehicles}_r-${requests}
+sudo $karriBinaryDir/Launchers/karri -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDir/${instanceName}_v-${vehicles}_r-${requests}

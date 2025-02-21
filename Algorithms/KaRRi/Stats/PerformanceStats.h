@@ -860,7 +860,6 @@ namespace karri::stats {
         AssignmentsWithTransferALSDVehPerformanceStats transferALSDVehStats;
 
         AssignmentsWithTransferPerformanceStats transferStats;
-
         AssignmentCostStats costStats;
 
         int64_t getTotalTime() const {
