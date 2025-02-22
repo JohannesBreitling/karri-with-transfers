@@ -68,7 +68,7 @@ echo $karriBinaryDir
 # echo $requestPath
 
 printf "Running without transfers...\n"
-$karriBinaryDir/Launchers/karri -trans 0 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDir/wot/${instanceName}
+$karriBinaryDir/Launchers/karri -trans 0 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDir/wot/${instanceName}-wot
 
 printf "\nRunning with transfers...\n"
-$karriBinaryDir/Launchers/karri -trans 1 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDir/wt/${instanceName}
+$karriBinaryDir/Launchers/karri -trans 1 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDir/wt/${instanceName}-wt

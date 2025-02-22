@@ -794,6 +794,7 @@ namespace karri {
                 pickupIdx++;
             }
 
+            assert(stopLocationsPVeh[pickupIdx] != asgn.pickup->loc || pickupIdx > 0 || schedDepTimesPVeh[pickupIdx] >= asgn.requestTime);
             if(!(stopLocationsPVeh[pickupIdx] != asgn.pickup->loc || pickupIdx > 0 || schedDepTimesPVeh[pickupIdx] >= asgn.requestTime))
                 return false;
 
@@ -807,24 +808,29 @@ namespace karri {
             const int correctedTransferIdx = asgn.transferIdxPVeh + pickupLaterShifted;
             const bool transferAsNewStop = correctedTransferIdx != transferIdxPVeh;
 
+            assert(pickupBNS || pickupIdx == asgn.pickupIdx + pickupAsNewStop);
             if (!(pickupBNS || pickupIdx == asgn.pickupIdx + pickupAsNewStop))
-                return false;
-
+               
+            assert(correctedTransferIdx + transferAsNewStop == transferIdxPVeh);
             if (!(correctedTransferIdx + transferAsNewStop == transferIdxPVeh))
                 return false;
 
             // Assert that the departure at the pickup is later than the arrival at the pickup
+            assert(schedDepTimesPVeh[pickupIdx] >= asgn.requestTime + asgn.pickup->walkingDist);
             if (!(schedDepTimesPVeh[pickupIdx] >= asgn.requestTime + asgn.pickup->walkingDist))
                 return false;
 
             const int schedDepAtPickup = schedDepTimesPVeh[pickupIdx];
+            assert(schedDepAtPickup == asgn.depAtPickup);
             if (!(schedDepAtPickup == asgn.depAtPickup))
                 return false;
 
             // Assert that it is recognized correctly, when a transfer is not a new stop
+            assert(asgn.transferAtStopPVeh == !transferAsNewStop);
             if (!(asgn.transferAtStopPVeh == !transferAsNewStop))
                 return false;
             
+
             if (pickupAsNewStop && !assertPickupNew(asgn, schedDepTimesPVeh, schedArrTimesPVeh, pickupIdx, transferIdxPVeh))
                 return false;
 
@@ -832,6 +838,7 @@ namespace karri {
                 return false;
 
             // Assert the the arrival at the transfer point (dropoff for passenger) is correct
+            assert(transferIdxPVeh == 0 || !transferAsNewStop || schedDepTimesPVeh[transferIdxPVeh - 1] + asgn.distToTransferPVeh == asgn.arrAtTransferPoint);
             if (transferIdxPVeh > 0 && transferAsNewStop && !(schedDepTimesPVeh[transferIdxPVeh - 1] + asgn.distToTransferPVeh == asgn.arrAtTransferPoint)) { 
                 return false;
             }

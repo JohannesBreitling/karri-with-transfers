@@ -70,6 +70,8 @@ namespace karri {
             // Arrival and departure at transfer
             int arrAtTransferPoint;
             int depTimeAtTransfer;
+            int arrAtDropoff;
+            int depTimeAtPickup;
         };
 
     public:
@@ -79,7 +81,7 @@ namespace karri {
                 const Fleet &fleet, const std::vector<Request> &requests,
                 AssignmentFinderT &assignmentFinder, SystemStateUpdaterT &systemStateUpdater,
                 const ScheduledStopsT &scheduledStops,
-                const bool verbose = true) // TODO Change here to false
+                const bool verbose = true)
                 : fleet(fleet),
                   requests(requests),
                   assignmentFinder(assignmentFinder),
@@ -179,12 +181,8 @@ namespace karri {
                     break;
                 
                 case ASSIGNED_TO_VEH:
-                    // When assigned to a vehicle, there should be no request event until the dropoff. // TODO Achtung weil hier jetzt ja ein transfer am start ist....
-                    // At that point the request state becomes WALKING_TO_DEST.
-                    assert(false);
-                    break;
                 case ASSIGNED_TO_DVEH:
-                    // When assigned to a vehicle, there should be no request event until the dropoff. // TODO Achtung weil hier jetzt ja ein transfer am start ist....
+                    // When assigned to a vehicle, there should be no request event until the dropoff.
                     // At that point the request state becomes WALKING_TO_DEST.
                     assert(false);
                     break;
@@ -258,7 +256,7 @@ namespace karri {
                 const auto &reqData = requestData[reqId];
 
                 if (requestState[reqId] == ASSIGNED_TO_PVEH) {
-                    requestState[reqId] = ASSIGNED_TO_DVEH;          
+                    requestState[reqId] = ASSIGNED_TO_DVEH;
                 } else {
                     requestState[reqId] = WALKING_TO_DEST;
                     requestEvents.insert(reqId, occTime + reqData.walkingTimeFromDropoff);
@@ -285,12 +283,7 @@ namespace karri {
                 // Remember departure time for all requests picked up at this stop:
                 const auto curStop = scheduledStops.getCurrentOrPrevScheduledStop(vehId);
                 for (const auto &reqId: curStop.requestsPickedUpHere) {
-                    if (requestState[reqId] == ASSIGNED_TO_DVEH) { // TODO Hier weiter machen
-                        // If the request is assigned to the pickup vehicle, we need to remember the departure time at the
-                        // transfer point.
-                        requestData[reqId].depTimeAtTransfer = occTime;
-                    } else {
-                        // Otherwise we handle the departure at the pickup
+                    if (!requestData[reqId].usingTransfer) {
                         requestData[reqId].depTime = occTime;
                     }
                 }
@@ -325,7 +318,7 @@ namespace karri {
         }
 
         void handleArrivalAtTransferPoint(const int reqId, const int occTime) {
-
+            unused(occTime);
             assert(requestState[reqId] == ASSIGNED_TO_PVEH);
 
             int id, key;
@@ -333,7 +326,6 @@ namespace karri {
             assert(reqId == id && occTime == key);
  
             requestState[reqId] = ASSIGNED_TO_DVEH;
-            requestData[reqId].arrAtTransferPoint = occTime;
 
         }
 
@@ -350,6 +342,11 @@ namespace karri {
             requestData[reqId].walkingTimeFromDropoff = asgn.dropoff->walkingDist;
             requestData[reqId].assignmentCost = asgn.cost.total;
             requestData[reqId].usingTransfer = true;
+
+            requestData[reqId].arrAtTransferPoint = asgn.arrAtTransferPoint;
+            requestData[reqId].depTimeAtTransfer = asgn.depAtTransfer;
+            requestData[reqId].depTimeAtPickup = asgn.depAtPickup;
+            requestData[reqId].arrAtDropoff = asgn.arrAtDropoff;
             
             int pickupStopId, transferStopIdPVeh, transferStopIdDVeh, dropoffStopId; 
             systemStateUpdater.insertBestAssignmentWithTransfer(asgn, pickupStopId, transferStopIdPVeh, transferStopIdDVeh, dropoffStopId);
@@ -463,20 +460,26 @@ namespace karri {
             requestEvents.deleteMin(id, key);
             assert(id == reqId && key == occTime);
 
-            
             int waitTime;
-            int arrTime = occTime;
+            int arrTime;
             int rideTime;
-            int tripTime = arrTime - requests[reqId].requestTime;
+            int tripTime;
             if (!reqData.usingTransfer) {
+                arrTime = occTime;
+                tripTime = arrTime - requests[reqId].requestTime;
                 waitTime = reqData.depTime - requests[reqId].requestTime;
                 rideTime = occTime - reqData.walkingTimeFromDropoff - reqData.depTime;
             } else {
                 // Calculate the values if the assignment consists of two vehicles
+                arrTime = reqData.arrAtDropoff + reqData.walkingTimeFromDropoff;
+                tripTime = arrTime - requests[reqId].requestTime;
                 int waitAtTransfer = reqData.depTimeAtTransfer - reqData.arrAtTransferPoint;
-                waitTime = reqData.depTime - requests[reqId].requestTime + waitAtTransfer;
-                rideTime = occTime - reqData.walkingTimeFromDropoff - reqData.depTime - waitAtTransfer;
+                assert(waitAtTransfer >= 0);
+                waitTime = reqData.depTimeAtPickup - requests[reqId].requestTime + waitAtTransfer;
+                rideTime = arrTime - reqData.walkingTimeFromDropoff - reqData.depTimeAtPickup - waitAtTransfer;
             }
+
+            assert(waitTime >= 0 && rideTime >= 0);
             
             assignmentQualityStats << reqId << ','
                                    << reqData.usingTransfer << ","

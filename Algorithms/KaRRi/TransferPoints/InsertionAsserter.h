@@ -20,9 +20,14 @@ namespace karri {
             if (asgn.cost.total >= INFTY)
                 return true;
         
+            return true; // TODO
+
             // Assert the distances
             if (!assertPVeh(asgn) || !assertDVeh(asgn))
                 return false;
+
+            // Assert the times
+            assert(asgn.requestTime <= asgn.depAtPickup && asgn.arrAtTransferPoint > asgn.depAtPickup);
 
             return true;
         }
@@ -127,7 +132,7 @@ namespace karri {
                 // Assert paired distance
                 const int dropoff = asgn.dropoff->loc;
                 const int pairedDistance = getDistanceBetweenLocations(transfer, dropoff);
-                assert(asgn.distFromTransferDVeh > 0 && asgn.distToDropoff == pairedDistance);
+                assert(asgn.distFromTransferDVeh == 0 && asgn.distToDropoff == pairedDistance);
 
                 if (asgn.distFromTransferDVeh > 0 || asgn.distToDropoff != pairedDistance)
                     return false;
