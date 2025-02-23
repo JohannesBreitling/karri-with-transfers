@@ -14,10 +14,10 @@ def format_mm_ss(x):
     return ("{:02f}:{:02f}").format(m, s)
     
 
-df_asq_wt = pd.read_csv('./outputs/Berlin-1pct-wt.assignmentquality.csv')
-df_asq_wot = pd.read_csv('./outputs/Berlin-1pct-wot.assignmentquality.csv')
-df_leg_wt = pd.read_csv('./outputs/Berlin-1pct-wt.legstats.csv')
-df_leg_wot = pd.read_csv('./outputs/Berlin-1pct-wot.legstats.csv')
+df_asq_wt = pd.read_csv('./outputs/server/karri-with-transfers/v-500/wt/Berlin-1pct-wt.assignmentquality.csv')
+df_asq_wot = pd.read_csv('./outputs/server/karri-with-transfers/v-500/wot/Berlin-1pct-wot.assignmentquality.csv')
+df_leg_wt = pd.read_csv('./outputs/server/karri-with-transfers/v-500/wt/Berlin-1pct-wt.legstats.csv')
+df_leg_wot = pd.read_csv('./outputs/server/karri-with-transfers/v-500/wot/Berlin-1pct-wot.legstats.csv')
 
 
 # Get the mean wait and trip times
@@ -25,6 +25,9 @@ avg_wait_time_wt = df_asq_wt['wait_time'].mean()
 avg_trip_time_wt = df_asq_wt['trip_time'].mean()
 avg_wait_time_wot = df_asq_wot['wait_time'].mean()
 avg_trip_time_wot = df_asq_wot['trip_time'].mean()
+
+print(avg_trip_time_wt)
+print(avg_trip_time_wot)
 
 print("Average wait time with transfers:", int(avg_wait_time_wt))
 print("Average trip time with transfers:", int(avg_trip_time_wt))
@@ -86,6 +89,9 @@ total_avg_occupancy_wot = sum(avg_occupancy_wot) / n_vehicles_wot
 
 total_avg_operation_time_wt = sum(total_operation_time_wt) / n_vehicles_wt
 total_avg_operation_time_wot = sum(total_operation_time_wot) / n_vehicles_wot
+
+# print(total_avg_occupancy_wot)
+# print(total_avg_occupancy_wt)
 
 print("Average occupancy with transfers:", format_float(total_avg_occupancy_wt))
 print("Average occupancy without transfers:", format_float(total_avg_occupancy_wot))

@@ -96,7 +96,7 @@ namespace karri {
                                                                                   "occurrence_time,"
                                                                                   "type,"
                                                                                   "running_time\n")),
-                  assignmentQualityStats(LogManager<std::ofstream>::getLogger("assignmentquality.csv",
+                  assignmentQualityStatsLogger(LogManager<std::ofstream>::getLogger("assignmentquality.csv",
                                                                               "request_id,"
                                                                               "using_transfer,"
                                                                               "arr_time,"
@@ -256,8 +256,12 @@ namespace karri {
                 const auto &reqData = requestData[reqId];
 
                 if (requestState[reqId] == ASSIGNED_TO_PVEH) {
+                    std::cout << "wird ausgeführt... assigned to pveh\n";
                     requestState[reqId] = ASSIGNED_TO_DVEH;
                 } else {
+                    if (requestState[reqId] == ASSIGNED_TO_DVEH)
+                        std::cout << "wird ausgeführt... assigned to dveh\n";
+
                     requestState[reqId] = WALKING_TO_DEST;
                     requestEvents.insert(reqId, occTime + reqData.walkingTimeFromDropoff);
                 }
@@ -338,6 +342,7 @@ namespace karri {
             }
 
             requestState[reqId] = ASSIGNED_TO_PVEH;
+            std::cout << "Assigned to pveh for request " << reqId << "\n";
             requestData[reqId].walkingTimeToPickup = asgn.pickup->walkingDist;
             requestData[reqId].walkingTimeFromDropoff = asgn.dropoff->walkingDist;
             requestData[reqId].assignmentCost = asgn.cost.total;
@@ -481,7 +486,7 @@ namespace karri {
 
             assert(waitTime >= 0 && rideTime >= 0);
             
-            assignmentQualityStats << reqId << ','
+            assignmentQualityStatsLogger << reqId << ','
                                    << reqData.usingTransfer << ","
                                    << arrTime << ','
                                    << waitTime << ','
@@ -511,7 +516,7 @@ namespace karri {
         std::vector<RequestData> requestData;
 
         std::ofstream &eventSimulationStatsLogger;
-        std::ofstream &assignmentQualityStats;
+        std::ofstream &assignmentQualityStatsLogger;
         std::ofstream &legStatsLogger;
         ProgressBar progressBar;
 

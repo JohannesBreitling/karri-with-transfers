@@ -39,7 +39,7 @@ vehiclePath=$inputDir/Vehicles/${instanceName}-${vehicles}.csv
 requestPath=$inputDir/Requests/${instanceName}-${requests}.csv
 
 # Erzeuge konkretes Output-Directory, dessen Name aus scriptName (s.o.) + instanceName + aktuellem timestamp besteht.
-currentTime=$(date "+%Y.%m.%d-%H:%M")
+currentTime=$(date "+%m.%d-%H:%M")
 karriOutputDir=$outputBaseDir/karri-with-transfers/${scriptName}_${instanceName}_v-${vehicles}_r-${requests}_${currentTime}/
 mkdir -p $karriOutputDir
 mkdir -p $karriOutputDir/wt

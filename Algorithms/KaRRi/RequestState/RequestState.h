@@ -140,11 +140,10 @@ namespace karri {
                 cost = calculator.calc(asgn, *this);
             }
 
-            if (cost.total >= INFTY || cost.total >= getBestCost())
+            if (cost.total >= INFTY)
                 return;
 
-            if (asgn.isFinished()) {
-                assert(asgn.depAtPickup < asgn.arrAtTransferPoint || asgn.distToTransferPVeh == 0);
+            if (asgn.isFinished() && cost.total < bestCostWithTransfer) {
                 asgn.maxDepAtPickup = getMaxDepTimeAtPickup();
                 bestAssignmentWithTransfer = AssignmentWithTransfer(asgn);
                 bestCostWithTransfer = cost.total;

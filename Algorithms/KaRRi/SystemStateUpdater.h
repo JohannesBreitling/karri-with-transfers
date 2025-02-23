@@ -292,6 +292,7 @@ namespace karri {
 
 
         void writeBestAssignmentToLogger() {
+            // Set up the best assignment for logging
             bestAssignmentsLogger
                     << requestState.originalRequest.requestId << ", "
                     << requestState.originalRequest.requestTime << ", "
@@ -302,101 +303,103 @@ namespace karri {
                     << requestState.originalRequest.requestTime << ", "
                     << requestState.originalReqDirectDist << ", ";
 
+            // Log the cost as well
             assignmentsCostLogger << requestState.originalRequest.requestId << ", "
                                   << requestState.stats().costStats.getLoggerRow() << "\n";
 
-            if (requestState.getBestCost() == INFTY) {
-                bestAssignmentsLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
-                bestAssignmentsWithTransferLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
-                return;
-            }
-
             if (requestState.isNotUsingVehicleBest()) {
                 bestAssignmentsLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, true, "
-                                      << requestState.getBestCost() << "\n";
+                                        << requestState.getBestCost() << "\n";
                 bestAssignmentsWithTransferLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
                 return;
             }
 
-            if (requestState.getBestCostWithTransfer() >= INFTY) {
+            const int costWT = requestState.getCostObjectWithTransfer().total;
+            const int costWOT = requestState.getCostObjectWithTransfer().total;
+                    
+            if (costWOT >= INFTY) {
+                bestAssignmentsLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
+            }
+
+            if (costWT >= INFTY) {
                 bestAssignmentsWithTransferLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
             }
 
-            const auto &bestAsgn = requestState.getBestAssignment();
-
-            const auto &vehId = bestAsgn.vehicle->vehicleId;
-            const auto &numStops = routeState.numStopsOf(vehId);
             using time_utils::getVehDepTimeAtStopForRequest;
-            const auto &vehDepTimeBeforePickup = getVehDepTimeAtStopForRequest(vehId, bestAsgn.pickupStopIdx,
-                                                                               requestState, routeState);
-            const auto &vehDepTimeBeforeDropoff = getVehDepTimeAtStopForRequest(vehId, bestAsgn.dropoffStopIdx,
-                                                                                requestState, routeState);
-            bestAssignmentsLogger
-                    << vehId << ", "
-                    << bestAsgn.pickupStopIdx << ", "
-                    << bestAsgn.dropoffStopIdx << ", "
-                    << bestAsgn.distToPickup << ", "
-                    << bestAsgn.distFromPickup << ", "
-                    << bestAsgn.distToDropoff << ", "
-                    << bestAsgn.distFromDropoff << ", "
-                    << bestAsgn.pickup->id << ", "
-                    << bestAsgn.pickup->walkingDist << ", "
-                    << bestAsgn.dropoff->id << ", "
-                    << bestAsgn.dropoff->walkingDist << ", "
-                    << numStops << ", "
-                    << vehDepTimeBeforePickup << ", "
-                    << vehDepTimeBeforeDropoff << ", "
-                    << "false, "
-                    << requestState.getBestCost() << "\n";
-            
-            
-            if (requestState.getBestCostWithTransfer() >= INFTY)
-                return;
-            
-            const auto &bestAsgnWT = requestState.getBestAssignmentWithTransfer();
-            const int pVehId = bestAsgnWT.pVeh->vehicleId;
-            const int dVehId = bestAsgnWT.dVeh->vehicleId;
-            const int pickupIdx = bestAsgnWT.pickupIdx;
-            const int transferIdxPVeh = bestAsgnWT.transferIdxPVeh;
-            const int transferIdxDVeh = bestAsgnWT.transferIdxDVeh;
-            const int dropoffIdx = bestAsgnWT.dropoffIdx;
+            if (costWOT < INFTY) {
+                const auto &bestAsgn = requestState.getBestAssignment();
 
-            const auto &numStopsPVeh = routeState.numStopsOf(pVehId);
-            const auto &numStopsDVeh = routeState.numStopsOf(dVehId);
-            const auto &vehDepTimeBeforePickupWT = getVehDepTimeAtStopForRequest(pVehId, pickupIdx,
-                                                                               requestState, routeState);
-            const auto &vehDepTimeBeforeTransferPVeh = getVehDepTimeAtStopForRequest(pVehId, transferIdxPVeh,
-                                                                               requestState, routeState);
-            const auto &vehDepTimeBeforeTransferDVeh = getVehDepTimeAtStopForRequest(dVehId, transferIdxDVeh,
-                                                                               requestState, routeState);
-            const auto &vehDepTimeBeforeDropoffWT = getVehDepTimeAtStopForRequest(dVehId, dropoffIdx,
-                                                                               requestState, routeState);
-            bestAssignmentsWithTransferLogger
-                    << pVehId << ", "
-                    << dVehId << ", "
-                    << pickupIdx << ", "
-                    << transferIdxPVeh << ", "
-                    << transferIdxDVeh << ", "
-                    << dropoffIdx << ", "
-                    << bestAsgnWT.distToPickup << ", "
-                    << bestAsgnWT.distFromPickup << ", "
-                    << bestAsgnWT.distToTransferPVeh << ", "
-                    << bestAsgnWT.distFromTransferPVeh << ", "
-                    << bestAsgnWT.distToTransferDVeh << ", "
-                    << bestAsgnWT.distFromTransferDVeh << ", "
-                    << bestAsgnWT.distToDropoff << ", "
-                    << bestAsgnWT.pickup->id << ", "
-                    << bestAsgnWT.pickup->walkingDist << ", "
-                    << bestAsgnWT.dropoff->id << ", "
-                    << bestAsgnWT.dropoff->walkingDist << ", "
-                    << bestAsgnWT.distFromDropoff << ", "
-                    << numStopsPVeh << ", "
-                    << numStopsDVeh << ", "
-                    << vehDepTimeBeforePickupWT << ", "
-                    << vehDepTimeBeforeTransferPVeh << ", "
-                    << vehDepTimeBeforeTransferDVeh << ", "
-                    << vehDepTimeBeforeDropoffWT << ", "
-                    << bestAsgnWT.cost.total << "\n";
+                const auto &vehId = bestAsgn.vehicle->vehicleId;
+                const auto &numStops = routeState.numStopsOf(vehId);
+                const auto &vehDepTimeBeforePickup = getVehDepTimeAtStopForRequest(vehId, bestAsgn.pickupStopIdx,
+                                                                                requestState, routeState);
+                const auto &vehDepTimeBeforeDropoff = getVehDepTimeAtStopForRequest(vehId, bestAsgn.dropoffStopIdx,
+                                                                                    requestState, routeState);
+                bestAssignmentsLogger
+                        << vehId << ", "
+                        << bestAsgn.pickupStopIdx << ", "
+                        << bestAsgn.dropoffStopIdx << ", "
+                        << bestAsgn.distToPickup << ", "
+                        << bestAsgn.distFromPickup << ", "
+                        << bestAsgn.distToDropoff << ", "
+                        << bestAsgn.distFromDropoff << ", "
+                        << bestAsgn.pickup->id << ", "
+                        << bestAsgn.pickup->walkingDist << ", "
+                        << bestAsgn.dropoff->id << ", "
+                        << bestAsgn.dropoff->walkingDist << ", "
+                        << numStops << ", "
+                        << vehDepTimeBeforePickup << ", "
+                        << vehDepTimeBeforeDropoff << ", "
+                        << "false, "
+                        << requestState.getBestCost() << "\n";
+            }
+
+            if (costWT < INFTY) {
+                const auto &bestAsgnWT = requestState.getBestAssignmentWithTransfer();
+                const int pVehId = bestAsgnWT.pVeh->vehicleId;
+                const int dVehId = bestAsgnWT.dVeh->vehicleId;
+                const int pickupIdx = bestAsgnWT.pickupIdx;
+                const int transferIdxPVeh = bestAsgnWT.transferIdxPVeh;
+                const int transferIdxDVeh = bestAsgnWT.transferIdxDVeh;
+                const int dropoffIdx = bestAsgnWT.dropoffIdx;
+
+                const auto &numStopsPVeh = routeState.numStopsOf(pVehId);
+                const auto &numStopsDVeh = routeState.numStopsOf(dVehId);
+                const auto &vehDepTimeBeforePickupWT = getVehDepTimeAtStopForRequest(pVehId, pickupIdx,
+                                                                                requestState, routeState);
+                const auto &vehDepTimeBeforeTransferPVeh = getVehDepTimeAtStopForRequest(pVehId, transferIdxPVeh,
+                                                                                requestState, routeState);
+                const auto &vehDepTimeBeforeTransferDVeh = getVehDepTimeAtStopForRequest(dVehId, transferIdxDVeh,
+                                                                                requestState, routeState);
+                const auto &vehDepTimeBeforeDropoffWT = getVehDepTimeAtStopForRequest(dVehId, dropoffIdx,
+                                                                                requestState, routeState);
+                bestAssignmentsWithTransferLogger
+                        << pVehId << ", "
+                        << dVehId << ", "
+                        << pickupIdx << ", "
+                        << transferIdxPVeh << ", "
+                        << transferIdxDVeh << ", "
+                        << dropoffIdx << ", "
+                        << bestAsgnWT.distToPickup << ", "
+                        << bestAsgnWT.distFromPickup << ", "
+                        << bestAsgnWT.distToTransferPVeh << ", "
+                        << bestAsgnWT.distFromTransferPVeh << ", "
+                        << bestAsgnWT.distToTransferDVeh << ", "
+                        << bestAsgnWT.distFromTransferDVeh << ", "
+                        << bestAsgnWT.distToDropoff << ", "
+                        << bestAsgnWT.pickup->id << ", "
+                        << bestAsgnWT.pickup->walkingDist << ", "
+                        << bestAsgnWT.dropoff->id << ", "
+                        << bestAsgnWT.dropoff->walkingDist << ", "
+                        << bestAsgnWT.distFromDropoff << ", "
+                        << numStopsPVeh << ", "
+                        << numStopsDVeh << ", "
+                        << vehDepTimeBeforePickupWT << ", "
+                        << vehDepTimeBeforeTransferPVeh << ", "
+                        << vehDepTimeBeforeTransferDVeh << ", "
+                        << vehDepTimeBeforeDropoffWT << ", "
+                        << bestAsgnWT.cost.total << "\n";
+            }
         }
 
         void writePerformanceLogs() {
