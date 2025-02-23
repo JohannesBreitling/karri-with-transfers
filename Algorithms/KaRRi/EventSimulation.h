@@ -176,12 +176,13 @@ namespace karri {
                     handleRequestReceipt(reqId, occTime);
                     break;
                 
-                case ASSIGNED_TO_PVEH:
-                    handleArrivalAtTransferPoint(reqId, occTime);
-                    break;
+                //case ASSIGNED_TO_PVEH:
+                //    handleArrivalAtTransferPoint(reqId, occTime);
+                //    break;
                 
                 case ASSIGNED_TO_VEH:
                 case ASSIGNED_TO_DVEH:
+                case ASSIGNED_TO_PVEH:
                     // When assigned to a vehicle, there should be no request event until the dropoff.
                     // At that point the request state becomes WALKING_TO_DEST.
                     assert(false);
@@ -257,6 +258,7 @@ namespace karri {
 
                 if (requestState[reqId] == ASSIGNED_TO_PVEH) {
                     std::cout << "wird ausgeführt... assigned to pveh\n";
+                    handleArrivalAtTransferPoint(reqId, occTime);
                     requestState[reqId] = ASSIGNED_TO_DVEH;
                 } else {
                     if (requestState[reqId] == ASSIGNED_TO_DVEH)
@@ -322,15 +324,17 @@ namespace karri {
         }
 
         void handleArrivalAtTransferPoint(const int reqId, const int occTime) {
+            
+            std::cout << "Arrival at transfer point for request " << reqId << "\n";
+            
             unused(occTime);
             assert(requestState[reqId] == ASSIGNED_TO_PVEH);
 
-            int id, key;
-            requestEvents.deleteMin(id, key);
-            assert(reqId == id && occTime == key);
+            // int id, key;
+            // requestEvents.deleteMin(id, key);
+            // assert(reqId == id && occTime == key);
  
-            requestState[reqId] = ASSIGNED_TO_DVEH;
-
+            // requestState[reqId] = ASSIGNED_TO_DVEH;
         }
 
         template<typename AssignmentWithTransferT>
@@ -340,6 +344,10 @@ namespace karri {
                 systemStateUpdater.writePerformanceLogs();
                 return;
             }
+
+            int id, key;
+            requestEvents.deleteMin(id, key); // event for walking arrival at dest inserted at dropoff
+            assert(id == reqId && key == occTime);
 
             requestState[reqId] = ASSIGNED_TO_PVEH;
             std::cout << "Assigned to pveh for request " << reqId << "\n";
@@ -412,13 +420,6 @@ namespace karri {
             int id, key;
             requestEvents.deleteMin(id, key); // event for walking arrival at dest inserted at dropoff
             assert(id == reqId && key == occTime);
-
-            // Now differentiate if the solution with or without transfer is best
-            if (asgnFinderResponse.improvementThroughTransfer()) {
-                const auto asgn = asgnFinderResponse.getBestAssignmentWithTransfer();
-                applyAssignmentWithTransfer(asgn, reqId);
-                return;
-            }
 
             const auto &bestAsgn = asgnFinderResponse.getBestAssignment();
             if (!bestAsgn.vehicle || !bestAsgn.pickup || !bestAsgn.dropoff) {

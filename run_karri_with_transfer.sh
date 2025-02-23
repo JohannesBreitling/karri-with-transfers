@@ -61,14 +61,10 @@ cmake --build $karriBinaryDir --target karri -j 16
 
 
 # Lasse KaRRi mit Transfers laufen
-# Run pedestrian/KaRRi, radius 0, wait time 300
 echo $karriBinaryDir
-# echo $vehCh
-# echo $vehiclePath
-# echo $requestPath
 
 printf "Running without transfers...\n"
-$karriBinaryDir/Launchers/karri -trans 0 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDir/wot/${instanceName}-wot
+$karriBinaryDir/Launchers/karri -trans 0 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDir/wot/wot
 
 printf "\nRunning with transfers...\n"
-$karriBinaryDir/Launchers/karri -trans 1 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDir/wt/${instanceName}-wt
+$karriBinaryDir/Launchers/karri -trans 1 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDir/wt/wt
