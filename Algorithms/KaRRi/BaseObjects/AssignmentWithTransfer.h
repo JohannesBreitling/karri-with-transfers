@@ -35,15 +35,13 @@
 namespace karri {
 
     enum INS_TYPES {
-        NOT_SET,
-        BEFORE_NEXT_STOP,
-        ORDINARY,
-        AFTER_LAST_STOP
+        NOT_SET = 0,
+        BEFORE_NEXT_STOP = 1,
+        ORDINARY = 2,
+        AFTER_LAST_STOP = 3
     };
 
     struct AssignmentWithTransfer {
-
-        // using RelevantPDLoc = RelevantPDLocs::RelevantPDLoc;
 
         AssignmentWithTransfer() {
             cost = RequestCost::INFTY_COST();

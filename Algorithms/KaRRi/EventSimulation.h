@@ -176,10 +176,6 @@ namespace karri {
                     handleRequestReceipt(reqId, occTime);
                     break;
                 
-                //case ASSIGNED_TO_PVEH:
-                //    handleArrivalAtTransferPoint(reqId, occTime);
-                //    break;
-                
                 case ASSIGNED_TO_VEH:
                 case ASSIGNED_TO_DVEH:
                 case ASSIGNED_TO_PVEH:
@@ -257,13 +253,9 @@ namespace karri {
                 const auto &reqData = requestData[reqId];
 
                 if (requestState[reqId] == ASSIGNED_TO_PVEH) {
-                    std::cout << "wird ausgeführt... assigned to pveh\n";
                     handleArrivalAtTransferPoint(reqId, occTime);
                     requestState[reqId] = ASSIGNED_TO_DVEH;
                 } else {
-                    if (requestState[reqId] == ASSIGNED_TO_DVEH)
-                        std::cout << "wird ausgeführt... assigned to dveh\n";
-
                     requestState[reqId] = WALKING_TO_DEST;
                     requestEvents.insert(reqId, occTime + reqData.walkingTimeFromDropoff);
                 }
@@ -324,17 +316,8 @@ namespace karri {
         }
 
         void handleArrivalAtTransferPoint(const int reqId, const int occTime) {
-            
-            std::cout << "Arrival at transfer point for request " << reqId << "\n";
-            
-            unused(occTime);
+            unused(reqId, occTime);
             assert(requestState[reqId] == ASSIGNED_TO_PVEH);
-
-            // int id, key;
-            // requestEvents.deleteMin(id, key);
-            // assert(reqId == id && occTime == key);
- 
-            // requestState[reqId] = ASSIGNED_TO_DVEH;
         }
 
         template<typename AssignmentWithTransferT>
@@ -350,7 +333,6 @@ namespace karri {
             assert(id == reqId && key == occTime);
 
             requestState[reqId] = ASSIGNED_TO_PVEH;
-            std::cout << "Assigned to pveh for request " << reqId << "\n";
             requestData[reqId].walkingTimeToPickup = asgn.pickup->walkingDist;
             requestData[reqId].walkingTimeFromDropoff = asgn.dropoff->walkingDist;
             requestData[reqId].assignmentCost = asgn.cost.total;

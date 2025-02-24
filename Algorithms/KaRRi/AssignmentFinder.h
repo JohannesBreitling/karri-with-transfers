@@ -135,6 +135,7 @@ namespace karri {
             costStats.waitTimeViolationCostWT = costWT.waitTimeViolationCost;
             costStats.changeInTripCostsOfOthersWT = costWT.changeInTripCostsOfOthers;
             costStats.vehCostWT = costWT.vehCost;
+            
             costStats.inftyWOT = costWOT.total >= INFTY;
             costStats.inftyWT = costWT.total >= INFTY;
             costStats.transferImproves = costWT.total < costWOT.total;

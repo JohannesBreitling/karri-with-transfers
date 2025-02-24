@@ -56,53 +56,57 @@ namespace karri {
                   ellipticBucketsEnv(ellipticBucketsEnv),
                   lastStopBucketsEnv(lastStopBucketsEnv),
                   bestAssignmentsLogger(LogManager<LoggerT>::getLogger("bestassignments.csv",
-                                                                       "request_id, "
-                                                                       "request_time, "
-                                                                       "direct_od_dist, "
-                                                                       "vehicle_id, "
-                                                                       "pickup_insertion_point, "
-                                                                       "dropoff_insertion_point, "
-                                                                       "dist_to_pickup, "
-                                                                       "dist_from_pickup, "
-                                                                       "dist_to_dropoff, "
-                                                                       "dist_from_dropoff, "
-                                                                       "pickup_id, "
-                                                                       "pickup_walking_dist, "
-                                                                       "dropoff_id, "
-                                                                       "dropoff_walking_dist, "
-                                                                       "num_stops, "
-                                                                       "veh_dep_time_at_stop_before_pickup, "
-                                                                       "veh_dep_time_at_stop_before_dropoff, "
-                                                                       "not_using_vehicle, "
+                                                                       "request_id,"
+                                                                       "request_time,"
+                                                                       "direct_od_dist,"
+                                                                       "vehicle_id,"
+                                                                       "pickup_insertion_point,"
+                                                                       "dropoff_insertion_point,"
+                                                                       "dist_to_pickup,"
+                                                                       "dist_from_pickup,"
+                                                                       "dist_to_dropoff,"
+                                                                       "dist_from_dropoff,"
+                                                                       "pickup_id,"
+                                                                       "pickup_walking_dist,"
+                                                                       "dropoff_id,"
+                                                                       "dropoff_walking_dist,"
+                                                                       "num_stops,"
+                                                                       "veh_dep_time_at_stop_before_pickup,"
+                                                                       "veh_dep_time_at_stop_before_dropoff,"
+                                                                       "not_using_vehicle,"
                                                                        "cost\n")),
                   bestAssignmentsWithTransferLogger(LogManager<LoggerT>::getLogger("bestassignmentswithtransfer.csv",
-                                                                        "request_id, "
-                                                                        "request_time, "
-                                                                        "direct_od_dist, "
-                                                                        "pickup_vehicle_id, "
-                                                                        "dropoff_vehicle_id, "
-                                                                        "pickup_insertion_point, "
-                                                                        "transfer_pveh_insertion_point, "
-                                                                        "transfer_dveh_insertion_point, "
-                                                                        "dropoff_insertion_point, "
-                                                                        "dist_to_pickup, "
-                                                                        "dist_from_pickup, "
-                                                                        "dist_to_transfer_pveh, "
-                                                                        "dist_from_transfer_pveh, "
-                                                                        "dist_to_transfer_dveh, "
-                                                                        "dist_from_transfer_dveh, "
-                                                                        "dist_to_dropoff, "
-                                                                        "dist_from_dropoff, "
-                                                                        "pickup_id, "
-                                                                        "pickup_walking_dist, "
-                                                                        "dropoff_id, "
-                                                                        "dropoff_walking_dist, "
-                                                                        "num_stops_pveh, "
-                                                                        "num_stops_dveh, "
-                                                                        "veh_dep_time_at_stop_before_pickup, "
-                                                                        "veh_dep_time_at_stop_before_transfer_pveh, "
-                                                                        "veh_dep_time_at_stop_before_transfer_dveh, "
-                                                                        "veh_dep_time_at_stop_before_dropoff, "
+                                                                        "request_id,"
+                                                                        "request_time,"
+                                                                        "direct_od_dist,"
+                                                                        "pickup_vehicle_id,"
+                                                                        "dropoff_vehicle_id,"
+                                                                        "pickup_insertion_point,"
+                                                                        "transfer_pveh_insertion_point,"
+                                                                        "transfer_dveh_insertion_point,"
+                                                                        "dropoff_insertion_point,"
+                                                                        "dist_to_pickup,"
+                                                                        "dist_from_pickup,"
+                                                                        "dist_to_transfer_pveh,"
+                                                                        "dist_from_transfer_pveh,"
+                                                                        "dist_to_transfer_dveh,"
+                                                                        "dist_from_transfer_dveh,"
+                                                                        "dist_to_dropoff,"
+                                                                        "dist_from_dropoff,"
+                                                                        "pickup_type,"
+                                                                        "transfer_type_pveh,"
+                                                                        "transfer_type_dveh,"
+                                                                        "dropoff_type,"
+                                                                        "pickup_id,"
+                                                                        "pickup_walking_dist,"
+                                                                        "dropoff_id,"
+                                                                        "dropoff_walking_dist,"
+                                                                        "num_stops_pveh,"
+                                                                        "num_stops_dveh,"
+                                                                        "veh_dep_time_at_stop_before_pickup,"
+                                                                        "veh_dep_time_at_stop_before_transfer_pveh,"
+                                                                        "veh_dep_time_at_stop_before_transfer_dveh,"
+                                                                        "veh_dep_time_at_stop_before_dropoff,"
                                                                         "cost\n")),
                   overallPerfLogger(
                           LogManager<LoggerT>::getLogger(stats::DispatchingPerformanceStats::LOGGER_NAME,
@@ -146,11 +150,11 @@ namespace karri {
                                                                   std::string(
                                                                           stats::UpdatePerformanceStats::LOGGER_COLS))),
                   transferPerfLogger(LogManager<LoggerT>::getLogger(stats::AssignmentsWithTransferPerformanceStats::LOGGER_NAME,
-                                                                  "request_id, " +
+                                                                  "request_id," +
                                                                   std::string(
                                                                           stats::AssignmentsWithTransferPerformanceStats::LOGGER_COLS))),
                   assignmentsCostLogger(LogManager<LoggerT>::getLogger(stats::AssignmentCostStats::LOGGER_NAME,
-                                                                  "request_id, " +
+                                                                  "request_id," +
                                                                   std::string(
                                                                           stats::AssignmentCostStats::LOGGER_COLS))) {}
 
@@ -310,7 +314,7 @@ namespace karri {
             if (requestState.isNotUsingVehicleBest()) {
                 bestAssignmentsLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, true, "
                                         << requestState.getBestCost() << "\n";
-                bestAssignmentsWithTransferLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
+                bestAssignmentsWithTransferLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
                 return;
             }
 
@@ -322,7 +326,7 @@ namespace karri {
             }
 
             if (costWT >= INFTY) {
-                bestAssignmentsWithTransferLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
+                bestAssignmentsWithTransferLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
             }
 
             using time_utils::getVehDepTimeAtStopForRequest;
@@ -373,6 +377,15 @@ namespace karri {
                                                                                 requestState, routeState);
                 const auto &vehDepTimeBeforeDropoffWT = getVehDepTimeAtStopForRequest(dVehId, dropoffIdx,
                                                                                 requestState, routeState);
+
+                const std::array<std::string, 4> types = {"NOT_SET", "BNS", "ORD", "ALS"};
+
+                const auto pickupType = types[bestAsgnWT.pickupType];
+                const auto transferTypePVeh = types[bestAsgnWT.transferTypePVeh];
+                const auto transferTypeDVeh = types[bestAsgnWT.transferTypeDVeh];
+                const auto dropoffType = types[bestAsgnWT.dropoffType];
+
+
                 bestAssignmentsWithTransferLogger
                         << pVehId << ", "
                         << dVehId << ", "
@@ -387,11 +400,15 @@ namespace karri {
                         << bestAsgnWT.distToTransferDVeh << ", "
                         << bestAsgnWT.distFromTransferDVeh << ", "
                         << bestAsgnWT.distToDropoff << ", "
+                        << bestAsgnWT.distFromDropoff << ", "
+                        << pickupType << ", "
+                        << transferTypePVeh << ", "
+                        << transferTypeDVeh << ", "
+                        << dropoffType << ", "
                         << bestAsgnWT.pickup->id << ", "
                         << bestAsgnWT.pickup->walkingDist << ", "
                         << bestAsgnWT.dropoff->id << ", "
                         << bestAsgnWT.dropoff->walkingDist << ", "
-                        << bestAsgnWT.distFromDropoff << ", "
                         << numStopsPVeh << ", "
                         << numStopsDVeh << ", "
                         << vehDepTimeBeforePickupWT << ", "

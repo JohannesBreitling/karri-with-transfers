@@ -1001,7 +1001,7 @@ namespace karri {
                 return asgn.cost;
             }
 
-            int total = (vehCost + walkingCost + tripCost + waitTimeViolationCost + changeInTripCostsOfOthers);
+            int total = (asgn.costPVeh.total + vehCost + walkingCost + tripCost + waitTimeViolationCost + changeInTripCostsOfOthers);
             assert(total >= 0);
             asgn.cost.total = total;
             return asgn.cost;

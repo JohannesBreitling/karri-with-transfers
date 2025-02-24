@@ -526,26 +526,20 @@ namespace karri::stats {
             inftyWT = true;
         }
 
-
-
-
-
-
-
         static constexpr auto LOGGER_NAME = "assignmentcost.csv";
         static constexpr auto LOGGER_COLS =
                 "total_no_transfer,"
                 "walking_cost_no_transfer,"
-                "tripCost_no_transfer,"
-                "waitTimeViolationCost_no_transfer,"
-                "changeInTripCostsOfOthers_no_transfer,"
-                "vehCost_no_transfer,"
+                "trip_cost_no_transfer,"
+                "wait_time_violation_cost_no_transfer,"
+                "change_in_trip_costs_of_others_no_transfer,"
+                "veh_cost_no_transfer,"
                 "total_transfer,"
                 "walking_cost_transfer,"
-                "tripCost_transfer,"
-                "waitTimeViolationCost_transfer,"
-                "changeInTripCostsOfOthers_transfer,"
-                "vehCost_transfer,"
+                "trip_cost_transfer,"
+                "wait_time_violation_cost_transfer,"
+                "change_in_trip_costs_of_others_transfer,"
+                "veh_cost_transfer,"
                 "infty_no_transfer,"
                 "infty_transfer,"
                 "transfer_improves\n";
