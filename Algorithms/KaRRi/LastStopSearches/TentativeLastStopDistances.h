@@ -68,7 +68,7 @@ namespace karri {
             const int batchIdx = pdLocId / K;
             // assert(distances[startIdx + batchIdx][pdLocId % K] >= 0);
             const int dist = distances[startIdx + batchIdx][pdLocId % K];
-            return dist >= 0 ? dist : INFTY; // TODO Sometshing is not working right in the search, the search is setting some distaces that are negative
+            return dist >= 0 ? dist : INFTY;
         }
 
         DistanceLabel getDistancesForCurBatch(const int &vehId) {

@@ -97,10 +97,6 @@ namespace karri::PickupAfterLastStopStrategies {
             enumerateAssignments();
         }
 
-        void findVehiclesForPALS() {
-            // TODO
-        }
-
     private:
 
         void runDijkstraSearches() {

@@ -97,52 +97,6 @@ class CHQuery {
     return search.runAnyShortestPath(sources, targets);
   }
 
-  // TODO Seems to not work right...
-  std::vector<int> runManyToMany(const std::vector<int> sources, const std::vector<int> targets, const std::vector<int> offsets) {
-    std::vector<int> distances = std::vector<int>{};
-
-    assert(sources.size() == targets.size() && targets.size() == offsets.size());
-
-    for (int i = 0; i < targets.size(); i+= K) {
-      // Construct sources / target arrays for the search of K simultaneous searches
-      std::array<int, K> sourcesSearch;
-      std::array<int, K> targetsSearch;
-
-      const int elementsLeft = targets.size() - i * K;
-
-      if (elementsLeft < K) {
-        for (int j = 0; j < elementsLeft; j++) {
-          sourcesSearch[j] = sources[i + j];
-          targetsSearch[j] = targets[i + j];
-        }
-
-        for (int j = elementsLeft; j < K; j++) {
-          sourcesSearch[j] = sources[0];
-          targetsSearch[j] = targets[0]; 
-        }
-
-
-      } else {
-        for (int j = 0; j < K; j++) {
-          sourcesSearch[j] = sources[j];
-          targetsSearch[j] = targets[i + j];
-        }
-      }
-      
-      // Run the search
-      run(sourcesSearch, targetsSearch);
-      const auto distancesSearch = getAllDistances();
-
-      for (int j = 0; j < std::min(K, elementsLeft); j++) {
-        distances.push_back(distancesSearch[j] + offsets[i + j]);
-      }
-    }
-
-    assert(sources.size() == distances.size());
-
-    return distances;
-  }
-
   // Used for dropoff als / transfer als
   std::vector<int> runOneToMany(const int source, const std::vector<int> targets, const std::vector<int> offsets) {
     std::vector<int> distances = std::vector<int>{};

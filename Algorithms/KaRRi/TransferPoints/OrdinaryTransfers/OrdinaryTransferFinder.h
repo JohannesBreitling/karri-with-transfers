@@ -1,4 +1,26 @@
-
+/// ******************************************************************************
+/// MIT License
+///
+/// Copyright (c) 2025 Johannes Breitling <johannes.breitling@student.kit.edu>
+///
+/// Permission is hereby granted, free of charge, to any person obtaining a copy
+/// of this software and associated documentation files (the "Software"), to deal
+/// in the Software without restriction, including without limitation the rights
+/// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+/// copies of the Software, and to permit persons to whom the Software is
+/// furnished to do so, subject to the following conditions:
+///
+/// The above copyright notice and this permission notice shall be included in all
+/// copies or substantial portions of the Software.
+///
+/// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+/// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+/// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+/// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+/// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+/// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+/// SOFTWARE.
+/// ******************************************************************************
 
 #pragma once
 
@@ -48,12 +70,39 @@ namespace karri {
             transferPoints(transferPoints),
             dVehIdsALS(Subset(0)) {}
         
+        void init() {
+            totalTime = 0;
+            numCandidateVehiclesPickupBNS = 0;
+            numCandidateVehiclesPickupORD = 0;
+            numCandidateVehiclesDropoffBNS = 0;
+            numCandidateVehiclesDropoffORD = 0;
+            numCandidateVehiclesDropoffALS = 0; // TODO
+            numPartialsTriedPickupBNS = 0; // TODO
+            numPartialsTriedPickupORD = 0; // TODO
+            numAssignmentsTriedPickupBNS = 0; // TODO
+            numAssignmentsTriedPickupORD = 0; // TODO
+            numAssignmentsTriedDropoffBNS = 0; // TODO
+            numAssignmentsTriedDropoffORD = 0; // TODO
+            numAssignmentsTriedDropoffALS = 0; // TODO
+            tryAssignmentsTime = 0;
+            numStopPairs = 0; // TODO
+            numTransferPoints = 0; // TODO
+            numDijkstraSearchesRun = 0; // TODO
+            numEdgesRelaxed = 0; // TODO
+            numVerticesScanned = 0; // TODO
+            searchTime = 0; // TODO
+        }
+
         void findAssignments() {
+            Timer total;
             if (relORDPickups.getVehiclesWithRelevantPDLocs().size() == 0 && relBNSPickups.getVehiclesWithRelevantPDLocs().size() == 0)
                 return;
 
-            // Reset the statistcs
-            numPartialsTried = 0;
+            numCandidateVehiclesPickupBNS += relBNSPickups.getVehiclesWithRelevantPDLocs().size();
+            numCandidateVehiclesPickupORD += relORDPickups.getVehiclesWithRelevantPDLocs().size();
+            numCandidateVehiclesDropoffBNS += relBNSDropoffs.getVehiclesWithRelevantPDLocs().size();
+            numCandidateVehiclesDropoffORD += relORDDropoffs.getVehiclesWithRelevantPDLocs().size();
+
             promisingPartials = std::vector<AssignmentWithTransfer>{};
 
             // Construct the set of possible pickup and dropoff vehicles
@@ -89,7 +138,7 @@ namespace karri {
                     findAssignmentsForVehiclePair(pVeh, dVeh);
 
                     if (promisingPartials.size() == 0)
-                        return;
+                        continue;
                     
                     for (auto &asgn : promisingPartials) {
                         tryDropoffBNS(asgn);
@@ -100,14 +149,38 @@ namespace karri {
                     promisingPartials.clear();
 
                     if (postponedAssignments.size() == 0)
-                        return;
+                        continue;
 
                     // Finish the postponed assignments
                     finishAssignments(pVeh, dVeh);
                     
                     postponedAssignments.clear();
-                }                
+                }
             }
+
+            // Write the statss
+            auto &stats = requestState.stats().ordinaryTransferStats;
+            
+            stats.totalTime = total.elapsed();
+            stats.numCandidateVehiclesPickupBNS += numCandidateVehiclesPickupBNS;
+            stats.numCandidateVehiclesPickupORD += numCandidateVehiclesPickupORD;
+            stats.numCandidateVehiclesDropoffBNS += numCandidateVehiclesDropoffBNS;
+            stats.numCandidateVehiclesDropoffORD += numCandidateVehiclesDropoffORD;
+            stats.numCandidateVehiclesDropoffALS += numCandidateVehiclesDropoffALS;
+            stats.numPartialsTriedPickupBNS += numPartialsTriedPickupBNS;
+            stats.numPartialsTriedPickupORD += numPartialsTriedPickupORD;
+            stats.numAssignmentsTriedPickupBNS += numAssignmentsTriedPickupBNS;
+            stats.numAssignmentsTriedPickupORD += numAssignmentsTriedPickupORD;
+            stats.numAssignmentsTriedDropoffBNS += numAssignmentsTriedDropoffBNS;
+            stats.numAssignmentsTriedDropoffORD += numAssignmentsTriedDropoffORD;
+            stats.numAssignmentsTriedDropoffALS += numAssignmentsTriedDropoffALS;
+            stats.tryAssignmentsTime += tryAssignmentsTime;
+            stats.numStopPairs += numStopPairs;
+            stats.numTransferPoints += numTransferPoints;
+            stats.numDijkstraSearchesRun += numDijkstraSearchesRun;
+            stats.numEdgesRelaxed += numEdgesRelaxed;
+            stats.numVerticesScanned += numVerticesScanned;
+            stats.searchTime += searchTime;
         }
 
     private:
@@ -224,8 +297,6 @@ namespace karri {
         }
 
         void tryPartialAssignment(AssignmentWithTransfer &asgn) {
-            numPartialsTried++;
-
             const bool unfinished = asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed;
             // Check the cost of the partial assignment with transfer where pickup vehicle, dropoff vehicle, pickup and transfer point (therefore also both transfer stop indices) are set
             RequestCost pickupVehCost;
@@ -623,7 +694,9 @@ namespace karri {
              || (asgn.dropoffIdx < numStopsDVeh - 1 && asgn.dropoff->loc == stopLocationsDVeh[asgn.dropoffIdx + 1]))
                 return;
 
+            Timer time;
             requestState.tryAssignment(asgn);
+            tryAssignmentsTime += time.elapsed();
         }
 
 
@@ -849,8 +922,36 @@ namespace karri {
         std::vector<bool> alsDropoffVehs;
         Subset dVehIdsALS;
 
-        int numPartialsTried;
+        //* Statistics for the ordinary transfer assignment finder
+        int64_t totalTime;
         
-    };
+        // Stats for the PD Locs
+        int64_t numCandidateVehiclesPickupBNS;
+        int64_t numCandidateVehiclesPickupORD;
 
+        int64_t numCandidateVehiclesDropoffBNS;
+        int64_t numCandidateVehiclesDropoffORD;
+        int64_t numCandidateVehiclesDropoffALS;
+        
+        // Stats for the tried assignments
+        int64_t numPartialsTriedPickupBNS;
+        int64_t numPartialsTriedPickupORD;
+
+        int64_t numAssignmentsTriedPickupBNS;
+        int64_t numAssignmentsTriedPickupORD;
+
+        int64_t numAssignmentsTriedDropoffBNS;
+        int64_t numAssignmentsTriedDropoffORD;
+        int64_t numAssignmentsTriedDropoffALS;
+
+        int64_t tryAssignmentsTime;
+        
+        // Stats for the transfer search itself
+        int64_t numStopPairs;
+        int64_t numTransferPoints;
+        int64_t numDijkstraSearchesRun;
+        int64_t numEdgesRelaxed;
+        int64_t numVerticesScanned;
+        int64_t searchTime;
+    };
 }

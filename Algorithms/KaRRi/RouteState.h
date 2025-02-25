@@ -441,7 +441,7 @@ namespace karri {
             const bool conditionTransferNotNewStop = pickup.loc != transfer.loc && transfer.loc == actualStopLocationTransfer;
             if (conditionTransferNotNewStop) {
                 assert(schedDepTimes[start + transferIdx] > asgn.arrAtTransferPoint);
-                maxArrTimes[start + transferIdx] = std::min(maxArrTimes[start + transferIdx], asgn.arrAtTransferPoint); // TODO Hier nochmal schauen (geändert von requestState.getMaxArrTimeAtTransfer(asgn))
+                maxArrTimes[start + transferIdx] = std::min(maxArrTimes[start + transferIdx], asgn.arrAtTransferPoint);
             } else {
                 // Insert transfer as new stop
                 ++transferIdx;

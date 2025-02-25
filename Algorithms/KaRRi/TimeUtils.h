@@ -2,7 +2,7 @@
 /// MIT License
 ///
 /// Copyright (c) 2023 Moritz Laupichler <moritz.laupichler@kit.edu>
-/// Copyright (c) 2024 Johannes Breitling <johannes.breitling@student.kit.edu>
+/// Copyright (c) 2025 Johannes Breitling <johannes.breitling@student.kit.edu>
 ///
 /// Permission is hereby granted, free of charge, to any person obtaining a copy
 /// of this software and associated documentation files (the "Software"), to deal
@@ -51,7 +51,7 @@ namespace karri::time_utils {
     }
 
     static INLINE bool isMakingStop(const int vehId, const int now, const RouteState &routeState) {
-        return routeState.schedDepTimesFor(vehId)[0] > now /* || routeState.numStopsOf(vehId) == 1 */;  // TODO Hier nochmal beobachten
+        return routeState.schedDepTimesFor(vehId)[0] > now;
     }
 
     static INLINE bool isPickupAtExistingStop(const PDLoc &pickup, const int vehId, const int now, const int stopIndex,
@@ -108,7 +108,6 @@ namespace karri::time_utils {
     static INLINE int getActualDepTimeAtTranfer(const AssignmentWithTransfer &asgn, const RequestContext &context, const RouteState &routeState) {
         const bool atStop = isTransferAtExistingStopDVeh(asgn, context.originalRequest.requestTime, routeState);
         
-        // const auto minVehicleDepTimeAtTransfer = getVehDepTimeAtStopForTransfer(asgn.dVeh->vehicleId, asgn.transferIdxDVeh, asgn.arrAtTransferPoint, routeState) + !atStop * (asgn.distToTransferDVeh + InputConfig::getInstance().stopTime); // TODO Nochmal schauen
         const auto minVehicleDepTimeAtTransfer = getVehDepTimeAtStopForRequest(asgn.dVeh->vehicleId, asgn.transferIdxDVeh, context, routeState) + !atStop * (asgn.distToTransferDVeh + InputConfig::getInstance().stopTime);
 
         return std::max(minVehicleDepTimeAtTransfer, asgn.arrAtTransferPoint);
@@ -412,7 +411,7 @@ namespace karri::time_utils {
 
     static INLINE int
     calcDetourRightAfterTransferPVeh(const AssignmentWithTransfer &asgn, const int initialPickupDetour, const int initialTransferDetour, const RouteState &routeState) {
-        const auto detour = calcResidualPickupDetour(asgn.pVeh->vehicleId, asgn.pickupIdx, asgn.transferIdxPVeh, initialPickupDetour, routeState) + initialTransferDetour; // TODO Achtung, hier von transferIdxPVeh + 1 geändert
+        const auto detour = calcResidualPickupDetour(asgn.pVeh->vehicleId, asgn.pickupIdx, asgn.transferIdxPVeh, initialPickupDetour, routeState) + initialTransferDetour;
         
         assert(detour >= 0 || asgn.pickupIdx == asgn.transferIdxPVeh);
         return std::max(detour, 0);

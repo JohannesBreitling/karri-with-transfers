@@ -1,3 +1,27 @@
+/// ******************************************************************************
+/// MIT License
+///
+/// Copyright (c) 2025 Johannes Breitling <johannes.breitling@student.kit.edu>
+///
+/// Permission is hereby granted, free of charge, to any person obtaining a copy
+/// of this software and associated documentation files (the "Software"), to deal
+/// in the Software without restriction, including without limitation the rights
+/// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+/// copies of the Software, and to permit persons to whom the Software is
+/// furnished to do so, subject to the following conditions:
+///
+/// The above copyright notice and this permission notice shall be included in all
+/// copies or substantial portions of the Software.
+///
+/// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+/// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+/// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+/// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+/// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+/// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+/// SOFTWARE.
+/// ******************************************************************************
+
 #include "Algorithms/KaRRi/RequestState/RelevantPDLocs.h"
 #include "Algorithms/KaRRi/TransferPoints/TransfersALS/CHStrategyALS.h"
 
@@ -42,14 +66,43 @@ namespace karri {
             routeState(routeState),
             requestState(requestState),
             calc(calc),
-            asserter(asserter) {}
+            asserter(asserter),
+            dVehIds(fleet.size()) {}
 
+        void init() {
+            totalTime = 0;
+            numCandidateVehiclesPickupBNS = 0;
+            numCandidateVehiclesPickupORD = 0;
+            numCandidateVehiclesPickupALS = 0; // TODO
+            numCandidateVehiclesDropoffORD = 0;
+            numCandidateVehiclesDropoffALS = 0;
+            numAssignmentsTriedPickupBNS = 0;
+            numAssignmentsTriedPickupORD = 0;
+            numAssignmentsTriedPickupALS = 0;
+            numAssignmentsTriedDropoffORD = 0;
+            numAssignmentsTriedDropoffALS = 0;
+            tryAssignmentsTime = 0;
+            numTransferPoints = 0; // TODO
+            numSearchesRunLastStopToDVeh = 0; // TODO
+            numEdgesRelaxedLastStopToDVeh = 0; // TODO
+            numVerticesScannedLastStopToDVeh = 0; // TODO
+            searchTimeLastStopToDVeh = 0; // TODO
+            numSearchesRunPickupToDVeh = 0; // TODO
+            numEdgesRelaxedPickupToDVeh = 0; // TODO
+            numVerticesScannedPickupToDVeh = 0; // TODO
+            searchTimePickupToDVeh = 0; // TODO
+        }
+        
         void findAssignments() {
+            Timer total;
+            
             // Reset the last stop distances
             lastStopDistances = std::map<int, std::map<int, std::vector<int>>>{};
 
             //* Calculate the distances from the last stop of the pickup vehicles to all possible stops of the dropoff vehicles (for the case that the pickup is ORD or BNS)
-            const auto dVehALSIds = dropoffALSStrategy.findDropoffsAfterLastStop();
+            dVehIds = dropoffALSStrategy.findDropoffsAfterLastStop();
+            numCandidateVehiclesDropoffALS += dVehIds.size();
+            
             for (const auto pVehId : relORDPickups.getVehiclesWithRelevantPDLocs()) {
                 const auto &pVeh = &fleet[pVehId];
                 
@@ -61,7 +114,7 @@ namespace karri {
                     lastStopDistances[pVehId][dVehId] = distances;
                 }
 
-                for (const auto dVehId : dVehALSIds) {
+                for (const auto dVehId : dVehIds) {
                     const auto &dVeh = &fleet[dVehId];
                     const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
 
@@ -81,7 +134,7 @@ namespace karri {
                     lastStopDistances[pVehId][dVehId] = distances;   
                 }
 
-                for (const auto dVehId : dVehALSIds) {
+                for (const auto dVehId : dVehIds) {
                     const auto *dVeh = &fleet[dVehId];
                     const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
 
@@ -90,13 +143,40 @@ namespace karri {
                 }
             }
 
-            assert(postponedAssignments.size() == 0);
+            numCandidateVehiclesPickupBNS += relBNSPickups.getVehiclesWithRelevantPDLocs().size();
+            numCandidateVehiclesPickupORD += relORDPickups.getVehiclesWithRelevantPDLocs().size();
+            numCandidateVehiclesDropoffORD += relORDDropoffs.getVehiclesWithRelevantPDLocs().size();
             
             findAssignmentsWithPickupBNS();
             findAssignmentsWithPickupORD();
             findAssignmentsWithPickupALS();
 
             assert(postponedAssignments.size() == 0);
+        
+            // Write the stats
+            auto &stats = requestState.stats().transferALSPVehStats;
+
+            stats.totalTime = total.elapsed();
+            stats.numCandidateVehiclesPickupBNS += numCandidateVehiclesPickupBNS;
+            stats.numCandidateVehiclesPickupORD += numCandidateVehiclesPickupORD;
+            stats.numCandidateVehiclesPickupALS += numCandidateVehiclesPickupALS;
+            stats.numCandidateVehiclesDropoffORD += numCandidateVehiclesDropoffORD;
+            stats.numCandidateVehiclesDropoffALS += numCandidateVehiclesDropoffALS;
+            stats.numAssignmentsTriedPickupBNS += numAssignmentsTriedPickupBNS;
+            stats.numAssignmentsTriedPickupORD += numAssignmentsTriedPickupORD;
+            stats.numAssignmentsTriedPickupALS += numAssignmentsTriedPickupALS;
+            stats.numAssignmentsTriedDropoffORD += numAssignmentsTriedDropoffORD;
+            stats.numAssignmentsTriedDropoffALS += numAssignmentsTriedDropoffALS;
+            stats.tryAssignmentsTime += tryAssignmentsTime;
+            stats.numTransferPoints += numTransferPoints;
+            stats.numSearchesRunLastStopToDVeh += numSearchesRunLastStopToDVeh;
+            stats.numEdgesRelaxedLastStopToDVeh += numEdgesRelaxedLastStopToDVeh;
+            stats.numVerticesScannedLastStopToDVeh += numVerticesScannedLastStopToDVeh;
+            stats.searchTimeLastStopToDVeh += searchTimeLastStopToDVeh;
+            stats.numSearchesRunPickupToDVeh += numSearchesRunPickupToDVeh;
+            stats.numEdgesRelaxedPickupToDVeh += numEdgesRelaxedPickupToDVeh;
+            stats.numVerticesScannedPickupToDVeh += numVerticesScannedPickupToDVeh;
+            stats.searchTimePickupToDVeh += searchTimePickupToDVeh;
         }
 
     private:
@@ -233,7 +313,6 @@ namespace karri {
 
         void tryDropoffALSForPickupALS(const Vehicle *pVeh, const PDLoc *pickup, const int distanceToPickup) {
             // In this case we consider all the vehicles that are able to perform the dropoff ALS
-            const auto dVehIds = dropoffALSStrategy.findDropoffsAfterLastStop();
             const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
 
             if (dVehIds.size() == 0)
@@ -375,8 +454,6 @@ namespace karri {
             const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
 
             // In this case we consider all the vehicles that are able to perform the dropoff ALS
-            const auto dVehIds = dropoffALSStrategy.findDropoffsAfterLastStop();
-            
             if (dVehIds.size() == 0)
                 return;
 
@@ -481,9 +558,6 @@ namespace karri {
             const bool transferAtStopDVeh = asgn.transfer.loc == stopLocationsDVeh[transferIdxDVeh];
             const bool dropoffAtStop = asgn.dropoff->loc == stopLocationsDVeh[dropoffIdx];
 
-            // const bool pickupBNS = pickupIdx == 0;
-            // const bool transferBNSDVeh = transferIdxDVeh == 0;
-            
             const bool pairedPVeh = pickupIdx == transferIdxPVeh;
             const bool pairedDVeh = transferIdxDVeh == dropoffIdx;
 
@@ -510,10 +584,6 @@ namespace karri {
 
             if (pickupAtStop && !pairedPVeh && !pickupAfterLastStop)
                 asgn.distFromPickup = legPickup;
-
-            // if (pickupAtStop && pairedPVeh && !pickupAfterLastStop)
-            //    asgn.distToTransferPVeh = legPickup;
-
 
             //* Transfer distances pVeh
             if (pairedPVeh)
@@ -551,10 +621,6 @@ namespace karri {
             if (transferAtStopDVeh && !pairedDVeh && !transferAfterLastStopDVeh)
                 asgn.distFromTransferDVeh = legTransferDVeh;
 
-            // if (transferAtStopDVeh && pairedDVeh && !transferAfterLastStopDVeh)
-            //     asgn.distToDropoff = legDropoff;
-
-
             //* Dropoff distances
             if (pairedDVeh)
                 asgn.distToDropoff = pairedDistanceDVeh;
@@ -584,7 +650,36 @@ namespace karri {
              || (asgn.dropoffIdx < numStopsDVeh - 1 && asgn.dropoff->loc == stopLocationsDVeh[asgn.dropoffIdx + 1]))
                 return;
 
+            switch (asgn.pickupType) {
+                case BEFORE_NEXT_STOP:
+                    numAssignmentsTriedPickupBNS++;
+                    break;
+
+                case ORDINARY:
+                    numAssignmentsTriedPickupORD++;
+                    break;
+                
+                case AFTER_LAST_STOP:
+                    numAssignmentsTriedPickupALS++;
+                    break;
+                default:
+                    assert(false);
+            }
+
+            switch (asgn.dropoffType) {
+                case ORDINARY:
+                    numAssignmentsTriedDropoffORD++;
+                    break;
+                case AFTER_LAST_STOP:
+                    numAssignmentsTriedDropoffALS++;
+                    break;
+                default:
+                    assert(false);
+            }
+
+            Timer time;
             requestState.tryAssignment(asgn);
+            tryAssignmentsTime += time.elapsed();
         }
 
         void finishAssignments(const Vehicle *pVeh) {
@@ -629,5 +724,45 @@ namespace karri {
         
         // Stores for each pickup vehicle, the distances to all possible stops of dropoff vehicles
         std::map<int, std::map<int, std::vector<int>>> lastStopDistances;
+
+        Subset dVehIds;
+
+
+
+        //* Statistics for the transfer als pveh assignment finder
+        int64_t totalTime;
+        
+        // Stats for the PD Locs
+        int64_t numCandidateVehiclesPickupBNS;
+        int64_t numCandidateVehiclesPickupORD;
+        int64_t numCandidateVehiclesPickupALS;
+
+        int64_t numCandidateVehiclesDropoffORD;
+        int64_t numCandidateVehiclesDropoffALS;
+        
+        // Stats for the tried assignments 
+        int64_t numAssignmentsTriedPickupBNS;
+        int64_t numAssignmentsTriedPickupORD;
+        int64_t numAssignmentsTriedPickupALS;
+
+        int64_t numAssignmentsTriedDropoffORD;
+        int64_t numAssignmentsTriedDropoffALS;
+
+        int64_t tryAssignmentsTime;
+        
+        // Stats for the transfer search itself
+        int64_t numTransferPoints;
+        
+        // Search from last stop to all stops
+        int64_t numSearchesRunLastStopToDVeh;
+        int64_t numEdgesRelaxedLastStopToDVeh;
+        int64_t numVerticesScannedLastStopToDVeh;
+        int64_t searchTimeLastStopToDVeh;
+        
+        // Search from pickup to all stops
+        int64_t numSearchesRunPickupToDVeh;
+        int64_t numEdgesRelaxedPickupToDVeh;
+        int64_t numVerticesScannedPickupToDVeh;
+        int64_t searchTimePickupToDVeh;
     };
 }

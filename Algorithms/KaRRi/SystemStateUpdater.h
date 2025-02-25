@@ -149,10 +149,19 @@ namespace karri {
                                                                   "request_id, " +
                                                                   std::string(
                                                                           stats::UpdatePerformanceStats::LOGGER_COLS))),
-                  transferPerfLogger(LogManager<LoggerT>::getLogger(stats::AssignmentsWithTransferPerformanceStats::LOGGER_NAME,
+                  
+                  ordinaryTransferPerfLogger(LogManager<LoggerT>::getLogger(stats::AssignmentsWithOrdinaryTransferPerformanceStats::LOGGER_NAME,
                                                                   "request_id," +
-                                                                  std::string(
-                                                                          stats::AssignmentsWithTransferPerformanceStats::LOGGER_COLS))),
+                                                                  std::string(stats::AssignmentsWithOrdinaryTransferPerformanceStats::LOGGER_COLS))),                              
+                  
+                  transferALSPVehPerfLogger(LogManager<LoggerT>::getLogger(stats::AssignmentsWithTransferALSPVehPerformanceStats::LOGGER_NAME,
+                                                                   "request_id," +
+                                                                   std::string(stats::AssignmentsWithTransferALSPVehPerformanceStats::LOGGER_COLS))),
+                  
+                  transferALSDVehPerfLogger(LogManager<LoggerT>::getLogger(stats::AssignmentsWithTransferALSDVehPerformanceStats::LOGGER_NAME,
+                                                                   "request_id," +
+                                                                   std::string(stats::AssignmentsWithTransferALSDVehPerformanceStats::LOGGER_COLS))),
+                  
                   assignmentsCostLogger(LogManager<LoggerT>::getLogger(stats::AssignmentCostStats::LOGGER_NAME,
                                                                   "request_id," +
                                                                   std::string(
@@ -438,8 +447,12 @@ namespace karri {
                            << requestState.stats().dalsAssignmentsStats.getLoggerRow() << "\n";
             updatePerfLogger << requestState.originalRequest.requestId << ", "
                              << requestState.stats().updateStats.getLoggerRow() << "\n";
-            transferPerfLogger << requestState.originalRequest.requestId << ", "
-                               << requestState.stats().transferStats.getLoggerRow() << "\n";
+            ordinaryTransferPerfLogger << requestState.originalRequest.requestId << ", "
+                               << requestState.stats().ordinaryTransferStats.getLoggerRow() << "\n";
+            transferALSPVehPerfLogger << requestState.originalRequest.requestId << ", "
+                               << requestState.stats().transferALSPVehStats.getLoggerRow() << "\n";
+            transferALSDVehPerfLogger << requestState.originalRequest.requestId << ", "
+                               << requestState.stats().transferALSDVehStats.getLoggerRow() << "\n";
         }
 
     private:
@@ -682,7 +695,10 @@ namespace karri {
         LoggerT &dalsPerfLogger;
         LoggerT &updatePerfLogger;
 
-        LoggerT &transferPerfLogger;
+        LoggerT &ordinaryTransferPerfLogger;
+        LoggerT &transferALSPVehPerfLogger;
+        LoggerT &transferALSDVehPerfLogger;
+
         LoggerT &assignmentsCostLogger;
 
     };

@@ -1,7 +1,6 @@
 /// ******************************************************************************
 /// MIT License
 ///
-/// Copyright (c) 2023 Moritz Laupichler <moritz.laupichler@kit.edu>
 /// Copyright (c) 2025 Johannes Breitling <johannes.breitling@student.kit.edu>
 ///
 /// Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -54,25 +53,15 @@ namespace karri {
                               asserter(asserter) {}
 
         void init() {
-            // no op
+            ordinaryTransfers.init();
+            transfersALSPVeh.init();
+            transfersALSDVeh.init();
         }
 
-        // TODO Stats wie die Verteilung der Verbesserung der Kosten liegen und so
-        // TODO Im Aufschrieb, SPP gut ausarbeiten, um das Framework gut zu erklären, um eventuelle Follow Ups zu erleichtern 
-        // Method to find the best assignment with exactly one transfer
         void findBestAssignment() {
-            Timer totalTimer;
-
-            // std::cout << "// - - - - - - - - - - - - - - - - - - - -" << std::endl;
-            // std::cout << "REQUEST START" << std::endl;
-
-            // auto &stats = requestState.stats().transferStats;
-            // numPartialsTried = 0;
-            // numAssignmentsTried = 0;
-            // numAssignmentsWithUnkownPairedDistanceTried = 0;
-            // int64_t numPickupDropoffPairs = 0;
-            // int64_t numStopPairs = 0;
-
+            // Method to find the best assignment with exactly one transfer, i. e. the best possible
+            // single transfer journey for the given request
+            
             // * TRANSFER AFTER LAST STOP (PVeh)
             // The pickup vehicle picks up the user either bns, ord or als
             // Then the pickup vehicle drives to one of the stops of the dropoff vehicle, where the transfer is done
@@ -90,20 +79,6 @@ namespace karri {
 
             //* Test the best assignment found
             assert(asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
-
-            return;
-
-
-            // std::cout << "REQUEST END" << std::endl;
-            // std::cout << "- - - - - - - - - - - - - - - - - - - - //" << std::endl;
-
-            // const auto totalTime = totalTimer.elapsed<std::chrono::nanoseconds>();
-
-            // stats.totalTime += totalTime;
-            // stats.numPickupDropoffPairs += numPickupDropoffPairs;
-            // stats.numStopPairs += numStopPairs;
-            // stats.numPartialAssignmentsTried += numPartialsTried;
-            // stats.numAssignmentsTried += numAssignmentsTried;
         }
 
 
@@ -116,10 +91,5 @@ namespace karri {
         RequestState &requestState;
 
         InsertionAsserterT &asserter;
-        // int64_t numAssignmentsTried = 0;
-        // int64_t numPartialsTried = 0;
-        // int64_t numAssignmentsWithUnkownPairedDistanceTried = 0;
     };
-
-
 }

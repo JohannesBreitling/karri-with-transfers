@@ -110,7 +110,6 @@ target_compile_definitions(karri PRIVATE KARRI_IND=${IND_CODE})
 target_compile_definitions(karri PRIVATE KARRI_DIJ=${DIJ_CODE})
 set(KARRI_STRAT_ARG_VALUES COL IND DIJ)
 
-# TODO : Hier habe ich die Strategie geändert 1/2 + im cache file (build directory)
 set(KARRI_PALS_STRATEGY COL CACHE STRING "Pickup-After-Last-Stop strategy to use. Possible values: COL, IND, DIJ")
 set_property(CACHE KARRI_PALS_STRATEGY PROPERTY STRINGS ${KARRI_STRAT_ARG_VALUES})
 list(FIND KARRI_STRAT_ARG_VALUES ${KARRI_PALS_STRATEGY} index)
@@ -126,7 +125,6 @@ else()
     target_compile_definitions(karri PRIVATE KARRI_PALS_STRATEGY=${DIJ_CODE}) # Dijkstra
 endif()
 
-# TODO : Hier habe ich die Strategie geändert 2/2 + im cache file (build directory)
 set(KARRI_DALS_STRATEGY COL CACHE STRING "Dropoff-After-Last-Stop strategy to use. Possible values: COL, IND, DIJ")
 set_property(CACHE KARRI_DALS_STRATEGY PROPERTY STRINGS ${KARRI_STRAT_ARG_VALUES})
 list(FIND KARRI_STRAT_ARG_VALUES ${KARRI_DALS_STRATEGY} index)

@@ -1,3 +1,26 @@
+/// ******************************************************************************
+/// MIT License
+///
+/// Copyright (c) 2025 Johannes Breitling <johannes.breitling@student.kit.edu>
+///
+/// Permission is hereby granted, free of charge, to any person obtaining a copy
+/// of this software and associated documentation files (the "Software"), to deal
+/// in the Software without restriction, including without limitation the rights
+/// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+/// copies of the Software, and to permit persons to whom the Software is
+/// furnished to do so, subject to the following conditions:
+///
+/// The above copyright notice and this permission notice shall be included in all
+/// copies or substantial portions of the Software.
+///
+/// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+/// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+/// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+/// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+/// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+/// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+/// SOFTWARE.
+/// ******************************************************************************
 
 #pragma once
 
@@ -36,16 +59,42 @@ class TransferALSDVehFinder {
             asserter(asserter) {}
 
     void findAssignments() {
-        auto &stats = requestState.stats().transferALSDVehStats;
-        (void) stats;
-        init();
-
+        Timer total;
         assert(postponedAssignments.size() == 0);
+        
         findAssignmentsWithDropoffALS();
+
+        // Write the stats
+        auto &stats = requestState.stats().transferALSDVehStats;
+        stats.totalTime = total.elapsed();
+        stats.numCandidateVehiclesPickupBNS += numCandidateVehiclesPickupBNS;
+        stats.numCandidateVehiclesPickupORD += numCandidateVehiclesPickupORD;
+        stats.numCandidateVehiclesDropoffALS += numCandidateVehiclesDropoffALS;
+        stats.numAssignmentsTriedPickupBNS += numAssignmentsTriedPickupBNS;
+        stats.numAssignmentsTriedPickupORD += numAssignmentsTriedPickupORD;
+        stats.numAssignmentsTriedDropoffALS += numAssignmentsTriedDropoffALS;
+        stats.tryAssignmentsTime += tryAssignmentsTime;
+        stats.numTransferPoints += numTransferPoints;
+        stats.numSearchesRunLastStopToPVeh += numSearchesRunLastStopToPVeh;
+        stats.numEdgesRelaxedLastStopToPVeh += numEdgesRelaxedLastStopToPVeh;
+        stats.numVerticesScannedLastStopToPVeh += numVerticesScannedLastStopToPVeh;
+        stats.searchTimeLastStopToPVeh += searchTimeLastStopToPVeh;
     }
 
     void init() {
-        triedAssignments = 0;
+        totalTime = 0;
+        numCandidateVehiclesPickupBNS = 0;
+        numCandidateVehiclesPickupORD = 0;
+        numCandidateVehiclesDropoffALS = 0;
+        numAssignmentsTriedPickupBNS = 0;
+        numAssignmentsTriedPickupORD = 0;
+        numAssignmentsTriedDropoffALS = 0;
+        tryAssignmentsTime = 0;
+        numTransferPoints = 0; // TODO
+        numSearchesRunLastStopToPVeh = 0; // TODO
+        numEdgesRelaxedLastStopToPVeh = 0; // TODO
+        numVerticesScannedLastStopToPVeh = 0; // TODO
+        searchTimeLastStopToPVeh = 0; // TODO
     }
 
     private:
@@ -55,9 +104,13 @@ class TransferALSDVehFinder {
             if (relORDPickups.getVehiclesWithRelevantPDLocs().size() == 0 && relBNSPickups.getVehiclesWithRelevantPDLocs().size() == 0)
                 return;
 
+            numCandidateVehiclesPickupBNS += relBNSPickups.getVehiclesWithRelevantPDLocs().size();
+            numCandidateVehiclesPickupORD += relORDPickups.getVehiclesWithRelevantPDLocs().size();
+            
             // The vehicle set for the dropoff is the set of vehicles for the ALS dropoff
             // The distance from the last stop to the dropoff is a lower bound for the distance from the last stop to the dropoff via the transfer point
             const auto dVehIds = dropoffALSStrategy.findDropoffsAfterLastStop();
+            numCandidateVehiclesDropoffALS += dVehIds.size();
             
             if (dVehIds.size() == 0)
                 return;
@@ -242,8 +295,23 @@ class TransferALSDVehFinder {
                 }
             }
 
+            switch (asgn.pickupType) {
+                case BEFORE_NEXT_STOP:
+                    numAssignmentsTriedPickupBNS++;
+                    break;
+
+                case ORDINARY:
+                    numAssignmentsTriedPickupORD++;
+                    break;
+
+                default:
+                    assert(false);
+            }
+            numAssignmentsTriedDropoffALS++;
+            
+            Timer time;
             requestState.tryAssignment(asgn);
-            triedAssignments++;
+            tryAssignmentsTime += time.elapsed();
         }
 
         void finishAssignments(const Vehicle *pVeh) {
@@ -288,26 +356,30 @@ class TransferALSDVehFinder {
 
         InsertionAsserterT &asserter;
 
-        int64_t numDropoffVehicles;
-        int64_t numPickupVehicles;
+        //* Statistics for the transfer als dveh assignment finder
+        int64_t totalTime;
         
+        // Stats for the PD Locs
+        int64_t numCandidateVehiclesPickupBNS;
+        int64_t numCandidateVehiclesPickupORD;
 
-        // Stats for the dropoff als assignment stats
-        int64_t totalNumEdgeRelaxations;
-        int64_t totalNumVerticesSettled;
-        int64_t totalNumEntriesScanned;
-
-        // Stats for the search to the transfer stop
-        int64_t totalNumEdgeRelaxationsTransfer;
-        int64_t totalNumVerticesSettledTransfer;
-        // int64_t totalNumEntriesScannedTransfer;
-
-
+        int64_t numCandidateVehiclesDropoffALS;
         
-        int64_t triedAssignments;
+        // Stats for the tried assignments 
+        int64_t numAssignmentsTriedPickupBNS;
+        int64_t numAssignmentsTriedPickupORD;
         
+        int64_t numAssignmentsTriedDropoffALS;
+
+        int64_t tryAssignmentsTime;
         
-
-};
-
+        // Stats for the transfer search itself
+        int64_t numTransferPoints;
+        
+        // Search from last stop to all stops
+        int64_t numSearchesRunLastStopToPVeh;
+        int64_t numEdgesRelaxedLastStopToPVeh;
+        int64_t numVerticesScannedLastStopToPVeh;
+        int64_t searchTimeLastStopToPVeh;
+    };
 }
