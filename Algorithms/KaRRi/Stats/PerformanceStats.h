@@ -301,6 +301,33 @@ namespace karri::stats {
 
     struct AssignmentsWithTransferALSPVehPerformanceStats {
 
+        /*
+        
+
+
+
+        
+        int64_t initializationTime;
+
+        int64_t numEdgeRelaxationsInSearchGraph;
+        int64_t numVerticesOrLabelsSettled;
+        int64_t numEntriesOrLastStopsScanned;
+        int64_t searchTime;
+
+        int64_t numCandidateVehicles;
+        int64_t numAssignmentsTried;
+        int64_t tryAssignmentsTime;
+
+        // Stats about pickup coinciding with last stop (same independent of PALS strategy):
+        int64_t pickupAtLastStop_numCandidateVehicles;
+        int64_t pickupAtLastStop_numAssignmentsTried;
+        int64_t pickupAtLastStop_tryAssignmentsTime;
+
+        
+        */
+
+
+
 
         /* int64_t initializationTime;
 

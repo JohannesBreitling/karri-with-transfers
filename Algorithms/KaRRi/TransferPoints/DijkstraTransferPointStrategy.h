@@ -36,10 +36,12 @@ namespace karri::TransferPointStrategies {
     public:
         SearchSpaceIntersection(const int numSearches) : numSearches(numSearches), currSearchIntersect(0), edges(std::map<int, int>{}), distances(std::map<int, int[4]>{}) {}
         
-        void init() {
+        void init(const int maxLeewayP, const int maxLeewayD) {
             currSearchIntersect = 0;
             edges = std::map<int, int>{};
             distances = std::map<int, int[4]>{};
+            maxLeewayPVeh = maxLeewayP;
+            maxLeewayDVeh = maxLeewayD;
         }
 
         void nextSearch() {
@@ -87,6 +89,10 @@ namespace karri::TransferPointStrategies {
                 tp.distanceDVehToTransfer = foundDistances[2];
                 tp.distanceDVehFromTransfer = foundDistances[3];
 
+                // Prune the solutions where the max leeway is exceeded
+                if (tp.distancePVehToTransfer + tp.distancePVehFromTransfer > maxLeewayPVeh || tp.distanceDVehToTransfer + tp.distanceDVehFromTransfer > maxLeewayDVeh)
+                    continue;
+
                 intersection.push_back(tp);
             }
 
@@ -96,6 +102,8 @@ namespace karri::TransferPointStrategies {
     private:
         const int numSearches;
         int currSearchIntersect;
+        int maxLeewayPVeh;
+        int maxLeewayDVeh;
         std::map<int, int> edges;
         std::map<int, int[4]> distances;
     };
@@ -185,12 +193,12 @@ namespace karri::TransferPointStrategies {
             // assert(inputGraph.edgeTail(pNStopLoc) == reverseGraph.edgeHead(pNStopLoc));
             int dStopVertex = inputGraph.edgeHead(dStopLoc);
             int dNextStopVertex = inputGraph.edgeTail(dNStopLoc);
-            
-            searchSpaceIntersection.init();
 
             // Get max leeways for the current leg
             const int maxLeewayPVeh = routeState.leewayOfLegStartingAt(pStopId);
             const int maxLeewayDVeh = routeState.leewayOfLegStartingAt(dStopId);
+
+            searchSpaceIntersection.init(maxLeewayPVeh, maxLeewayDVeh);
 
             offsetPNStop = inputGraph.travelTime(pNStopLoc);
             offsetDNStop = inputGraph.travelTime(dNStopLoc);
