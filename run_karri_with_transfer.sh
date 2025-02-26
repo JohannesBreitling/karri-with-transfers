@@ -64,8 +64,8 @@ cmake --build $karriBinaryDir --target karri -j 16
 echo $karriBinaryDir
 
 
-karriOutputDirWot = $karriOutputDir/wot/wot
-karriOutputDirWt = $karriOutputDir/wt/wt
+karriOutputDirWot=$karriOutputDir/wot/wot
+karriOutputDirWt=$karriOutputDir/wt/wt
 
 printf "Running without transfers...\n"
 echo $karriOutputDir
