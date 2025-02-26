@@ -163,6 +163,11 @@ def assignmentcost(name, path):
         if df_cost_wt.loc[i, 'transfer_improves'] == 0 or df_cost_wt.loc[i, 'infty_transfer'] or df_cost_wt.loc[i, 'infty_no_transfer']:
             df_cost_wt.drop(i, inplace=True)
     
+    print("Rows left: " + repr(df_cost_wt.index.size))
+    if df_cost_wt.index.size == 0:
+        print("Only assignments wiht former cost infty were improved")
+        return
+
     avg_imp_total_cost_wt = df_cost_wt['total_transfer'].mean()
     avg_imp_trip_cost_wt = df_cost_wt['trip_cost_transfer'].mean()
     avg_imp_wait_cost_wt = df_cost_wt['wait_time_violation_cost_transfer'].mean()
@@ -214,9 +219,12 @@ def assignmentcost(name, path):
 # assignmentquality('AQ Berlin 1pct, R all, V 500', './outputs/server/karri-with-transfers/v-500')
 # legstats('LS Berlin 1pct, R all, V 500', './outputs/server/karri-with-transfers/v-500')
 
-assignmentquality('AQ Berlin 1pct, R1000, V200', './outputs/local/v-200_r-1000')
-legstats('LS Berlin 1pct, R1000, V200', './outputs/local/v-200_r-1000')
-assignmentcost('AC Berlin 1pct, R1000, V200', './outputs/local/v-200_r-1000')
+
+PATH = './outputs/local/test'
+
+assignmentquality('AQ Berlin 1pct, R1000, V50', PATH)
+legstats('LS Berlin 1pct, R1000, V50', PATH)
+assignmentcost('AC Berlin 1pct, R1000, V50', PATH)
 
 
 

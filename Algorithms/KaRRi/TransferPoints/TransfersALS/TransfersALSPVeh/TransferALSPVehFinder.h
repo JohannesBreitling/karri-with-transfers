@@ -110,7 +110,7 @@ namespace karri {
                     const auto &dVeh = &fleet[dVehId];
                     Timer searchTime;
                     const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
-                    searchTimeLastStopToDVeh += searchTime.elapsed();
+                    searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
                     numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
 
                     // Save the distances for building the assignments later
@@ -121,7 +121,7 @@ namespace karri {
                     const auto &dVeh = &fleet[dVehId];
                     Timer searchTime;
                     const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
-                    searchTimeLastStopToDVeh += searchTime.elapsed();
+                    searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
                     numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
 
                     // Save the distances for building the assignments later
@@ -136,7 +136,7 @@ namespace karri {
                     const auto *dVeh = &fleet[dVehId];
                     Timer searchTime;
                     const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
-                    searchTimeLastStopToDVeh += searchTime.elapsed();
+                    searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
                     numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
 
                     // Save the distances for building the assignments later
@@ -148,7 +148,7 @@ namespace karri {
                     const auto *dVeh = &fleet[dVehId];
                     Timer searchTime;
                     const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
-                    searchTimeLastStopToDVeh += searchTime.elapsed();
+                    searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
                     numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
 
                     // Save the distances for building the assignments later
@@ -170,7 +170,7 @@ namespace karri {
             // Write the stats
             auto &stats = requestState.stats().transferALSPVehStats;
 
-            stats.totalTime = total.elapsed();
+            stats.totalTime = total.elapsed<std::chrono::nanoseconds>();
             stats.numCandidateVehiclesPickupBNS += numCandidateVehiclesPickupBNS;
             stats.numCandidateVehiclesPickupORD += numCandidateVehiclesPickupORD;
             stats.numCandidateVehiclesPickupALS += numCandidateVehiclesPickupALS;
@@ -276,7 +276,7 @@ namespace karri {
                 Timer searchTimer;
                 const auto distancesToTransfer = strategy.calculateDistancesFromPickupToAllStops(pickup->loc, *dVeh);
                 numTransferPoints += distancesToTransfer.size();
-                searchTimePickupToDVeh += searchTimer.elapsed();
+                searchTimePickupToDVeh += searchTimer.elapsed<std::chrono::nanoseconds>();
                 numSearchesRunPickupToDVeh += strategy.getNumSearchesRun();
 
                 for (const auto &dropoff : relORDDropoffs.relevantSpotsFor(dVehId)) {
@@ -352,7 +352,7 @@ namespace karri {
                 // Calculate the distances from the pickup to the stops of the dropoff vehicle
                 Timer searchTimer;
                 const auto distancesToTransfer = strategy.calculateDistancesFromPickupToAllStops(pickup->loc, *dVeh);
-                searchTimePickupToDVeh += searchTimer.elapsed();
+                searchTimePickupToDVeh += searchTimer.elapsed<std::chrono::nanoseconds>();
                 numTransferPoints += distancesToTransfer.size();
                 numSearchesRunPickupToDVeh += strategy.getNumSearchesRun();
 
@@ -702,7 +702,7 @@ namespace karri {
 
             Timer time;
             requestState.tryAssignment(asgn);
-            tryAssignmentsTime += time.elapsed();
+            tryAssignmentsTime += time.elapsed<std::chrono::nanoseconds>();
         }
 
         void finishAssignments(const Vehicle *pVeh) {

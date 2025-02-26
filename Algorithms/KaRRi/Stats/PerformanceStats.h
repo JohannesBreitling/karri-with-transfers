@@ -359,7 +359,7 @@ namespace karri::stats {
                << numDijkstraSearchesRun << ", "
                << numEdgesRelaxed << ", "
                << numVerticesScanned << ", "
-               << searchTime << "\n";
+               << searchTime;
             return ss.str();
         }
         
@@ -475,7 +475,7 @@ namespace karri::stats {
                << numSearchesRunLastStopToDVeh << ", "
                << numEdgesRelaxedPickupToDVeh << ", "
                << numVerticesScannedPickupToDVeh << ", "
-               << searchTimePickupToDVeh << "\n";
+               << searchTimePickupToDVeh;
             return ss.str();
         }
 
@@ -566,7 +566,7 @@ namespace karri::stats {
                << numSearchesRunLastStopToPVeh << ", "
                << numEdgesRelaxedLastStopToPVeh << ", "
                << numVerticesScannedLastStopToPVeh << ", "
-               << searchTimeLastStopToPVeh << "\n";
+               << searchTimeLastStopToPVeh;
             return ss.str();
         }
 
@@ -983,7 +983,7 @@ namespace karri::stats {
             updateStats.clear();
             ordinaryTransferStats.clear();
             transferALSPVehStats.clear();
-            transferALSPVehStats.clear();
+            transferALSDVehStats.clear();
             costStats.clear();
         }
 

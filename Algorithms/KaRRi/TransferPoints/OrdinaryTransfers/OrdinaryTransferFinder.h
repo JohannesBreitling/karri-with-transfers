@@ -131,7 +131,7 @@ namespace karri {
                     // Find the transfer points between the two vehicles
                     Timer searchTimer;
                     calculateTransferPoints(pVeh, dVeh);
-                    searchTime += searchTimer.elapsed();
+                    searchTime += searchTimer.elapsed<std::chrono::nanoseconds>();
 
                     if (transferPointsSize() == 0)
                         continue;
@@ -165,7 +165,7 @@ namespace karri {
             // Write the statss
             auto &stats = requestState.stats().ordinaryTransferStats;
             
-            stats.totalTime = total.elapsed();
+            stats.totalTime = total.elapsed<std::chrono::nanoseconds>();
             stats.numCandidateVehiclesPickupBNS += numCandidateVehiclesPickupBNS;
             stats.numCandidateVehiclesPickupORD += numCandidateVehiclesPickupORD;
             stats.numCandidateVehiclesDropoffBNS += numCandidateVehiclesDropoffBNS;
@@ -742,7 +742,7 @@ namespace karri {
 
             Timer time;
             requestState.tryAssignment(asgn);
-            tryAssignmentsTime += time.elapsed();
+            tryAssignmentsTime += time.elapsed<std::chrono::nanoseconds>();
         }
 
 

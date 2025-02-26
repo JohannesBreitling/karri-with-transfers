@@ -48,7 +48,7 @@ namespace karri {
 
             Timer searchTimer;
             auto result = vehChQuery.runManyToOne(sources, targetRank, offset);
-            searchTime = searchTimer.elapsed();
+            searchTime = searchTimer.elapsed<std::chrono::nanoseconds>();
 
             return result;
         }
@@ -84,7 +84,7 @@ namespace karri {
             
             Timer searchTimer;
             auto result = vehChQuery.runOneToMany(sourceRank, ranks, offsets);
-            searchTime = searchTimer.elapsed();
+            searchTime = searchTimer.elapsed<std::chrono::nanoseconds>();
 
             return result;
         }

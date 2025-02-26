@@ -66,7 +66,7 @@ class TransferALSDVehFinder {
 
         // Write the stats
         auto &stats = requestState.stats().transferALSDVehStats;
-        stats.totalTime = total.elapsed();
+        stats.totalTime = total.elapsed<std::chrono::nanoseconds>();
         stats.numCandidateVehiclesPickupBNS += numCandidateVehiclesPickupBNS;
         stats.numCandidateVehiclesPickupORD += numCandidateVehiclesPickupORD;
         stats.numCandidateVehiclesDropoffALS += numCandidateVehiclesDropoffALS;
@@ -315,7 +315,7 @@ class TransferALSDVehFinder {
             
             Timer time;
             requestState.tryAssignment(asgn);
-            tryAssignmentsTime += time.elapsed();
+            tryAssignmentsTime += time.elapsed<std::chrono::nanoseconds>();
         }
 
         void finishAssignments(const Vehicle *pVeh) {
