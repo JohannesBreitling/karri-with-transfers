@@ -35,8 +35,16 @@ psgGraph=$inputDir/Graphs/${instanceName}_pedestrian_psg.gr.bin
 vehCh=$inputDir/CHs/${instanceName}_pedestrian_veh_time.ch.bin
 psgCh=$inputDir/CHs/${instanceName}_pedestrian_psg_time.ch.bin
 
+echo $vehGraph
+echo $psgGraph
+echo $vehCh
+echo $psgCh
+
 vehiclePath=$inputDir/Vehicles/${instanceName}-${vehicles}.csv
 requestPath=$inputDir/Requests/${instanceName}-${requests}.csv
+
+echo $vehiclePath
+echo $requestPath
 
 # Erzeuge konkretes Output-Directory, dessen Name aus scriptName (s.o.) + instanceName + aktuellem timestamp besteht.
 currentTime=$(date "+%m.%d-%H:%M")
@@ -68,9 +76,8 @@ karriOutputDirWot=$karriOutputDir/wot/wot
 karriOutputDirWt=$karriOutputDir/wt/wt
 
 printf "Running without transfers...\n"
-echo $karriOutputDir
+
 $karriBinaryDir/Launchers/karri -trans 0 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDirWot
 
-echo $karriOutputDir/wt/wt
 printf "\nRunning with transfers...\n"
 $karriBinaryDir/Launchers/karri -trans 1 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDirWt
