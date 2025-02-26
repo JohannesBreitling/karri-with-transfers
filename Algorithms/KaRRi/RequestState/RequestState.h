@@ -148,7 +148,7 @@ namespace karri {
                 bestAssignmentWithTransfer = AssignmentWithTransfer(asgn);
                 bestCostWithTransfer = cost.total;
                 bestCostObjectWT = cost;
-            } else {
+            } else if (cost.total < bestCostWithTransfer) {
                 postponedAssignments.push_back(asgn);
             }
         }

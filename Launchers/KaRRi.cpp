@@ -69,6 +69,7 @@
 #include "Algorithms/KaRRi/TransferPoints/DijkstraTransferPointStrategy.h"
 #include "Algorithms/KaRRi/TransferPoints/TransferVehicles.h"
 
+#include "Algorithms/KaRRi/TransferPoints/CHEllipseReconstructor.h"
 #include "Algorithms/KaRRi/TransferPoints/PickupALS/TransfersPickupALSBCHStrategy.h"
 #include "Algorithms/KaRRi/TransferPoints/DropoffALS/TransfersDropoffALSBCHStrategy.h"
 #include "Algorithms/KaRRi/TransferPoints/OrdinaryTransfers/OrdinaryTransferFinder.h"
@@ -592,6 +593,9 @@ int main(int argc, char *argv[]) {
         using TransferPointsLabelSet = BasicLabelSet<1, ParentInfo::NO_PARENT_INFO>;
         using TransferPointStrategy = TransferPointStrategies::DijkstraTransferPointStrategy<VehicleInputGraph, TransferPointsLabelSet>;
 
+        using CHEllipseReconstructorImpl = CHEllipseReconstructor<VehCHEnv, EllipticBucketsEnv>;
+        CHEllipseReconstructorImpl chEllipseReconstructor(*vehChEnv, ellipticBucketsEnv, routeState);
+
         std::map<std::tuple<int, int>, std::vector<TransferPoint>> transferPoints = std::map<std::tuple<int, int>, std::vector<TransferPoint>>{};
         TransferPointStrategy transferPointStrategy = TransferPointStrategy(routeState, vehicleInputGraph, revVehicleGraph, transferPoints);
         using TransferPointFinderImpl = TransferPointFinder<TransferPointStrategy>;
@@ -617,8 +621,8 @@ int main(int argc, char *argv[]) {
         using TransferAsserterImpl = InsertionAsserter<VehicleInputGraph, VehCHEnv>;
         TransferAsserterImpl asserter(routeState, vehicleInputGraph, *vehChEnv);
         
-        using OrdinaryTransferInsertionsImpl =  OrdinaryTransferFinder<TransferPointFinderImpl, TransfersDropoffALSStrategy, VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
-        OrdinaryTransferInsertionsImpl ordinaryTransferInsertions = OrdinaryTransferInsertionsImpl(transferPointFinder, transferDropoffALSStrategy, vehicleInputGraph, *vehChEnv, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, relOrdinaryDropoffs, relDropoffsBeforeNextStop, postponedAssignments, fleet, routeState, reqState, calc, asserter, transferPoints);
+        using OrdinaryTransferInsertionsImpl =  OrdinaryTransferFinder<TransferPointFinderImpl, TransfersDropoffALSStrategy, VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, TransferAsserterImpl, CHEllipseReconstructorImpl>;
+        OrdinaryTransferInsertionsImpl ordinaryTransferInsertions = OrdinaryTransferInsertionsImpl(transferPointFinder, transferDropoffALSStrategy, chEllipseReconstructor, vehicleInputGraph, *vehChEnv, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, relOrdinaryDropoffs, relDropoffsBeforeNextStop, postponedAssignments, fleet, routeState, reqState, calc, asserter, transferPoints);
 
         using TransferALSPVehFinderImpl = TransferALSPVehFinder<TransferStrategyALSImpl, TransfersPickupALSStrategy, TransfersDropoffALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
         TransferALSPVehFinderImpl transferALSPVehInsertions = TransferALSPVehFinderImpl(transferALSStrategy, transferPickupALSStrategy, transferDropoffALSStrategy, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, relOrdinaryDropoffs, postponedAssignments, fleet, routeState, reqState, calc, asserter);

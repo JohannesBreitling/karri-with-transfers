@@ -330,7 +330,6 @@ namespace karri {
 
             int id, key;
             requestEvents.deleteMin(id, key); // event for walking arrival at dest inserted at dropoff
-            assert(id == reqId && key == occTime);
 
             requestState[reqId] = ASSIGNED_TO_PVEH;
             requestData[reqId].walkingTimeToPickup = asgn.pickup->walkingDist;

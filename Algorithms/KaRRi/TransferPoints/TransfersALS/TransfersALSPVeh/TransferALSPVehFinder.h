@@ -162,6 +162,7 @@ namespace karri {
             numCandidateVehiclesDropoffORD += relORDDropoffs.getVehiclesWithRelevantPDLocs().size();
             
             findAssignmentsWithPickupBNS();
+            assert(postponedAssignments.size() == 0);
             findAssignmentsWithPickupORD();
             findAssignmentsWithPickupALS();
 
@@ -231,6 +232,7 @@ namespace karri {
                     continue;
 
                 finishAssignments(pVeh);
+                postponedAssignments.clear();
             }
         }
 

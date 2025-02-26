@@ -22,11 +22,13 @@
 /// SOFTWARE.
 /// ******************************************************************************
 
+#include "../VertexInEllipse.h"
+
 #pragma once
 
 namespace karri {
 
-    template<typename TransferPointFinderT, typename TransfersDropoffALSStrategyT, typename InputGraphT, typename VehCHEnvT, typename CurVehLocToPickupSearchesT, typename InsertionAsserterT>
+    template<typename TransferPointFinderT, typename TransfersDropoffALSStrategyT, typename InputGraphT, typename VehCHEnvT, typename CurVehLocToPickupSearchesT, typename InsertionAsserterT, typename CHEllipseReconstructorT>
     class OrdinaryTransferFinder {
         
     // Both vehicles can drive a detour to the transfer point, but none drives the detour ALS
@@ -37,6 +39,7 @@ namespace karri {
         OrdinaryTransferFinder(
             TransferPointFinderT &tpFinder,
             TransfersDropoffALSStrategyT &dropoffALSStrategy,
+            CHEllipseReconstructorT &chEllipseReconstructor,
             const InputGraphT &inputGraph,
             const VehCHEnvT &vehChEnv,
             CurVehLocToPickupSearchesT &searches,
@@ -53,6 +56,7 @@ namespace karri {
             std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints
         ) : tpFinder(tpFinder),
             dropoffALSStrategy(dropoffALSStrategy),
+            chEllipseReconstructor(chEllipseReconstructor),
             inputGraph(inputGraph),
             vehCh(vehChEnv.getCH()),
             vehChQuery(vehChEnv.template getFullCHQuery<>()),
@@ -67,6 +71,7 @@ namespace karri {
             requestState(requestState),
             calc(calc),
             asserter(asserter),
+            distanceFromVertexToNextStop(inputGraph.numVertices(), INFTY),
             transferPoints(transferPoints),
             dVehIdsALS(Subset(0)) {}
         
@@ -119,7 +124,50 @@ namespace karri {
             for (const int dVehId : dVehIds) {
                 dVehs.push_back(&fleet[dVehId]);
             }
-            
+
+            // Calculate the necessary ellipses for every vehicle for pickup and dropoff
+            std::vector<int> idxOfStop(routeState.getMaxStopId() + 1, INVALID_INDEX);
+            std::vector<int> stopIdsForEllipses;
+            for (const auto *pVeh : pVehs) {
+                const auto stopIds = routeState.stopIdsFor(pVeh->vehicleId);
+                for (int i = 0; i < routeState.numStopsOf(pVeh->vehicleId) - 1; i++) {
+                    if (idxOfStop[stopIds[i]] == INVALID_INDEX) {
+                        idxOfStop[stopIds[i]] = stopIdsForEllipses.size();
+                        stopIdsForEllipses.push_back(stopIds[i]);
+                    }
+                }
+            }
+
+            for (const auto *dVeh: dVehs) {
+                const auto stopIds = routeState.stopIdsFor(dVeh->vehicleId);
+                for (int i = 0; i < routeState.numStopsOf(dVeh->vehicleId) - 1; i++) {
+                    if (idxOfStop[stopIds[i]] == INVALID_INDEX) {
+                        idxOfStop[stopIds[i]] = stopIdsForEllipses.size();
+                        stopIdsForEllipses.push_back(stopIds[i]);
+                    }
+                }
+            }
+
+            // Calculate all necessary ellipses
+            Timer searchTimer;
+            const auto vertexEllipses = chEllipseReconstructor.getVerticesInEllipsesOfLegsAfterStops(stopIdsForEllipses, numVerticesScanned, numEdgesRelaxed);
+
+            // Convert the ellipses of vertices to ellipses of edges
+            std::vector<std::vector<EdgeInEllipse>> edgeEllipses;
+            for (const auto& stopId : stopIdsForEllipses) {
+                const auto leeway = routeState.leewayOfLegStartingAt(stopId);
+                auto edgeEllipse = convertVertexEllipseIntoEdgeEllipse(vertexEllipses[idxOfStop[stopId]], leeway);
+
+                std::sort(edgeEllipse.begin(), edgeEllipse.end(), [](const EdgeInEllipse& e1, const EdgeInEllipse& e2) {
+                    return e1.edge < e2.edge;
+                });
+
+                edgeEllipses.push_back(edgeEllipse);
+            }
+
+            searchTime += searchTimer.elapsed<std::chrono::nanoseconds>();
+
+
             // Loop over all the possible vehicle combinations
             for (const auto *pVeh : pVehs) {
                 for (const auto *dVeh : dVehs) {
@@ -129,9 +177,22 @@ namespace karri {
                     
                     // Now we have a vehicle pair to work with
                     // Find the transfer points between the two vehicles
-                    Timer searchTimer;
-                    calculateTransferPoints(pVeh, dVeh);
-                    searchTime += searchTimer.elapsed<std::chrono::nanoseconds>();
+
+
+                    // Populate the map
+                    for (int stopIdxPVeh = 0; stopIdxPVeh < routeState.numStopsOf(pVeh->vehicleId) - 1; stopIdxPVeh++) {
+                        const int stopIdPVeh = routeState.stopIdsFor(pVeh->vehicleId)[stopIdxPVeh];
+                        const auto &ellipsePVeh = edgeEllipses[idxOfStop[stopIdPVeh]];
+
+                        for (int stopIdxDVeh = 0; stopIdxDVeh < routeState.numStopsOf(dVeh->vehicleId) - 1; stopIdxDVeh++) {
+                            const int stopIdDVeh = routeState.stopIdsFor(dVeh->vehicleId)[stopIdxDVeh];
+                            const auto &ellipseDVeh = edgeEllipses[idxOfStop[stopIdDVeh]];
+
+                            transferPoints[{stopIdxPVeh, stopIdxDVeh}] = getIntersectionOfEllipses(ellipsePVeh, ellipseDVeh, pVeh, dVeh, stopIdxPVeh, stopIdxDVeh);
+                        }
+                    }
+
+                    // calculateTransferPoints(pVeh, dVeh);
 
                     if (transferPointsSize() == 0)
                         continue;
@@ -872,6 +933,67 @@ namespace karri {
             return lb;
         }
 
+        std::vector<EdgeInEllipse> convertVertexEllipseIntoEdgeEllipse(const std::vector<VertexInEllipse> &vertexEllipse, const int leeway) {
+            std::vector<EdgeInEllipse> result;
+
+            for (auto vertexInEllipse : vertexEllipse) {
+                distanceFromVertexToNextStop[vertexInEllipse.vertex] = vertexInEllipse.distFromVertex;
+            }
+
+            for (auto vertexInEllipse : vertexEllipse) {
+
+                FORALL_INCIDENT_EDGES(inputGraph, vertexInEllipse.vertex, e) {
+
+                    const int travelTime = inputGraph.travelTime(e);
+                    const int edgeHead = inputGraph.edgeHead(e);
+                    const int distToTail = vertexInEllipse.distToVertex;
+                    const int distFromHead = distanceFromVertexToNextStop[edgeHead];
+
+                    if (distToTail + travelTime + distFromHead < leeway) {
+                        result.push_back(EdgeInEllipse{e, distToTail, distFromHead});
+                    }
+                }
+            }
+
+            distanceFromVertexToNextStop.clear();
+            return result;
+        }
+
+        std::vector<TransferPoint> getIntersectionOfEllipses(const std::vector<EdgeInEllipse> &ellipsePVeh, const std::vector<EdgeInEllipse> &ellipseDVeh, const Vehicle* pVeh, const Vehicle* dVeh, const int stopIdxPVeh, const int stopIdxDVeh) {
+            std::vector<TransferPoint> result;
+            int posPVeh = 0, posDVeh = 0;
+
+            while (posPVeh < ellipsePVeh.size() && posDVeh < ellipseDVeh.size()) {
+                if (ellipsePVeh[posPVeh].edge < ellipseDVeh[posDVeh].edge) {
+                    posPVeh++;
+                    continue;
+                }
+
+                if (ellipsePVeh[posPVeh].edge > ellipseDVeh[posDVeh].edge) {
+                    posDVeh++;
+                    continue;
+                }
+
+                const auto edgePVeh = ellipsePVeh[posPVeh];
+                const auto edgeDVeh = ellipseDVeh[posDVeh];
+                const int loc = edgePVeh.edge;
+
+
+                const int distPVehToTransfer = edgePVeh.distToTail + inputGraph.travelTime(loc);
+                const int distPVehFromTransfer = edgePVeh.distFromHead;
+                const int distDVehToTransfer = edgeDVeh.distToTail + inputGraph.travelTime(loc);
+                const int distDVehFromTransfer = edgeDVeh.distFromHead;
+
+                TransferPoint tp(loc, pVeh, dVeh, stopIdxPVeh, stopIdxDVeh, distPVehToTransfer, distPVehFromTransfer, distDVehToTransfer, distDVehFromTransfer);
+                result.push_back(tp);
+
+                ++posPVeh;
+                ++posDVeh;
+            }
+
+            return result;
+        }
+
         bool assertTransferPointCalculation(const TransferPoint tp) {
             const auto stopLocationsPVeh = routeState.stopLocationsFor(tp.pVeh->vehicleId);
             const auto stopLocationsDVeh = routeState.stopLocationsFor(tp.dVeh->vehicleId);
@@ -943,6 +1065,7 @@ namespace karri {
 
         TransferPointFinderT &tpFinder;
         TransfersDropoffALSStrategyT &dropoffALSStrategy;
+        CHEllipseReconstructorT &chEllipseReconstructor;
 
         const InputGraphT &inputGraph;
         const CH &vehCh;
@@ -964,6 +1087,8 @@ namespace karri {
         CostCalculator &calc;
         InsertionAsserterT &asserter;
 
+
+        TimestampedVector<int> distanceFromVertexToNextStop;
         std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints;
         
         std::vector<bool> alsDropoffVehs;
