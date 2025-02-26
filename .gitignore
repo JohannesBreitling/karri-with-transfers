@@ -5,10 +5,11 @@
 # Generated input files
 /Inputs/
 /Publications/karri/Inputs/
-/Publications/karri-with-transfers/outputs/
 
 # Output files
 /Outputs/
+/Publications/karri-with-transfers/outputs/
+/Publications/karri-with-transfers/results/
 
 # Various config files.
 /.settings/
