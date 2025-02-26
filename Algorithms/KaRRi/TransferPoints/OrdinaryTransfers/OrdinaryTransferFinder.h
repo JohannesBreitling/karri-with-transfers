@@ -76,21 +76,21 @@ namespace karri {
             numCandidateVehiclesPickupORD = 0;
             numCandidateVehiclesDropoffBNS = 0;
             numCandidateVehiclesDropoffORD = 0;
-            numCandidateVehiclesDropoffALS = 0; // TODO
-            numPartialsTriedPickupBNS = 0; // TODO
-            numPartialsTriedPickupORD = 0; // TODO
-            numAssignmentsTriedPickupBNS = 0; // TODO
-            numAssignmentsTriedPickupORD = 0; // TODO
-            numAssignmentsTriedDropoffBNS = 0; // TODO
-            numAssignmentsTriedDropoffORD = 0; // TODO
-            numAssignmentsTriedDropoffALS = 0; // TODO
+            numCandidateVehiclesDropoffALS = 0;
+            numPartialsTriedPickupBNS = 0;
+            numPartialsTriedPickupORD = 0;
+            numAssignmentsTriedPickupBNS = 0;
+            numAssignmentsTriedPickupORD = 0;
+            numAssignmentsTriedDropoffBNS = 0;
+            numAssignmentsTriedDropoffORD = 0;
+            numAssignmentsTriedDropoffALS = 0;
             tryAssignmentsTime = 0;
-            numStopPairs = 0; // TODO
-            numTransferPoints = 0; // TODO
-            numDijkstraSearchesRun = 0; // TODO
-            numEdgesRelaxed = 0; // TODO
-            numVerticesScanned = 0; // TODO
-            searchTime = 0; // TODO
+            numStopPairs = 0;
+            numTransferPoints = 0;
+            numDijkstraSearchesRun = 0;
+            numEdgesRelaxed = 0;
+            numVerticesScanned = 0;
+            searchTime = 0;
         }
 
         void findAssignments() {
@@ -129,10 +129,14 @@ namespace karri {
                     
                     // Now we have a vehicle pair to work with
                     // Find the transfer points between the two vehicles
+                    Timer searchTimer;
                     calculateTransferPoints(pVeh, dVeh);
+                    searchTime += searchTimer.elapsed();
 
                     if (transferPointsSize() == 0)
                         continue;
+
+                    numTransferPoints += transferPointsSize();
 
                     // Find the assignments with the transfer points
                     findAssignmentsForVehiclePair(pVeh, dVeh);
@@ -193,6 +197,10 @@ namespace karri {
 
             //* Use the transfer point finder to find the possible transfer points  
             tpFinder.findTransferPoints(*pVeh, *dVeh);
+
+            numDijkstraSearchesRun += tpFinder.getNumSearchesRun();
+            numEdgesRelaxed += tpFinder.getNumEdgesRelaxed();
+            numVerticesScanned += tpFinder.getNumVerticesScanned();
         }
 
         void findAssignmentsForVehiclePair(const Vehicle *pVeh, const Vehicle *dVeh) {
@@ -211,6 +219,7 @@ namespace karri {
 
             for  (int trIdxPVeh = 0; trIdxPVeh < numStopsPVeh - 1; trIdxPVeh++) {
                 for  (int trIdxDVeh = 0; trIdxDVeh < numStopsDVeh - 1; trIdxDVeh++) {
+                    numStopPairs++;
                     // For fixed transfer indices, try to find possible pickups
                     tryPickupBNS(pVeh, dVeh, trIdxPVeh, trIdxDVeh);
                     tryPickupORD(pVeh, dVeh, trIdxPVeh, trIdxDVeh);
@@ -305,6 +314,18 @@ namespace karri {
             if (asgn.distToPickup == INFTY || asgn.distFromPickup == INFTY || asgn.distToTransferPVeh == INFTY || asgn.distFromTransferPVeh == INFTY)
                 return;
             
+            switch (asgn.pickupType) {
+                case BEFORE_NEXT_STOP:
+                    numPartialsTriedPickupBNS++;
+                    break;
+                case ORDINARY:
+                    numPartialsTriedPickupORD++;
+                    break;
+                default:
+                    assert(false);
+            }
+
+
             if (unfinished) {
                 pickupVehCost = calc.calcPartialCostForPVehLowerBound<true>(asgn, requestState);
             } else {
@@ -693,6 +714,31 @@ namespace karri {
              || (asgn.transferIdxDVeh < numStopsDVeh - 1 && asgn.transfer.loc == stopLocationsDVeh[asgn.transferIdxDVeh + 1])
              || (asgn.dropoffIdx < numStopsDVeh - 1 && asgn.dropoff->loc == stopLocationsDVeh[asgn.dropoffIdx + 1]))
                 return;
+            
+            switch (asgn.pickupType) {
+                case BEFORE_NEXT_STOP:
+                    numAssignmentsTriedPickupBNS++;
+                    break;
+                case ORDINARY:
+                    numAssignmentsTriedPickupORD++;
+                    break;
+                default:
+                    assert(false);
+            }
+
+            switch (asgn.dropoffType) {
+                case BEFORE_NEXT_STOP:
+                    numAssignmentsTriedDropoffBNS++;
+                    break;
+                case ORDINARY:
+                    numAssignmentsTriedDropoffORD++;
+                    break;
+                case AFTER_LAST_STOP:
+                    numAssignmentsTriedDropoffALS++;
+                    break;
+                default:
+                    assert(false);
+            }
 
             Timer time;
             requestState.tryAssignment(asgn);
@@ -745,6 +791,7 @@ namespace karri {
 
             // Calculate the possible vehicles for dropoff als
             dVehIdsALS = dropoffALSStrategy.findDropoffsAfterLastStop();
+            numCandidateVehiclesDropoffALS += dVehIds.size();
 
             for (const int dVehId : dVehIdsALS) {
                 dVehIds.push_back(dVehId);

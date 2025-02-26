@@ -138,9 +138,12 @@ namespace karri::TransferPointStrategies {
             const ConstantVectorRange<int> &stopLocationsPVeh, const ConstantVectorRange<int> &stopLocationsDVeh,
             const ConstantVectorRange<int> &stopIdsPVeh, const ConstantVectorRange<int> &stopIdsDVeh
         ) {
-
             if (numStopsPVeh <= 1 || numStopsDVeh <= 1)
                 return;
+
+            numSearchesRun = 0;
+            numEdgesRelaxed = 0;
+            numVerticesScanned = 0;
 
             transferPoints = std::map<std::tuple<int, int>, std::vector<TransferPoint>>{};
 
@@ -229,9 +232,13 @@ namespace karri::TransferPointStrategies {
 
             possibleTransferPoints = std::vector<TransferPoint>{};
             possibleTransferPoints = searchSpaceIntersection.getIntersection();
+
+            numSearchesRun += 4;
         }
 
         void settleVertex(int v, int distance) {
+            numVerticesScanned++;
+            
             int firstEdge;
             int degree;
 
@@ -247,6 +254,7 @@ namespace karri::TransferPointStrategies {
                     const auto distanceToEdgeHead = distance + travelTime;
                 
                     if (distanceToEdgeHead < maxDetour) {
+                        numEdgesRelaxed++;
                         searchSpaceIntersection.edgeFound(e, distanceToEdgeHead);
                     }
                 }
@@ -264,10 +272,23 @@ namespace karri::TransferPointStrategies {
                     const int forwardEdge = reverseGraph.edgeId(currentEdge);
 
                     if (distanceForEdge < maxDetour) {
+                        numEdgesRelaxed++;
                         searchSpaceIntersection.edgeFound(forwardEdge, distanceForEdge);
                     }
                 }
             }
+        }
+
+        int64_t getNumSearchesRun() {
+            return numSearchesRun;
+        }
+        
+        int64_t getNumEdgesRelaxed() {
+            return numEdgesRelaxed;
+        }
+
+        int64_t getNumVerticesScanned() {
+            return numVerticesScanned;
         }
 
     private:
@@ -322,6 +343,10 @@ namespace karri::TransferPointStrategies {
 
         std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints;
         std::vector<TransferPoint> possibleTransferPoints;
+
+        int64_t numSearchesRun;
+        int64_t numEdgesRelaxed;
+        int64_t numVerticesScanned;
     };
 
 }

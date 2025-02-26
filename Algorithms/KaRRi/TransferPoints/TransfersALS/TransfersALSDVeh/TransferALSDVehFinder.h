@@ -90,11 +90,11 @@ class TransferALSDVehFinder {
         numAssignmentsTriedPickupORD = 0;
         numAssignmentsTriedDropoffALS = 0;
         tryAssignmentsTime = 0;
-        numTransferPoints = 0; // TODO
-        numSearchesRunLastStopToPVeh = 0; // TODO
-        numEdgesRelaxedLastStopToPVeh = 0; // TODO
-        numVerticesScannedLastStopToPVeh = 0; // TODO
-        searchTimeLastStopToPVeh = 0; // TODO
+        numTransferPoints = 0;
+        numSearchesRunLastStopToPVeh = 0;
+        // numEdgesRelaxedLastStopToPVeh = 0;
+        // numVerticesScannedLastStopToPVeh = 0;
+        searchTimeLastStopToPVeh = 0;
     }
 
     private:
@@ -132,10 +132,13 @@ class TransferALSDVehFinder {
 
                     //* Calculate the distances from the last stop of the dVeh to all stops of the pVeh
                     const auto distancesToTransfer = strategy.calculateDistancesFromLastStopToAllStops(*dVeh, *pVeh);
-                
+                    numTransferPoints += distancesToTransfer.size();
+                    numSearchesRunLastStopToPVeh += strategy.getNumSearchesRun();
+                    searchTimeLastStopToPVeh += strategy.getSearchTime();
+
                     for (const auto &dropoff : requestState.dropoffs) {
                         const auto distancesToDropoff = strategy.calculateDistancesFromAllStopsToLocation(*pVeh, dropoff.loc);
-
+                        
                         assert(numStopsPVeh - 1 == distancesToTransfer.size());
                         assert(numStopsPVeh - 1 == distancesToDropoff.size());
 
@@ -211,6 +214,7 @@ class TransferALSDVehFinder {
 
                     //* Calculate the distances from the vehicles last stop to all stops of possible pickup vehicles
                     const auto distancesToTransfer = strategy.calculateDistancesFromLastStopToAllStops(*dVeh, *pVeh);
+                    numTransferPoints += distancesToTransfer.size();
                 
                     for (const auto &dropoff : requestState.dropoffs) {
                         //* Calculate the distances from the stops of the pVeh to the possible dropoffs

@@ -73,7 +73,7 @@ namespace karri {
             totalTime = 0;
             numCandidateVehiclesPickupBNS = 0;
             numCandidateVehiclesPickupORD = 0;
-            numCandidateVehiclesPickupALS = 0; // TODO
+            numCandidateVehiclesPickupALS = 0;
             numCandidateVehiclesDropoffORD = 0;
             numCandidateVehiclesDropoffALS = 0;
             numAssignmentsTriedPickupBNS = 0;
@@ -82,14 +82,14 @@ namespace karri {
             numAssignmentsTriedDropoffORD = 0;
             numAssignmentsTriedDropoffALS = 0;
             tryAssignmentsTime = 0;
-            numTransferPoints = 0; // TODO
+            numTransferPoints = 0;
             numSearchesRunLastStopToDVeh = 0; // TODO
-            numEdgesRelaxedLastStopToDVeh = 0; // TODO
-            numVerticesScannedLastStopToDVeh = 0; // TODO
+            // numEdgesRelaxedLastStopToDVeh = 0;
+            // numVerticesScannedLastStopToDVeh = 0;
             searchTimeLastStopToDVeh = 0; // TODO
             numSearchesRunPickupToDVeh = 0; // TODO
-            numEdgesRelaxedPickupToDVeh = 0; // TODO
-            numVerticesScannedPickupToDVeh = 0; // TODO
+            // numEdgesRelaxedPickupToDVeh = 0;
+            // numVerticesScannedPickupToDVeh = 0;
             searchTimePickupToDVeh = 0; // TODO
         }
         
@@ -108,7 +108,10 @@ namespace karri {
                 
                 for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
                     const auto &dVeh = &fleet[dVehId];
+                    Timer searchTime;
                     const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
+                    searchTimeLastStopToDVeh += searchTime.elapsed();
+                    numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
 
                     // Save the distances for building the assignments later
                     lastStopDistances[pVehId][dVehId] = distances;
@@ -116,7 +119,10 @@ namespace karri {
 
                 for (const auto dVehId : dVehIds) {
                     const auto &dVeh = &fleet[dVehId];
+                    Timer searchTime;
                     const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
+                    searchTimeLastStopToDVeh += searchTime.elapsed();
+                    numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
 
                     // Save the distances for building the assignments later
                     lastStopDistances[pVehId][dVehId] = distances;
@@ -128,18 +134,26 @@ namespace karri {
                 
                 for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
                     const auto *dVeh = &fleet[dVehId];
+                    Timer searchTime;
                     const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
+                    searchTimeLastStopToDVeh += searchTime.elapsed();
+                    numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
 
                     // Save the distances for building the assignments later
-                    lastStopDistances[pVehId][dVehId] = distances;   
+                    lastStopDistances[pVehId][dVehId] = distances;
+                    numTransferPoints += distances.size();
                 }
 
                 for (const auto dVehId : dVehIds) {
                     const auto *dVeh = &fleet[dVehId];
+                    Timer searchTime;
                     const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
+                    searchTimeLastStopToDVeh += searchTime.elapsed();
+                    numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
 
                     // Save the distances for building the assignments later
                     lastStopDistances[pVehId][dVehId] = distances;
+                    numTransferPoints += distances.size();
                 }
             }
 
@@ -224,6 +238,7 @@ namespace karri {
         void findAssignmentsWithPickupALS() {
             //* In this case we consider all vehicles that are able to perform the pickup ALS
             const auto pVehIds = pickupALSStrategy.findPickupsAfterLastStop();
+            numCandidateVehiclesPickupALS += pVehIds.size();
 
             if (pVehIds.size() == 0)
                 return;
@@ -258,8 +273,12 @@ namespace karri {
                     continue;
                 
                 // Calculate the distances from the pickup to the stops of the dropoff vehicle
+                Timer searchTimer;
                 const auto distancesToTransfer = strategy.calculateDistancesFromPickupToAllStops(pickup->loc, *dVeh);
-                
+                numTransferPoints += distancesToTransfer.size();
+                searchTimePickupToDVeh += searchTimer.elapsed();
+                numSearchesRunPickupToDVeh += strategy.getNumSearchesRun();
+
                 for (const auto &dropoff : relORDDropoffs.relevantSpotsFor(dVehId)) {
                     // Try all possible transfer points
                     if (dropoff.stopIndex == numStopsDVeh - 1)
@@ -331,7 +350,11 @@ namespace karri {
                     continue;
                 
                 // Calculate the distances from the pickup to the stops of the dropoff vehicle
+                Timer searchTimer;
                 const auto distancesToTransfer = strategy.calculateDistancesFromPickupToAllStops(pickup->loc, *dVeh);
+                searchTimePickupToDVeh += searchTimer.elapsed();
+                numTransferPoints += distancesToTransfer.size();
+                numSearchesRunPickupToDVeh += strategy.getNumSearchesRun();
 
                 for (const auto &dropoff : requestState.dropoffs) {
                     assert(numStopsDVeh - 1 == distancesToTransfer.size());

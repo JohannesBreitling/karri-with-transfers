@@ -50,6 +50,10 @@ namespace karri {
         }
 
         void findTransferPoints(const Vehicle &pVeh, const Vehicle &dVeh) {
+            numSearchesRun = 0;
+            numEdgesRelaxed = 0;
+            numVerticesScanned = 0;
+
             // Get the stop locations of the two vehicles               
             const auto &stopLocationsPVeh = routeState.stopLocationsFor(pVeh.vehicleId);
             const auto &stopLocationsDVeh = routeState.stopLocationsFor(dVeh.vehicleId);
@@ -61,12 +65,33 @@ namespace karri {
             const int numStopsDVeh = routeState.numStopsOf(dVeh.vehicleId);
             
             strategy.findTransferPoints(pVeh, dVeh, numStopsPVeh, numStopsDVeh, stopLocationsPVeh, stopLocationsDVeh, stopIdsPVeh, stopIdsDVeh);
+
+            numSearchesRun = strategy.getNumSearchesRun();
+            numEdgesRelaxed = strategy.getNumEdgesRelaxed();
+            numVerticesScanned = strategy.getNumVerticesScanned();
+        }
+
+        int64_t getNumSearchesRun() {
+            return numSearchesRun;
+        }
+
+        int64_t getNumEdgesRelaxed() {
+            return numEdgesRelaxed;
+        }
+
+        int64_t getNumVerticesScanned() {
+            return numVerticesScanned;
         }
 
     private:
         StrategyT &strategy;
         const RouteState &routeState;
         std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints;
+
+        int64_t numSearchesRun;
+        int64_t numEdgesRelaxed;
+        int64_t numVerticesScanned;
+
     };
 
 }

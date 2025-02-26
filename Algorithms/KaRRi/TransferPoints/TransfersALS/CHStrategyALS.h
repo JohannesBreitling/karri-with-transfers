@@ -19,6 +19,7 @@ namespace karri {
                 vehChQuery(vehChEnv.template getFullCHQuery<>()) {}
 
         std::vector<int> calculateDistancesFromLastStopToAllStops(const Vehicle &pVeh, const Vehicle &dVeh) {
+            numSearchesRun = 0;
             const auto numStopsPVeh = routeState.numStopsOf(pVeh.vehicleId);
             const auto lastStopLocPVeh = routeState.stopLocationsFor(pVeh.vehicleId)[numStopsPVeh - 1];
             const auto sourceRank = vehCh.rank(inputGraph.edgeHead(lastStopLocPVeh));
@@ -27,6 +28,7 @@ namespace karri {
         }
 
         std::vector<int> calculateDistancesFromPickupToAllStops(const int pickupLoc, const Vehicle &dVeh) {
+            numSearchesRun = 0;
             const auto sourceRank = vehCh.rank(inputGraph.edgeHead(pickupLoc));
             return runFromSourceToAllStops(sourceRank, dVeh);
         }
@@ -42,7 +44,21 @@ namespace karri {
             const int targetRank = vehCh.rank(inputGraph.edgeTail(location));
             const int offset = inputGraph.travelTime(location);
 
-            return vehChQuery.runManyToOne(sources, targetRank, offset);
+            numSearchesRun = sources.size();
+
+            Timer searchTimer;
+            auto result = vehChQuery.runManyToOne(sources, targetRank, offset);
+            searchTime = searchTimer.elapsed();
+
+            return result;
+        }
+
+        int64_t getNumSearchesRun() {
+            return numSearchesRun;
+        }
+
+        int64_t getSearchTime() {
+            return searchTime;
         }
             
 
@@ -63,7 +79,14 @@ namespace karri {
                 offsets.push_back(inputGraph.travelTime(stopLocationsDVeh[i]));
             }
 
-            return vehChQuery.runOneToMany(sourceRank, ranks, offsets);
+            numSearchesRun = ranks.size();
+            
+            
+            Timer searchTimer;
+            auto result = vehChQuery.runOneToMany(sourceRank, ranks, offsets);
+            searchTime = searchTimer.elapsed();
+
+            return result;
         }
         
         using VehCHQuery = typename VehCHEnvT::template FullCHQuery<>;
@@ -72,6 +95,11 @@ namespace karri {
         const InputGraphT &inputGraph;
         const CH &vehCh;
         VehCHQuery vehChQuery;
+
+        int64_t numSearchesRun;
+        int64_t searchTime;
+        // int64_t numEdgesRelaxed;
+        // int64_t numVerticesScanned;
     
     };
 
