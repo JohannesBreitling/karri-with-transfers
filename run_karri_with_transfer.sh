@@ -65,7 +65,7 @@ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${dependencyInstallDir}"\
 	-DKARRI_PSG_COST_SCALE=1 \
 	-DKARRI_VEH_COST_SCALE=1 \
 	-S $karriSourceDir -B $karriBinaryDir
-cmake --build $karriBinaryDir --target karri -j 16
+cmake --build $karriBinaryDir --target karri --clean-first -j 16
 
 
 # Lasse KaRRi mit Transfers laufen
