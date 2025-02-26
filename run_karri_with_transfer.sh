@@ -27,7 +27,7 @@ if ! [ -d "$outputBaseDir" ]; then
 	exit 1
 fi
 
-echo "Performing karri with transfers experiments."
+echo "Performing karri-with-transfers experiments."
 
 # Pfade zu Inputs
 vehGraph=$inputDir/Graphs/${instanceName}_pedestrian_veh.gr.bin
