@@ -22,7 +22,7 @@
 /// SOFTWARE.
 /// ******************************************************************************
 
-#include "../VertexInEllipse.h"
+#include "Algorithms/KaRRi/TransferPoints/VertexInEllipse.h"
 
 #pragma once
 
@@ -496,9 +496,9 @@ namespace karri {
 
         void finishAssignments(const Vehicle *pVeh, const Vehicle *dVeh) {
             // Method to finish the assignments that have lower bounds used
-            std::vector<AssignmentWithTransfer> toCalculate = std::vector<AssignmentWithTransfer>{};
-            std::vector<AssignmentWithTransfer> currentlyCalculating = std::vector<AssignmentWithTransfer>{};
-            std::vector<AssignmentWithTransfer> temp = std::vector<AssignmentWithTransfer>{};
+            std::vector<AssignmentWithTransfer> toCalculate;
+            std::vector<AssignmentWithTransfer> currentlyCalculating;
+            std::vector<AssignmentWithTransfer> temp;
 
             RequestCost total;
             // Start with the pickups with postponed bns distance
@@ -510,6 +510,8 @@ namespace karri {
                     toCalculate.push_back(asgn);
                 }
             }
+
+            postponedAssignments.clear();
 
             if (currentlyCalculating.size() > 0)
                 searches.computeExactDistancesVia(*pVeh);
@@ -529,14 +531,13 @@ namespace karri {
 
                     toCalculate.push_back(asgn);
                 } else {
-                    tryAssignment(asgn);
+                    requestState.tryAssignment(asgn);
                     continue;
                 }
             }
-
-            // Calculate the exact paired distance between pickup and transfer
             currentlyCalculating.clear();
 
+            // Calculate the exact paired distance between pickup and transfer
             auto sources = std::vector<int>{};
             auto targets = std::vector<int>{};
             auto offsets = std::vector<int>{};
@@ -558,9 +559,9 @@ namespace karri {
                         if (total.total > requestState.getBestCost())
                             continue;
                         
-                        toCalculate.push_back(asgn);
+                        temp.push_back(asgn);
                     } else {
-                        tryAssignment(asgn);
+                        requestState.tryAssignment(asgn);
                         continue;
                     }
                 } else {
@@ -581,9 +582,6 @@ namespace karri {
                 } else {
                     temp.push_back(asgn);
                 }
-
-                if (!asgn.isFinished())
-                    temp.push_back(asgn);
             }
 
             toCalculate.clear();
@@ -608,7 +606,7 @@ namespace karri {
 
                     toCalculate.push_back(asgn);
                 } else {
-                    tryAssignment(asgn);
+                    requestState.tryAssignment(asgn);
                 }   
             }
 
@@ -622,7 +620,6 @@ namespace karri {
             for (auto asgn : toCalculate) {
                 assert(asgn.dropoffPairedLowerBoundUsed);
                 
-                currentlyCalculating.push_back(asgn);
                 int sourceRank = vehCh.rank(inputGraph.edgeHead(asgn.transfer.loc));
                 int targetRank = vehCh.rank(inputGraph.edgeTail(asgn.dropoff->loc));
                 int offset = inputGraph.travelTime(asgn.dropoff->loc);
@@ -634,7 +631,7 @@ namespace karri {
 
                 // Try the assignments with the calculated distances
                 assert(asgn.isFinished());
-                tryAssignment(asgn);
+                requestState.tryAssignment(asgn);
             }
         }
 
