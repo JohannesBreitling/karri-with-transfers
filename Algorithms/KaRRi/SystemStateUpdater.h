@@ -328,7 +328,7 @@ namespace karri {
             }
 
             const int costWT = requestState.getCostObjectWithTransfer().total;
-            const int costWOT = requestState.getCostObjectWithTransfer().total;
+            const int costWOT = requestState.getCostObjectWithoutTransfer().total;
                     
             if (costWOT >= INFTY) {
                 bestAssignmentsLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";

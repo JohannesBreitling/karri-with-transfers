@@ -77,8 +77,6 @@ namespace karri {
 
         const RequestState &findBestAssignment(const Request &req) {
 
-            // std::cout << "Request initiated: " << req.requestId << std::endl;
-
             // Initialize finder for this request:
             initializeForRequest(req);
 

@@ -148,6 +148,8 @@ namespace karri {
                 bestAssignmentWithTransfer = AssignmentWithTransfer(asgn);
                 bestCostWithTransfer = cost.total;
                 bestCostObjectWT = cost;
+                notUsingVehicleIsBest = false;
+                notUsingVehicleDist = INFTY;
             } else if (cost.total < bestCostWithTransfer) {
                 postponedAssignments.push_back(asgn);
             }
@@ -192,6 +194,7 @@ namespace karri {
             if (cost.total < INFTY && (cost.total < bestCost || (cost.total == bestCost &&
                                     breakCostTie(asgn, bestAssignment)))) {
 
+                
                 bestAssignment = asgn;
                 bestCost = cost.total;
                 bestCostObjectWOT = cost;

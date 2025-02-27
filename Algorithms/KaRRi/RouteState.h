@@ -441,7 +441,7 @@ namespace karri {
             const bool conditionTransferNotNewStop = pickup.loc != transfer.loc && transfer.loc == actualStopLocationTransfer;
             if (conditionTransferNotNewStop) {
                 assert(schedDepTimes[start + transferIdx] > asgn.arrAtTransferPoint);
-                maxArrTimes[start + transferIdx] = std::min(maxArrTimes[start + transferIdx], asgn.arrAtTransferPoint);
+                maxArrTimes[start + transferIdx] = std::min(maxArrTimes[start + transferIdx], asgn.arrAtTransferPoint); // TODO This is not optimal, In this case we set the maxArrTime so, that the arrival can not be delayed, otherwise we would have to propagate the maxArrTime to the dropoffVehicle
             } else {
                 // Insert transfer as new stop
                 ++transferIdx;
@@ -452,7 +452,7 @@ namespace karri {
                 schedArrTimes[start + transferIdx] = schedDepTimes[start + transferIdx - 1] + asgn.distToTransferPVeh;
                 schedDepTimes[start + transferIdx] = schedArrTimes[start + transferIdx] + InputConfig::getInstance().stopTime;
                 // compare maxVehArrTime to next stop later
-                maxArrTimes[start + transferIdx] = asgn.arrAtTransferPoint; // In this case we set the maxArrTime so, that the arrival can not be delayed, otherwise we would have to propagate the maxArrTime to the dropoffVehicle
+                maxArrTimes[start + transferIdx] = asgn.arrAtTransferPoint; // TODO Not optimal, In this case we set the maxArrTime so, that the arrival can not be delayed, otherwise we would have to propagate the maxArrTime to the dropoffVehicle
                 occupancies[start + transferIdx] = occupancies[start + transferIdx - 1];
                 numDropoffsPrefixSum[start + transferIdx] = numDropoffsPrefixSum[start + transferIdx - 1];
                 transferInsertedAsNewStop = true;

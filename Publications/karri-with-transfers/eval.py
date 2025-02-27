@@ -32,10 +32,10 @@ def assignmentquality(name, path):
     avg_wait_time_wot = df_asq_wot['wait_time'].mean()
     avg_trip_time_wot = df_asq_wot['trip_time'].mean()
 
-    print("Avg wait time with transfers:", int(avg_wait_time_wt))
-    print("Avg wait time without transfers:", int(avg_wait_time_wot))
-    print("Avg trip time with transfers:", int(avg_trip_time_wt))
-    print("Avg trip time without transfers:", int(avg_trip_time_wot))
+    print("Avg wait time with transfers:", format_hh_mm_ss(int(avg_wait_time_wt)))
+    print("Avg wait time without transfers:", format_hh_mm_ss(int(avg_wait_time_wot)))
+    print("Avg trip time with transfers:", format_hh_mm_ss(int(avg_trip_time_wt)))
+    print("Avg trip time without transfers:", format_hh_mm_ss(int(avg_trip_time_wot)))
     print("")
 
 
@@ -181,19 +181,19 @@ def assignmentcost(name, path):
     avg_veh_cost_wt = total_veh_cost_wt / n_total
     avg_walking_cost_wt = total_walking_cost_wt / n_total
 
-    f_ac = open("./results/results.txt", "a")
-    f_ac.write(name + "\n")
-    f_ac.write("Improved assignments" + "\n")
-    f_ac.write(repr(n_assignments) + " & " + repr(n_improved_assignments) + " & " + format_float(n_improved_assignments / n_assignments * 100) + "%" + "\n")
-    f_ac.close()
+    # f_ac = open("./results/results.txt", "a")
+    # f_ac.write(name + "\n")
+    # f_ac.write("Improved assignments" + "\n")
+    # f_ac.write(repr(n_assignments) + " & " + repr(n_improved_assignments) + " & " + format_float(n_improved_assignments / n_assignments * 100) + "%" + "\n")
+    # f_ac.close()
 
-    writeCostStructure("cost structure wt", avg_total_cost_wt, avg_walking_cost_wt, avg_trip_cost_wt, avg_trip_others_cost_wt, avg_wait_cost_wt, avg_veh_cost_wt)
-    writeCostStructure("cost structure wot", avg_total_cost_wot, avg_walking_cost_wot, avg_trip_cost_wot, avg_trip_others_cost_wot, avg_wait_cost_wot, avg_veh_cost_wot)
+    # writeCostStructure("cost structure wt", avg_total_cost_wt, avg_walking_cost_wt, avg_trip_cost_wt, avg_trip_others_cost_wt, avg_wait_cost_wt, avg_veh_cost_wt)
+    # writeCostStructure("cost structure wot", avg_total_cost_wot, avg_walking_cost_wot, avg_trip_cost_wot, avg_trip_others_cost_wot, avg_wait_cost_wot, avg_veh_cost_wot)
     
     
-    # print("# total assignments: " + repr(n_assignments))
-    # print("# improved assignments: " + repr(n_improved_assignments))
-    # print("Improved: " + format_float(n_improved_assignments / n_assignments * 100) + "%")
+    print("# total assignments: " + repr(n_assignments))
+    print("# improved assignments: " + repr(n_improved_assignments))
+    print("Improved: " + format_float(n_improved_assignments / n_assignments * 100) + "%")
     
     # print("Avg total cost with transfers:", int(avg_total_cost_wt))
     # print("Avg total cost without transfers:", int(avg_total_cost_wot))
@@ -231,8 +231,8 @@ def assignmentcost(name, path):
     avg_imp_veh_cost_wot = df_cost_wt['veh_cost_no_transfer'].mean()
     avg_imp_walking_cost_wot = df_cost_wt['walking_cost_no_transfer'].mean()
 
-    writeCostStructure("cost structure improved wt", avg_imp_total_cost_wt, avg_imp_walking_cost_wt, avg_imp_trip_cost_wt, avg_imp_trip_others_cost_wt, avg_imp_wait_cost_wt, avg_imp_veh_cost_wt)
-    writeCostStructure("cost structure improved wot", avg_imp_total_cost_wot, avg_imp_walking_cost_wot, avg_imp_trip_cost_wot, avg_imp_trip_others_cost_wot, avg_imp_wait_cost_wot, avg_imp_veh_cost_wot)
+    # writeCostStructure("cost structure improved wt", avg_imp_total_cost_wt, avg_imp_walking_cost_wt, avg_imp_trip_cost_wt, avg_imp_trip_others_cost_wt, avg_imp_wait_cost_wt, avg_imp_veh_cost_wt)
+    # writeCostStructure("cost structure improved wot", avg_imp_total_cost_wot, avg_imp_walking_cost_wot, avg_imp_trip_cost_wot, avg_imp_trip_others_cost_wot, avg_imp_wait_cost_wot, avg_imp_veh_cost_wot)
     
     #print("Avg total cost for improved with transfers:", int(avg_imp_total_cost_wt))
     #print("Avg total cost for improved without transfers:", int(avg_imp_total_cost_wot))
@@ -251,12 +251,19 @@ def assignmentcost(name, path):
 
 BASE_PATH_SERVER = './outputs/server/karri-with-transfers'
 
-PATH_50 = '/v-50_r-hour-3'
-PATH_100 = '/v-100_r-hour-3'
-NAME_100 = 'Berlin 1pct, R-hour-3, V100'
 
-PATH = BASE_PATH_SERVER + PATH_100
-NAME = NAME_100
+PATH_V_100_R_HOUR_1 = BASE_PATH_SERVER + '/v-100_r-hour-1'
+PATH_V_150_R_HOUR_1 = BASE_PATH_SERVER + '/v-150_r-hour-1'
+PATH_V_200_R_HOUR_1 = BASE_PATH_SERVER + '/v-200_r-hour-1'
+PATH_V_250_R_HOUR_1 = BASE_PATH_SERVER + '/v-250_r-hour-1'
+PATH_V_500_R_HOUR_1 = BASE_PATH_SERVER + '/v-500_r-hour-1'
+
+PATH_V_500_R_ALL = BASE_PATH_SERVER + '/v-500_r-all'
+
+
+
+PATH = PATH_V_250_R_HOUR_1
+NAME = 'Vehicles: 250 Request: Hour 1'
 
 f_res = open("./results/results.txt", "w")
 f_res.write("")
