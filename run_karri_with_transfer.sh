@@ -21,6 +21,7 @@ outputBaseDir=$4
 vehicles=$5
 requests=$6
 psgCost=$7
+waitTime=$8
 
 # Prüfe, ob Output Directory existiert
 if ! [ -d "$outputBaseDir" ]; then
@@ -80,7 +81,7 @@ karriOutputDirWt=$karriOutputDir/wt/wt
 
 printf "Running without transfers...\n"
 
-$karriBinaryDir/Launchers/karri -trans 0 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDirWot
+$karriBinaryDir/Launchers/karri -trans 0 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDirWot -w ${waitTime}
 
 printf "\nRunning with transfers...\n"
-$karriBinaryDir/Launchers/karri -trans 1 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDirWt
+$karriBinaryDir/Launchers/karri -trans 1 -w 300 -p-radius 0 -d-radius 0 -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDirWt -w ${waitTime}
