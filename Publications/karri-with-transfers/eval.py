@@ -21,6 +21,35 @@ def format_mm_ss(x):
     s = x % 6000 / 60
     return ("{:02f}:{:02f}").format(m, s)
 
+
+def request_density_over_time(name, path):
+    df_req = pd.read_csv(path)
+    n_req = df_req.index.size
+    min_time = df_req['req_time'].min()
+    max_time = df_req['req_time'].max()
+
+    # Accumulate the results per 5 minutes
+    n_intervals = int((max_time - min_time) / 3000) + 1
+    req_density = [0] * n_intervals
+
+    for i in range(n_req):
+        interval = int((df_req.loc[i, 'req_time'] - min_time) / 3000)
+        req_density[interval] += 1
+
+    print(name)
+    print("Total duration:", format_hh_mm(max_time - min_time))
+    print(req_density)
+    print("")
+
+
+
+
+
+
+
+
+
+
 def assignmentquality(name, path):
     print(name)
     df_asq_wt = pd.read_csv(path + '/wt/wt.assignmentquality.csv')
@@ -57,11 +86,13 @@ def legstats(name, path):
     total_stop_time_wt = [0] * n_vehicles_wt
     weighted_occupancy_wt = [0] * n_vehicles_wt
     total_operation_time_wt = [0] * n_vehicles_wt
+    total_number_stops_wt = [0] * n_vehicles_wt
 
     total_driving_time_wot = [0] * n_vehicles_wot
     total_stop_time_wot = [0] * n_vehicles_wot
     weighted_occupancy_wot = [0] * n_vehicles_wot
     total_operation_time_wot = [0] * n_vehicles_wot
+    total_number_stops_wot = [0] * n_vehicles_wot
 
     for i in range(n_legs_wt):
         veh_id = df_leg_wt.loc[i, 'vehicle_id']
@@ -72,6 +103,7 @@ def legstats(name, path):
         total_stop_time_wt[veh_id] += stop_time
         total_operation_time_wt[veh_id] += stop_time + driving_time
         weighted_occupancy_wt[veh_id] += driving_time * occupancy
+        total_number_stops_wt[veh_id] += 1
 
     for i in range(n_legs_wot):
         veh_id = df_leg_wot.loc[i, 'vehicle_id']
@@ -82,6 +114,7 @@ def legstats(name, path):
         total_stop_time_wot[veh_id] += stop_time
         total_operation_time_wot[veh_id] += stop_time + driving_time
         weighted_occupancy_wot[veh_id] += driving_time * occupancy
+        total_number_stops_wot[veh_id] += 1
 
     # Avg occupancy
     avg_occupancy_wt = [0] * n_vehicles_wt
@@ -99,10 +132,15 @@ def legstats(name, path):
     total_avg_operation_time_wt = sum(total_operation_time_wt) / n_vehicles_wt
     total_avg_operation_time_wot = sum(total_operation_time_wot) / n_vehicles_wot
 
+    avg_stops_wt = sum(total_number_stops_wt) / n_vehicles_wt
+    avg_stops_wot = sum(total_number_stops_wot) / n_vehicles_wot
+
     print("Avg occupancy with transfers:", format_float(total_avg_occupancy_wt, 4))
     print("Avg occupancy without transfers:", format_float(total_avg_occupancy_wot, 4))
     print("Total operation time with transfers:", format_hh_mm_ss(total_avg_operation_time_wt))
     print("Total operation time without transfers:", format_hh_mm_ss(total_avg_operation_time_wot))
+    print("Total num stops with transfers:", repr(int(avg_stops_wt)))
+    print("Total num stops without transfers:", repr(int(avg_stops_wot)))
     print("")
 
 def writeCostStructure(name, total, walking, trip, trip_others, wait, veh):
@@ -263,27 +301,64 @@ PATH_V_500_R_ALL = BASE_PATH_SERVER + '/v-500_r-all'
 PATH_V_100_R_HOUR_3 = BASE_PATH_SERVER + '/v-100_r-hour-3'
 PATH_V_150_R_HOUR_3 = BASE_PATH_SERVER + '/v-150_r-hour-3'
 PATH_V_175_R_HOUR_3 = BASE_PATH_SERVER + '/v-175_r-hour-3'
+
 PATH_V_200_R_HOUR_3 = BASE_PATH_SERVER + '/v-200_r-hour-3'
+NAME_V_200_R_HOUR_3 = 'Vehicles: 200 Request: Hour 3'
+
 PATH_V_225_R_HOUR_3 = BASE_PATH_SERVER + '/v-225_r-hour-3'
 PATH_V_250_R_HOUR_3 = BASE_PATH_SERVER + '/v-250_r-hour-3'
 PATH_V_500_R_HOUR_3 = BASE_PATH_SERVER + '/v-500_r-hour-3'
 
-PATH_V_ALL_R_ALL = BASE_PATH_SERVER + '/v-all_r-all'
+# PATH_V_ALL_R_ALL = BASE_PATH_SERVER + '/v-all_r-all'
+
+
+PATH_V_200_R_FOURTH = BASE_PATH_SERVER + '/v-200_r-fourth-dens'
+NAME_V_200_R_FOURTH = 'Vehicles: 200 Request: 1/4 Berlin 1pct'
+
+PATH_V_400_R_FOURTH = BASE_PATH_SERVER + '/v-400_r-fourth-dens'
+NAME_V_400_R_FOURTH = 'Vehicles: 400 Request: 1/4 Berlin 1pct'
+
+PATH_V_400_R_HALF = BASE_PATH_SERVER + '/v-400_r-half-dens'
+NAME_V_400_R_HALF = 'Vehicles: 400 Request: 1/2 Berlin 1pct'
 
 
 
 PATH = PATH_V_200_R_HOUR_3
 NAME = 'Vehicles: 200 Request: Hour 3'
 
-f_res = open("./results/results.txt", "w")
-f_res.write("")
+# f_res = open("./results/results.txt", "w")
+# f_res.write("")
 
-assignmentquality('Assignment Quality ' + NAME, PATH)
-legstats('Leg Stats ' + NAME, PATH)
-assignmentcost('Assignment Cost ' + NAME, PATH)
+# assignmentquality('Assignment Quality ' + NAME, PATH)
+# legstats('Leg Stats ' + NAME, PATH)
+# assignmentcost('Assignment Cost ' + NAME, PATH)
 
-f_res.close()
+# request_density_over_time('Berlin 1pct', './inputs/Berlin-1pct-all.csv')
+# request_density_over_time('Berlin 1pct half dens', './inputs/Berlin-1pct-half-density.csv')
+
+# f_res.close()
+
+
+
+
+
+# assignmentquality('Assignment Quality ' + NAME_V_200_R_FOURTH, PATH_V_200_R_FOURTH)
+# legstats('Leg Stats ' + NAME_V_200_R_FOURTH, PATH_V_200_R_FOURTH)
+# assignmentcost('Assignment Cost ' + NAME_V_200_R_FOURTH, PATH_V_200_R_FOURTH)
+
+# assignmentquality('Assignment Quality ' + NAME_V_400_R_FOURTH, PATH_V_400_R_FOURTH)
+# legstats('Leg Stats ' + NAME_V_400_R_FOURTH, PATH_V_400_R_FOURTH)
+# assignmentcost('Assignment Cost ' + NAME_V_400_R_FOURTH, PATH_V_400_R_FOURTH)
+
+# assignmentquality('Assignment Quality ' + NAME_V_400_R_HALF, PATH_V_400_R_HALF)
+# legstats('Leg Stats ' + NAME_V_400_R_HALF, PATH_V_400_R_HALF)
+# assignmentcost('Assignment Cost ' + NAME_V_400_R_HALF, PATH_V_400_R_HALF)
+
+
 
 
 
 # Bisher am besten : V 200 Hour 3 -> 1 Minuten op gespart, 0.02 mehr Auslastung, 4.44% verbesserte Assignments
+assignmentquality('Assignment Quality ' + NAME_V_200_R_HOUR_3, PATH_V_200_R_HOUR_3)
+legstats('Leg Stats ' + NAME_V_200_R_HOUR_3, PATH_V_200_R_HOUR_3)
+assignmentcost('Assignment Cost ' + NAME_V_200_R_HOUR_3, PATH_V_200_R_HOUR_3)

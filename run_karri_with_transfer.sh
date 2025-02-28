@@ -20,6 +20,7 @@ instanceName=$3
 outputBaseDir=$4
 vehicles=$5
 requests=$6
+psgCost=$7
 
 # Prüfe, ob Output Directory existiert
 if ! [ -d "$outputBaseDir" ]; then
@@ -64,7 +65,7 @@ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${dependencyInstallDir}"\
 	-DKARRI_PALS_STRATEGY=COL -DKARRI_PALS_USE_SIMD=ON -DKARRI_PALS_LOG_K=3 \
 	-DKARRI_DALS_STRATEGY=COL -DKARRI_DALS_USE_SIMD=ON -DKARRI_DALS_LOG_K=3 \
 	-DKARRI_PD_DISTANCES_USE_SIMD=ON -DKARRI_PD_DISTANCES_LOG_K=5 \
-	-DKARRI_PSG_COST_SCALE=1 \
+	-DKARRI_PSG_COST_SCALE=${psgCost} \
 	-DKARRI_VEH_COST_SCALE=1 \
 	-S $karriSourceDir -B $karriBinaryDir
 cmake --build $karriBinaryDir --target karri -j 16

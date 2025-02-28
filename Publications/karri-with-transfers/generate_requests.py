@@ -1,6 +1,4 @@
 
-    
-
 def reduce_densitiy(input, output, n):
     fi = open(input, "r")
     fo = open(output, "w")
