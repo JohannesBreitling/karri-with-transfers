@@ -260,10 +260,20 @@ PATH_V_500_R_HOUR_1 = BASE_PATH_SERVER + '/v-500_r-hour-1'
 
 PATH_V_500_R_ALL = BASE_PATH_SERVER + '/v-500_r-all'
 
+PATH_V_100_R_HOUR_3 = BASE_PATH_SERVER + '/v-100_r-hour-3'
+PATH_V_150_R_HOUR_3 = BASE_PATH_SERVER + '/v-150_r-hour-3'
+PATH_V_175_R_HOUR_3 = BASE_PATH_SERVER + '/v-175_r-hour-3'
+PATH_V_200_R_HOUR_3 = BASE_PATH_SERVER + '/v-200_r-hour-3'
+PATH_V_225_R_HOUR_3 = BASE_PATH_SERVER + '/v-225_r-hour-3'
+PATH_V_250_R_HOUR_3 = BASE_PATH_SERVER + '/v-250_r-hour-3'
+PATH_V_500_R_HOUR_3 = BASE_PATH_SERVER + '/v-500_r-hour-3'
+
+PATH_V_ALL_R_ALL = BASE_PATH_SERVER + '/v-all_r-all'
 
 
-PATH = PATH_V_250_R_HOUR_1
-NAME = 'Vehicles: 250 Request: Hour 1'
+
+PATH = PATH_V_200_R_HOUR_3
+NAME = 'Vehicles: 200 Request: Hour 3'
 
 f_res = open("./results/results.txt", "w")
 f_res.write("")
@@ -276,3 +286,4 @@ f_res.close()
 
 
 
+# Bisher am besten : V 200 Hour 3 -> 1 Minuten op gespart, 0.02 mehr Auslastung, 4.44% verbesserte Assignments
