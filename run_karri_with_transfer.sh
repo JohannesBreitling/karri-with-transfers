@@ -55,7 +55,6 @@ mkdir -p $karriOutputDir
 mkdir -p $karriOutputDir/wt
 mkdir -p $karriOutputDir/wot
 
-spacktivate routing # Aktiviere das routing environment
 
 # Baue KaRRi nach $karriSourceDir/Build/Release.
 # Konfiguriere KaRRi CMake compile time parameter.
