@@ -21,9 +21,6 @@ def format_mm_ss(x):
     s = x % 6000 / 60
     return ("{:02f}:{:02f}").format(m, s)
 
-
-
-
 def request_density_over_time(name, path):
     df_req = pd.read_csv(path)
     n_req = df_req.index.size
@@ -46,6 +43,69 @@ def request_density_over_time(name, path):
 
 
 
+def assignment_comparison(name, path):
+    
+    df_aq = pd.read_csv(path + '/wt/wt.assignmentquality.csv')
+    df_asg_wt = pd.read_csv(path + '/wt/wt.bestassignmentswithtransfer.csv')
+    
+    n_requests = df_aq.index.size
+    n_improved = 0
+
+
+    t_als_pveh = 0
+    t_als_dveh = 0
+    t_ord = 0
+    
+    for i in range(n_requests):
+        if df_aq.loc[i, 'using_transfer'] == 1:
+            n_improved += 1
+            req_id = df_aq.loc[i, 'request_id']
+            row = df_asg_wt.loc[df_asg_wt['request_id'] == req_id]
+            
+            t_pveh = row['transfer_type_pveh'].values[0].strip()
+            t_dveh = row['transfer_type_dveh'].values[0].strip()
+
+            if ((t_pveh == "ORD" or t_pveh == "BNS") and (t_dveh == "ORD" or t_dveh == "BNS")):
+                t_ord += 1
+            
+            if (t_pveh == "ALS" and (t_dveh == "ORD" or t_dveh == "BNS")):
+                t_als_pveh += 1
+
+            if ((t_pveh == "ORD" or t_pveh == "BNS") and t_dveh == "ALS"):
+                t_als_dveh += 1
+            
+    print("# total requests: " + repr(n_requests))
+    print("# improved requests: " + repr(n_improved))
+    print("% improved requests: " + format_float(n_improved * 100 / n_requests) + "%")
+    print("")
+    print("# transfers ord: " + repr(t_ord))
+    print("# transfers als pveh: " + repr(t_als_pveh))
+    print("# transfers als dveh: " + repr(t_als_dveh))
+
+
+
+    print("")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def assignmentquality(name, path):
     print(name)
@@ -58,10 +118,18 @@ def assignmentquality(name, path):
     avg_wait_time_wot = df_asq_wot['wait_time'].mean()
     avg_trip_time_wot = df_asq_wot['trip_time'].mean()
 
+    avg_cost_wt = df_asq_wt['cost'].mean()
+    avg_cost_wot = df_asq_wot['cost'].mean()
+
     print("Avg wait time with transfers:", format_hh_mm_ss(int(avg_wait_time_wt)))
     print("Avg wait time without transfers:", format_hh_mm_ss(int(avg_wait_time_wot)))
     print("Avg trip time with transfers:", format_hh_mm_ss(int(avg_trip_time_wt)))
     print("Avg trip time without transfers:", format_hh_mm_ss(int(avg_trip_time_wot)))
+    print("Avg cost with transfers:", int(avg_cost_wt))
+    print("Avg cost with transfers:", int(avg_cost_wot))
+
+
+
     print("")
 
 
@@ -80,27 +148,6 @@ def legstats(name, path):
     n_legs_wot = df_leg_wot.index.size
     n_legs_wt = df_leg_wt.index.size
 
-    # print("Anzahl Legs WOT: " + repr(int(n_legs_wot)))
-    # print("Anzahl Legs WT: " + repr(int(n_legs_wt)))
-
-    # for i in range(n_legs_wot):
-    #     if (df_leg_wot.loc[i, 'drive_time'] == 0):
-    #         df_leg_wot.drop(i, inplace=True)
-
-    # for i in range(n_legs_wt):
-    #     if (df_leg_wt.loc[i, 'drive_time'] == 0):
-    #         df_leg_wt.drop(i, inplace=True)
-            
-    # n_legs_wot = df_leg_wot.index.size
-    # n_legs_wt = df_leg_wt.index.size
-
-    # print("Anzahl Legs > 0 WOT: " + repr(int(n_legs_wot)))
-    # print("Anzahl Legs > 0 WT: " + repr(int(n_legs_wt)))
-
-    # print(df_leg_wot)
-    # print(df_leg_wt)
-
-
     # Stats per vehicle
     total_driving_time_wt = [0] * n_vehicles_wt
     total_stop_time_wt = [0] * n_vehicles_wt
@@ -117,6 +164,9 @@ def legstats(name, path):
     for i in range(n_legs_wt):
         veh_id = df_leg_wt.loc[i, 'vehicle_id']
         driving_time = df_leg_wt.loc[i, 'drive_time']
+        if (driving_time == 0):
+            continue
+        
         stop_time = df_leg_wt.loc[i, 'stop_time']
         occupancy = df_leg_wt.loc[i, 'occupancy']
         total_driving_time_wt[veh_id] += driving_time
@@ -128,6 +178,9 @@ def legstats(name, path):
     for i in range(n_legs_wot):
         veh_id = df_leg_wot.loc[i, 'vehicle_id']
         driving_time = df_leg_wot.loc[i, 'drive_time']
+        if (driving_time == 0):
+            continue
+
         stop_time = df_leg_wot.loc[i, 'stop_time']
         occupancy = df_leg_wot.loc[i, 'occupancy']
         total_driving_time_wot[veh_id] += driving_time
@@ -136,37 +189,37 @@ def legstats(name, path):
         weighted_occupancy_wot[veh_id] += driving_time * occupancy
         total_number_stops_wot[veh_id] += 1
 
-    # # Avg occupancy
-    # avg_occupancy_wt = [0] * n_vehicles_wt
-    # avg_occupancy_wot = [0] * n_vehicles_wot
+    # Avg occupancy
+    avg_occupancy_wt = [0] * n_vehicles_wt
+    avg_occupancy_wot = [0] * n_vehicles_wot
 
-    # for i in range(n_vehicles_wt):
-    #     avg_occupancy_wt[i] = 0 if total_driving_time_wt[i] == 0 else weighted_occupancy_wt[i] / total_driving_time_wt[i]
+    for i in range(n_vehicles_wt):
+        avg_occupancy_wt[i] = 0 if total_driving_time_wt[i] == 0 else weighted_occupancy_wt[i] / total_driving_time_wt[i]
 
-    # for i in range(n_vehicles_wot):
-    #     avg_occupancy_wot[i] = 0 if total_driving_time_wot[i] == 0 else weighted_occupancy_wot[i] / total_driving_time_wot[i]
+    for i in range(n_vehicles_wot):
+        avg_occupancy_wot[i] = 0 if total_driving_time_wot[i] == 0 else weighted_occupancy_wot[i] / total_driving_time_wot[i]
 
-    # total_avg_occupancy_wt = sum(avg_occupancy_wt) / n_vehicles_wt
-    # total_avg_occupancy_wot = sum(avg_occupancy_wot) / n_vehicles_wot
+    total_avg_occupancy_wt = sum(avg_occupancy_wt) / n_vehicles_wt
+    total_avg_occupancy_wot = sum(avg_occupancy_wot) / n_vehicles_wot
     
-    # total_avg_driving_time_wt = sum(total_driving_time_wt) / n_vehicles_wt
-    # total_avg_driving_time_wot = sum(total_driving_time_wot) / n_vehicles_wot
+    total_avg_driving_time_wt = sum(total_driving_time_wt) / (n_vehicles_wt * 10)
+    total_avg_driving_time_wot = sum(total_driving_time_wot) / (n_vehicles_wot * 10)
 
     total_avg_operation_time_wt = sum(total_operation_time_wt) / (n_vehicles_wt * 10)
     total_avg_operation_time_wot = sum(total_operation_time_wot) / (n_vehicles_wot * 10)
 
-    # avg_stops_wt = sum(total_number_stops_wt) / n_vehicles_wt
-    # avg_stops_wot = sum(total_number_stops_wot) / n_vehicles_wot
+    avg_stops_wt = sum(total_number_stops_wt) / n_vehicles_wt
+    avg_stops_wot = sum(total_number_stops_wot) / n_vehicles_wot
 
-    # print("Avg occupancy with transfers:", format_float(total_avg_occupancy_wt, 4))
-    # print("Avg occupancy without transfers:", format_float(total_avg_occupancy_wot, 4))
+    print("Avg occupancy with transfers:", format_float(total_avg_occupancy_wt, 4))
+    print("Avg occupancy without transfers:", format_float(total_avg_occupancy_wot, 4))
     print("Total operation time with transfers:", format_hh_mm_ss(total_avg_operation_time_wt))
     print("Total operation time without transfers:", format_hh_mm_ss(total_avg_operation_time_wot))
-    # print("Total driving time with transfers:", format_hh_mm_ss(total_avg_driving_time_wt))
-    # print("Total driving time without transfers:", format_hh_mm_ss(total_avg_driving_time_wot))
-    # print("Total num stops with transfers:", repr(int(avg_stops_wt)))
-    # print("Total num stops without transfers:", repr(int(avg_stops_wot)))
-    # print("")
+    print("Total driving time with transfers:", format_hh_mm_ss(total_avg_driving_time_wt))
+    print("Total driving time without transfers:", format_hh_mm_ss(total_avg_driving_time_wot))
+    print("Total num stops with transfers:", repr(int(avg_stops_wt)))
+    print("Total num stops without transfers:", repr(int(avg_stops_wot)))
+    print("")
 
 def writeCostStructure(name, total, walking, trip, trip_others, wait, veh):
     f_ac = open("./results/results.txt", "a")
@@ -203,97 +256,120 @@ def assignmentcost(name, path):
     avg_walking_cost_wot = df_cost_wot['walking_cost_no_transfer'].mean()
 
     # With transfers we now have to differentiate between costs for improved assignments and the costs without transfers
-    df_cost_wt = pd.read_csv(path + '/wt/wt.assignmentcost.csv')
-    
-    n_assignments = df_cost_wt.index.size
-    n_total = 0
-    # Calculate the mean costs
-    total_total_cost_wt = 0
-    total_trip_cost_wt = 0
-    total_wait_cost_wt = 0
-    total_trip_others_cost_wt = 0
-    total_veh_cost_wt = 0
-    total_walking_cost_wt = 0
-    # Count the # of assignments that are improved
-    n_improved_assignments = 0
-    
-    for i in range(n_assignments):
-        if df_cost_wt.loc[i, 'transfer_improves'] == 1 and not df_cost_wt.loc[i, 'infty_transfer']:
-            n_improved_assignments += 1
-            n_total += 1
-            total_total_cost_wt += df_cost_wt.loc[i, 'total_transfer']
-            total_trip_cost_wt += df_cost_wt.loc[i, 'trip_cost_transfer']
-            total_wait_cost_wt += df_cost_wt.loc[i, 'wait_time_violation_cost_transfer']
-            total_trip_others_cost_wt += df_cost_wt.loc[i, 'change_in_trip_costs_of_others_transfer']
-            total_veh_cost_wt += df_cost_wt.loc[i, 'veh_cost_transfer']
-            total_walking_cost_wt += df_cost_wt.loc[i, 'walking_cost_transfer']
-        elif (df_cost_wt.loc[i, 'infty_no_transfer'] == 0):
-            n_total += 1
-            total_total_cost_wt += df_cost_wt.loc[i, 'total_no_transfer']
-            total_trip_cost_wt += df_cost_wt.loc[i, 'trip_cost_no_transfer']
-            total_wait_cost_wt += df_cost_wt.loc[i, 'wait_time_violation_cost_no_transfer']
-            total_trip_others_cost_wt += df_cost_wt.loc[i, 'change_in_trip_costs_of_others_no_transfer']
-            total_veh_cost_wt += df_cost_wt.loc[i, 'veh_cost_no_transfer']
-            total_walking_cost_wt +=df_cost_wt.loc[i, 'walking_cost_no_transfer']
+    df_cost_wt = pd.read_csv(path + '/wt/wt.assignmentcost.csv')    
+    n_assignments_wt = df_cost_wt.index.size
+
+    # Drop all lines, where the cost is infinite
+    for i in range(n_assignments_wt):
+        if (df_cost_wt.loc[i, 'infty_transfer']):
+            df_cost_wt.drop(i, inplace=True)
+
+    n_assignments_wt = df_cost_wt.index.size
+
+    # avg_total_cost_wt = total_total_cost_wt / n_total
+    # avg_trip_cost_wt = total_trip_cost_wt / n_total
+    # avg_wait_cost_wt = total_wait_cost_wt / n_total
+    # avg_trip_others_cost_wt = total_trip_others_cost_wt / n_assignments_wt
+    # avg_veh_cost_wt = total_veh_cost_wt / n_total
+    # avg_walking_cost_wt = total_walking_cost_wt / n_assignments_wt
 
 
-    avg_total_cost_wt = total_total_cost_wt / n_total
+    avg_total_cost_wt = df_cost_wot[] total_total_cost_wt / n_total
     avg_trip_cost_wt = total_trip_cost_wt / n_total
     avg_wait_cost_wt = total_wait_cost_wt / n_total
-    avg_trip_others_cost_wt = total_trip_others_cost_wt / n_total
+    avg_trip_others_cost_wt = total_trip_others_cost_wt / n_assignments_wt
     avg_veh_cost_wt = total_veh_cost_wt / n_total
-    avg_walking_cost_wt = total_walking_cost_wt / n_total
+    avg_walking_cost_wt = total_walking_cost_wt / n_assignments_wt
 
-    # f_ac = open("./results/results.txt", "a")
-    # f_ac.write(name + "\n")
-    # f_ac.write("Improved assignments" + "\n")
-    # f_ac.write(repr(n_assignments) + " & " + repr(n_improved_assignments) + " & " + format_float(n_improved_assignments / n_assignments * 100) + "%" + "\n")
-    # f_ac.close()
 
-    # writeCostStructure("cost structure wt", avg_total_cost_wt, avg_walking_cost_wt, avg_trip_cost_wt, avg_trip_others_cost_wt, avg_wait_cost_wt, avg_veh_cost_wt)
-    # writeCostStructure("cost structure wot", avg_total_cost_wot, avg_walking_cost_wot, avg_trip_cost_wot, avg_trip_others_cost_wot, avg_wait_cost_wot, avg_veh_cost_wot)
+    print("Avg total cost with transfers:", int(avg_total_cost_wt))
+    print("Avg total cost without transfers:", int(avg_total_cost_wot))
+    print("Avg trip cost with transfers:", int(avg_trip_cost_wt))
+    print("Avg trip cost without transfers:", int(avg_trip_cost_wot))
+    print("Avg wait cost with transfers:", int(avg_wait_cost_wt))
+    print("Avg wait cost without transfers:", int(avg_wait_cost_wot))
+    print("Avg change in trip cost with transfers:", int(avg_trip_others_cost_wt))
+    print("Avg change in trip cost without transfers:", int(avg_trip_others_cost_wot))
+    print("Avg veh cost with transfers:", int(avg_veh_cost_wt))
+    print("Avg veh cost without transfers:", int(avg_veh_cost_wot))
+    print("Avg walking cost with transfers:", int(avg_walking_cost_wt))
+    print("Avg walking cost without transfers:", int(avg_walking_cost_wot))
+
+
+    
+
+    
+    # n_total = 0
+    # # Calculate the mean costs
+    # total_total_cost_wt = 0
+    # total_trip_cost_wt = 0
+    # total_wait_cost_wt = 0
+    # total_trip_others_cost_wt = 0
+    # total_veh_cost_wt = 0
+    # total_walking_cost_wt = 0
+    # # Count the # of assignments that are improved
+    # n_improved_assignments = 0
+    
+    # for i in range(n_assignments):
+    #     if df_cost_wt.loc[i, 'transfer_improves'] == 1 and not df_cost_wt.loc[i, 'infty_transfer']:
+    #         n_improved_assignments += 1
+    #         n_total += 1
+    #         total_total_cost_wt += df_cost_wt.loc[i, 'total_transfer']
+    #         total_trip_cost_wt += df_cost_wt.loc[i, 'trip_cost_transfer']
+    #         total_wait_cost_wt += df_cost_wt.loc[i, 'wait_time_violation_cost_transfer']
+    #         total_trip_others_cost_wt += df_cost_wt.loc[i, 'change_in_trip_costs_of_others_transfer']
+    #         total_veh_cost_wt += df_cost_wt.loc[i, 'veh_cost_transfer']
+    #         total_walking_cost_wt += df_cost_wt.loc[i, 'walking_cost_transfer']
+    #     elif (df_cost_wt.loc[i, 'infty_no_transfer'] == 0):
+    #         n_total += 1
+    #         total_total_cost_wt += df_cost_wt.loc[i, 'total_no_transfer']
+    #         total_trip_cost_wt += df_cost_wt.loc[i, 'trip_cost_no_transfer']
+    #         total_wait_cost_wt += df_cost_wt.loc[i, 'wait_time_violation_cost_no_transfer']
+    #         total_trip_others_cost_wt += df_cost_wt.loc[i, 'change_in_trip_costs_of_others_no_transfer']
+    #         total_veh_cost_wt += df_cost_wt.loc[i, 'veh_cost_no_transfer']
+    #         total_walking_cost_wt +=df_cost_wt.loc[i, 'walking_cost_no_transfer']
+
+
+    
+
+    # # f_ac = open("./results/results.txt", "a")
+    # # f_ac.write(name + "\n")
+    # # f_ac.write("Improved assignments" + "\n")
+    # # f_ac.write(repr(n_assignments) + " & " + repr(n_improved_assignments) + " & " + format_float(n_improved_assignments / n_assignments * 100) + "%" + "\n")
+    # # f_ac.close()
+
+    # # writeCostStructure("cost structure wt", avg_total_cost_wt, avg_walking_cost_wt, avg_trip_cost_wt, avg_trip_others_cost_wt, avg_wait_cost_wt, avg_veh_cost_wt)
+    # # writeCostStructure("cost structure wot", avg_total_cost_wot, avg_walking_cost_wot, avg_trip_cost_wot, avg_trip_others_cost_wot, avg_wait_cost_wot, avg_veh_cost_wot)
     
     
-    print("# total assignments: " + repr(n_assignments))
-    print("# improved assignments: " + repr(n_improved_assignments))
-    print("Improved: " + format_float(n_improved_assignments / n_assignments * 100) + "%")
-    print("")
-    
-    # print("Avg total cost with transfers:", int(avg_total_cost_wt))
-    # print("Avg total cost without transfers:", int(avg_total_cost_wot))
-    # print("Avg trip cost with transfers:", int(avg_trip_cost_wt))
-    # print("Avg trip cost without transfers:", int(avg_trip_cost_wot))
-    # print("Avg wait cost with transfers:", int(avg_wait_cost_wt))
-    # print("Avg wait cost without transfers:", int(avg_wait_cost_wot))
-    # print("Avg change in trip cost with transfers:", int(avg_trip_others_cost_wt))
-    # print("Avg change in trip cost without transfers:", int(avg_trip_others_cost_wot))
-    # print("Avg veh cost with transfers:", int(avg_veh_cost_wt))
-    # print("Avg veh cost without transfers:", int(avg_veh_cost_wot))
-    # print("Avg walking cost with transfers:", int(avg_walking_cost_wt))
-    # print("Avg walking cost without transfers:", int(avg_walking_cost_wot))
+    # print("# total assignments: " + repr(n_assignments))
+    # print("# improved assignments: " + repr(n_improved_assignments))
+    # print("Improved: " + format_float(n_improved_assignments / n_assignments * 100) + "%")
+    # print("")
+
     
     # Calculate the mean costs wt / wot of the assignments that have been improved
-    for i in range(n_assignments):
-        if df_cost_wt.loc[i, 'transfer_improves'] == 0 or df_cost_wt.loc[i, 'infty_transfer'] or df_cost_wt.loc[i, 'infty_no_transfer']:
-            df_cost_wt.drop(i, inplace=True)
+    # for i in range(n_assignments):
+    #     if df_cost_wt.loc[i, 'transfer_improves'] == 0 or df_cost_wt.loc[i, 'infty_transfer'] or df_cost_wt.loc[i, 'infty_no_transfer']:
+    #         df_cost_wt.drop(i, inplace=True)
     
-    if df_cost_wt.index.size == 0:
-        print("Only assignments wiht former cost infty were improved")
-        return
+    # if df_cost_wt.index.size == 0:
+    #     print("Only assignments wiht former cost infty were improved")
+    #     return
 
-    avg_imp_total_cost_wt = df_cost_wt['total_transfer'].mean()
-    avg_imp_trip_cost_wt = df_cost_wt['trip_cost_transfer'].mean()
-    avg_imp_wait_cost_wt = df_cost_wt['wait_time_violation_cost_transfer'].mean()
-    avg_imp_trip_others_cost_wt = df_cost_wt['change_in_trip_costs_of_others_transfer'].mean()
-    avg_imp_veh_cost_wt = df_cost_wt['veh_cost_transfer'].mean()
-    avg_imp_walking_cost_wt = df_cost_wt['walking_cost_transfer'].mean()
+    # avg_imp_total_cost_wt = df_cost_wt['total_transfer'].mean()
+    # avg_imp_trip_cost_wt = df_cost_wt['trip_cost_transfer'].mean()
+    # avg_imp_wait_cost_wt = df_cost_wt['wait_time_violation_cost_transfer'].mean()
+    # avg_imp_trip_others_cost_wt = df_cost_wt['change_in_trip_costs_of_others_transfer'].mean()
+    # avg_imp_veh_cost_wt = df_cost_wt['veh_cost_transfer'].mean()
+    # avg_imp_walking_cost_wt = df_cost_wt['walking_cost_transfer'].mean()
 
-    avg_imp_total_cost_wot = df_cost_wt['total_no_transfer'].mean()
-    avg_imp_trip_cost_wot = df_cost_wt['trip_cost_no_transfer'].mean()
-    avg_imp_wait_cost_wot = df_cost_wt['wait_time_violation_cost_no_transfer'].mean()
-    avg_imp_trip_others_cost_wot = df_cost_wt['change_in_trip_costs_of_others_no_transfer'].mean()
-    avg_imp_veh_cost_wot = df_cost_wt['veh_cost_no_transfer'].mean()
-    avg_imp_walking_cost_wot = df_cost_wt['walking_cost_no_transfer'].mean()
+    # avg_imp_total_cost_wot = df_cost_wt['total_no_transfer'].mean()
+    # avg_imp_trip_cost_wot = df_cost_wt['trip_cost_no_transfer'].mean()
+    # avg_imp_wait_cost_wot = df_cost_wt['wait_time_violation_cost_no_transfer'].mean()
+    # avg_imp_trip_others_cost_wot = df_cost_wt['change_in_trip_costs_of_others_no_transfer'].mean()
+    # avg_imp_veh_cost_wot = df_cost_wt['veh_cost_no_transfer'].mean()
+    # avg_imp_walking_cost_wot = df_cost_wt['walking_cost_no_transfer'].mean()
 
     # writeCostStructure("cost structure improved wt", avg_imp_total_cost_wt, avg_imp_walking_cost_wt, avg_imp_trip_cost_wt, avg_imp_trip_others_cost_wt, avg_imp_wait_cost_wt, avg_imp_veh_cost_wt)
     # writeCostStructure("cost structure improved wot", avg_imp_total_cost_wot, avg_imp_walking_cost_wot, avg_imp_trip_cost_wot, avg_imp_trip_others_cost_wot, avg_imp_wait_cost_wot, avg_imp_veh_cost_wot)
@@ -369,22 +445,6 @@ NAME_V_400_R_HALF = 'Vehicles: 400 Request: 1/2 Berlin 1pct'
 
 
 
-# assignmentquality('Assignment Quality ' + NAME_V_200_R_FOURTH, PATH_V_200_R_FOURTH)
-# legstats('Leg Stats ' + NAME_V_200_R_FOURTH, PATH_V_200_R_FOURTH)
-# assignmentcost('Assignment Cost ' + NAME_V_200_R_FOURTH, PATH_V_200_R_FOURTH)
-
-# assignmentquality('Assignment Quality ' + NAME_V_400_R_FOURTH, PATH_V_400_R_FOURTH)
-# legstats('Leg Stats ' + NAME_V_400_R_FOURTH, PATH_V_400_R_FOURTH)
-# assignmentcost('Assignment Cost ' + NAME_V_400_R_FOURTH, PATH_V_400_R_FOURTH)
-
-# assignmentquality('Assignment Quality ' + NAME_V_400_R_HALF, PATH_V_400_R_HALF)
-# legstats('Leg Stats ' + NAME_V_400_R_HALF, PATH_V_400_R_HALF)
-# assignmentcost('Assignment Cost ' + NAME_V_400_R_HALF, PATH_V_400_R_HALF)
-
-
-
-
-
 # Bisher am besten : V 200 Hour 3 -> 1 Minuten op gespart, 0.02 mehr Auslastung, 4.44% verbesserte Assignments
 # assignmentquality('Assignment Quality ' + NAME_V_200_R_HOUR_3, PATH_V_200_R_HOUR_3)
 # legstats('Leg Stats ' + NAME_V_200_R_HOUR_3, PATH_V_200_R_HOUR_3)
@@ -411,19 +471,37 @@ NAME_V_400_R_HALF = 'Vehicles: 400 Request: 1/2 Berlin 1pct'
 
 
 BASE_PATH_HOPE = './outputs/hope'
+BASE_PATH_HOPE_2 = './outputs/hope2'
+
+
 PATH_V_400_R_HOUR_2 = BASE_PATH_HOPE + '/v-400-h2_r-hour-2'
+PATH_V_400_R_HOUR_2_2 = BASE_PATH_HOPE_2 + '/v-400-h2_r-hour-2'
+
+
 PATH_V_400_R_HOUR_2_PSG_0 = BASE_PATH_HOPE + '/v-400-h2_r-hour-2_psg_0'
 PATH_V_200_R_HOUR_2 = BASE_PATH_HOPE + '/v-200-h2_r-hour-2'
 PATH_V_200_R_HOUR_2_PSG_0 = BASE_PATH_HOPE + '/v-200-h2_r-hour-2_psg_0'
 
 
-legstats('AQ ' + "V 500 V ALL", PATH_V_500_R_ALL)
 
-legstats('AQ ' + "V 400 V H2", PATH_V_400_R_HOUR_2)
-legstats('AQ ' + "V 400 V H2 PSG 0", PATH_V_400_R_HOUR_2_PSG_0)
+# assignment_comparison('AC V 400 H2', PATH_V_400_R_HOUR_2)
+# assignment_comparison('AC V 400 H2', PATH_V_400_R_HOUR_2_2)
 
-legstats('AQ ' + "V 200 V H2", PATH_V_200_R_HOUR_2)
-legstats('AQ ' + "V 200 V H2 PSG 0", PATH_V_200_R_HOUR_2_PSG_0)
+# legstats('AQ V 400 H2', PATH_V_400_R_HOUR_2)
+# legstats('AQ V 400 H2', PATH_V_400_R_HOUR_2_2)
+
+# assignment_comparison('AC V 200 H3', PATH_V_200_R_HOUR_3)
+# legstats('LS ' + "V 200 V H3", PATH_V_200_R_HOUR_3)
+assignmentquality('AQ ' + "V 200 V H3", PATH_V_200_R_HOUR_3)
+assignmentcost('AQ ' + "V 200 V H3", PATH_V_200_R_HOUR_3)
+
+# legstats('AQ ' + "V 500 V ALL", PATH_V_500_R_ALL)
+
+# legstats('AQ ' + "V 400 V H2", PATH_V_400_R_HOUR_2)
+# legstats('AQ ' + "V 400 V H2 PSG 0", PATH_V_400_R_HOUR_2_PSG_0)
+
+# legstats('AQ ' + "V 200 V H2", PATH_V_200_R_HOUR_2)
+# legstats('AQ ' + "V 200 V H2 PSG 0", PATH_V_200_R_HOUR_2_PSG_0)
 
 
 # legstats('AQ ' + "V 400 V H2", PATH_V_400_R_HOUR_2)

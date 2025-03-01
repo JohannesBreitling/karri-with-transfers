@@ -58,13 +58,14 @@ namespace karri::Transfers {
             // assignment than the best known. Uses vehicle-independent lower bounds s.t. if this returns true, then
             // any vehicle with a last stop distance greater than the given one can also never lead to a better
             // assignment than the best known.
-            LabelMask doesDistanceNotAdmitBestAsgn(const DistanceLabel /*&distancesToDropoffs*/,
+            LabelMask doesDistanceNotAdmitBestAsgn(const DistanceLabel &distancesToDropoffs,
                                                    const bool /*considerWalkingDists*/) const {
-                return strat.upperBoundCost < INFTY;  // No actual pruning because of the transfer
-                
-                const DistanceLabel costLowerBound = calc.template calcKVehicleIndependentCostLowerBoundsForDALSWithKnownMinDistToDropoff<LabelSet>(
-                        0, /* distancesToDropoffs */ 0, 0, strat.requestState);
-                return strat.upperBoundCost < costLowerBound;
+                // return strat.upperBoundCost < INFTY;  // No actual pruning because of the transfer
+                return ~(distancesToDropoffs < INFTY);
+
+                // const DistanceLabel costLowerBound = calc.template calcKVehicleIndependentCostLowerBoundsForDALSWithKnownMinDistToDropoff<LabelSet>(
+                //         0, /* distancesToDropoffs */ 0, 0, strat.requestState);
+                // return strat.upperBoundCost < costLowerBound;
             }
 
             // Returns whether a given arrival time and minimum distance from a vehicle's last stop to the dropoff cannot
@@ -177,7 +178,7 @@ namespace karri::Transfers {
                 dropoffTails[i] = inputGraph.edgeTail(dropoff.loc);
                 travelTimes[i] = inputGraph.travelTime(dropoff.loc);
                 currentDropoffWalkingDists[i] = dropoff.walkingDist;
-            }
+            }s
 
             lastStopDistances.setCurBatchIdx(batchIdx);
             search.run(dropoffTails, travelTimes);
