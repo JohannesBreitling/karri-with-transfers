@@ -178,7 +178,7 @@ namespace karri::Transfers {
                 dropoffTails[i] = inputGraph.edgeTail(dropoff.loc);
                 travelTimes[i] = inputGraph.travelTime(dropoff.loc);
                 currentDropoffWalkingDists[i] = dropoff.walkingDist;
-            }s
+            }
 
             lastStopDistances.setCurBatchIdx(batchIdx);
             search.run(dropoffTails, travelTimes);
