@@ -247,9 +247,14 @@ namespace karri {
                 // If we allow pickupRadius > waitTime, then the passenger may arrive at the pickup location after
                 // the regular max dep time of requestTime + waitTime. In this case, the new latest permissible arrival
                 // time is defined by the passenger arrival time at the pickup, not the maximum wait time.
-                const int psgMaxDepTime =
-                        std::max(requestState.getMaxDepTimeAtPickup(), requestState.getPassengerArrAtPickup(pickup.id));
-                maxArrTimes[start + pickupIndex] = std::min(maxArrTimes[start + pickupIndex], psgMaxDepTime - InputConfig::getInstance().stopTime);
+                
+                // Original solution
+                // const int psgMaxDepTime = std::max(requestState.getMaxDepTimeAtPickup(), requestState.getPassengerArrAtPickup(pickup.id)); // TODO We restrict the karri dispatcher to enable compareability
+                // maxArrTimes[start + pickupIndex] = std::min(maxArrTimes[start + pickupIndex], psgMaxDepTime - InputConfig::getInstance().stopTime); // TODO Just for test reasons
+                
+                // Test solution
+                const int psgMaxDepTime = schedDepTimes[start + pickupIndex]; // TODO Not optimal!!
+                maxArrTimes[start + pickupIndex] = std::min(maxArrTimes[start + pickupIndex], psgMaxDepTime - InputConfig::getInstance().stopTime); // TODO Just for test reasons 
             } else {
                 // If vehicle is currently idle, the vehicle can leave its current stop at the earliest when the
                 // request is made. In that case, we update the arrival time to count the idling as one stopTime.
@@ -264,7 +269,13 @@ namespace karri {
                 schedArrTimes[start + pickupIndex] = schedDepTimes[start + pickupIndex - 1] + asgn.distToPickup;
                 schedDepTimes[start + pickupIndex] = std::max(schedArrTimes[start + pickupIndex] + InputConfig::getInstance().stopTime,
                                                               requestState.getPassengerArrAtPickup(pickup.id));
-                maxArrTimes[start + pickupIndex] = requestState.getMaxDepTimeAtPickup() - InputConfig::getInstance().stopTime;
+                
+                
+                // Original solution
+                // maxArrTimes[start + pickupIndex] = requestState.getMaxDepTimeAtPickup() - InputConfig::getInstance().stopTime;
+                
+                maxArrTimes[start + pickupIndex] = schedDepTimes[start + pickupIndex] - InputConfig::getInstance().stopTime; // TODO Not optimal!!!
+
                 occupancies[start + pickupIndex] = occupancies[start + pickupIndex - 1];
                 numDropoffsPrefixSum[start + pickupIndex] = numDropoffsPrefixSum[start + pickupIndex - 1];
                 pickupInsertedAsNewStop = true;
