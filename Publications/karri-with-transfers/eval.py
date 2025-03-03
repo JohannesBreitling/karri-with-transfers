@@ -380,7 +380,34 @@ def routelength(name, path):
     print(avg_route_length_wot)
 
 
+def overall_perf(name, path):
+    df_perf_wt = pd.read_csv(path + '/wt/wt.perf_overall.csv')
+    df_perf_wot = pd.read_csv(path + '/wot/wot.perf_overall.csv')
 
+    avg_t_ord = df_perf_wt['transf_ord_time'].mean()
+    avg_t_als_p = df_perf_wt['transf_als_pveh_time'].mean()
+    avg_t_als_d = df_perf_wt['transf_als_dveh_time'].mean()
+    
+    avg_total_rest = df_perf_wt['total_time'].mean()
+
+    avg_total_wt = avg_t_ord + avg_t_als_p + avg_t_als_d + avg_total_rest
+    avg_total_wot = df_perf_wot['total_time'].mean()
+
+    
+    
+    vals = []
+    vals.append(name)
+    vals.append(format_float(avg_total_wot / 1000000, 3))
+    vals.append(format_float(avg_total_wt / 1000000, 2))
+    vals.append(format_float(avg_t_ord / 1000000, 2))
+    vals.append(format_float(avg_t_als_p / 1000000, 2))
+    vals.append(format_float(avg_t_als_d / 1000000, 2))
+
+    row = get_table_row(vals)
+    f_tp = open("./results/transfer_perf.txt", "a")
+    f_tp.write("Overall Performance (Total WOT, Total WT, TORD, TALS P, TALS D)\n")
+    f_tp.write(row + "\n")
+    f_tp.close()
 
 
 def transfer_perf(name, path):
@@ -472,6 +499,11 @@ def evaluate_instance(name, path):
     transfer_quality(name, path)
     transfer_perf(name, path)
     routelength(name, path)
+    overall_perf(name, path)
+
+
+
+
 
 
 #############################################################################################
@@ -495,11 +527,11 @@ TN_SCEN_HD = 'B1% Half Density'
 TN_SCEN_H2 = 'B1% Hour 2'
 TN_SCEN_H3 = 'B1% Hour 3'
 
-TP_400_ALL = '/' 
-TN_400_ALL = "B1%-400-all, 400 Vehicles, All Requests"
+TP_400_ALL = FINAL_BASE + '/v-400_r-all' 
+TN_400_ALL = "B1\%-400-all"
 
-TP_400_HD = '/'
-TN_400_HD = "B1%-400-hd 400 Vehicles, 1/2 Density"
+TP_400_HD = FINAL_BASE + '/v-400_r-half-density' 
+TN_400_HD = "B1\%-400-hd"
 
 TP_200_H3 = FINAL_BASE +'/v-200-h3_r-hour-3'
 TN_200_H3 = "B1\%-200-h3"
@@ -516,7 +548,8 @@ evaluate_request_set(TN_SCEN_H3, TP_SCEN_H3)
 
 
 # Evaluate the instances:
-evaluate_instance(TN_200_H3, TP_200_H3)
-evaluate_instance(TN_400_H2, TP_400_H2)
-# evaluate_instance(TN_SCEN_H2, TP_SCEN_H2)
-# evaluate_instance(TN_SCEN_H3, TP_SCEN_H3)
+# evaluate_instance(TN_200_H3, TP_200_H3)
+# evaluate_instance(TN_400_H2, TP_400_H2)
+evaluate_instance(TN_400_HD, TP_400_HD)
+evaluate_instance(TN_400_ALL, TP_400_ALL)
+

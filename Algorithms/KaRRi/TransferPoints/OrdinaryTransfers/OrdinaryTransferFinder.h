@@ -126,46 +126,46 @@ namespace karri {
             }
 
             // Calculate the necessary ellipses for every vehicle for pickup and dropoff
-            std::vector<int> idxOfStop(routeState.getMaxStopId() + 1, INVALID_INDEX);
-            std::vector<int> stopIdsForEllipses;
-            for (const auto *pVeh : pVehs) {
-                const auto stopIds = routeState.stopIdsFor(pVeh->vehicleId);
-                for (int i = 0; i < routeState.numStopsOf(pVeh->vehicleId) - 1; i++) {
-                    if (idxOfStop[stopIds[i]] == INVALID_INDEX) {
-                        idxOfStop[stopIds[i]] = stopIdsForEllipses.size();
-                        stopIdsForEllipses.push_back(stopIds[i]);
-                    }
-                }
-            }
+            // std::vector<int> idxOfStop(routeState.getMaxStopId() + 1, INVALID_INDEX);
+            // std::vector<int> stopIdsForEllipses;
+            // for (const auto *pVeh : pVehs) {
+            //     const auto stopIds = routeState.stopIdsFor(pVeh->vehicleId);
+            //     for (int i = 0; i < routeState.numStopsOf(pVeh->vehicleId) - 1; i++) {
+            //         if (idxOfStop[stopIds[i]] == INVALID_INDEX) {
+            //             idxOfStop[stopIds[i]] = stopIdsForEllipses.size();
+            //             stopIdsForEllipses.push_back(stopIds[i]);
+            //         }
+            //     }
+            // }
 
-            for (const auto *dVeh: dVehs) {
-                const auto stopIds = routeState.stopIdsFor(dVeh->vehicleId);
-                for (int i = 0; i < routeState.numStopsOf(dVeh->vehicleId) - 1; i++) {
-                    if (idxOfStop[stopIds[i]] == INVALID_INDEX) {
-                        idxOfStop[stopIds[i]] = stopIdsForEllipses.size();
-                        stopIdsForEllipses.push_back(stopIds[i]);
-                    }
-                }
-            }
+            // for (const auto *dVeh: dVehs) {
+            //     const auto stopIds = routeState.stopIdsFor(dVeh->vehicleId);
+            //     for (int i = 0; i < routeState.numStopsOf(dVeh->vehicleId) - 1; i++) {
+            //         if (idxOfStop[stopIds[i]] == INVALID_INDEX) {
+            //             idxOfStop[stopIds[i]] = stopIdsForEllipses.size();
+            //             stopIdsForEllipses.push_back(stopIds[i]);
+            //         }
+            //     }
+            // }
 
             // Calculate all necessary ellipses
-            Timer searchTimer;
-            const auto vertexEllipses = chEllipseReconstructor.getVerticesInEllipsesOfLegsAfterStops(stopIdsForEllipses, numVerticesScanned, numEdgesRelaxed);
+            
+            // const auto vertexEllipses = chEllipseReconstructor.getVerticesInEllipsesOfLegsAfterStops(stopIdsForEllipses, numVerticesScanned, numEdgesRelaxed);
 
             // Convert the ellipses of vertices to ellipses of edges
-            std::vector<std::vector<EdgeInEllipse>> edgeEllipses;
-            for (const auto& stopId : stopIdsForEllipses) {
-                const auto leeway = routeState.leewayOfLegStartingAt(stopId);
-                auto edgeEllipse = convertVertexEllipseIntoEdgeEllipse(vertexEllipses[idxOfStop[stopId]], leeway);
+            // std::vector<std::vector<EdgeInEllipse>> edgeEllipses;
+            // for (const auto& stopId : stopIdsForEllipses) {
+            //     const auto leeway = routeState.leewayOfLegStartingAt(stopId);
+            //     auto edgeEllipse = convertVertexEllipseIntoEdgeEllipse(vertexEllipses[idxOfStop[stopId]], leeway);
 
-                std::sort(edgeEllipse.begin(), edgeEllipse.end(), [](const EdgeInEllipse& e1, const EdgeInEllipse& e2) {
-                    return e1.edge < e2.edge;
-                });
+            //     std::sort(edgeEllipse.begin(), edgeEllipse.end(), [](const EdgeInEllipse& e1, const EdgeInEllipse& e2) {
+            //         return e1.edge < e2.edge;
+            //     });
 
-                edgeEllipses.push_back(edgeEllipse);
-            }
+            //     edgeEllipses.push_back(edgeEllipse);
+            // }
 
-            searchTime += searchTimer.elapsed<std::chrono::nanoseconds>();
+            
 
 
             // Loop over all the possible vehicle combinations
@@ -180,19 +180,21 @@ namespace karri {
 
 
                     // Populate the map
-                    for (int stopIdxPVeh = 0; stopIdxPVeh < routeState.numStopsOf(pVeh->vehicleId) - 1; stopIdxPVeh++) {
-                        const int stopIdPVeh = routeState.stopIdsFor(pVeh->vehicleId)[stopIdxPVeh];
-                        const auto &ellipsePVeh = edgeEllipses[idxOfStop[stopIdPVeh]];
+                    // for (int stopIdxPVeh = 0; stopIdxPVeh < routeState.numStopsOf(pVeh->vehicleId) - 1; stopIdxPVeh++) {
+                    //     const int stopIdPVeh = routeState.stopIdsFor(pVeh->vehicleId)[stopIdxPVeh];
+                    //     const auto &ellipsePVeh = edgeEllipses[idxOfStop[stopIdPVeh]];
 
-                        for (int stopIdxDVeh = 0; stopIdxDVeh < routeState.numStopsOf(dVeh->vehicleId) - 1; stopIdxDVeh++) {
-                            const int stopIdDVeh = routeState.stopIdsFor(dVeh->vehicleId)[stopIdxDVeh];
-                            const auto &ellipseDVeh = edgeEllipses[idxOfStop[stopIdDVeh]];
+                    //     for (int stopIdxDVeh = 0; stopIdxDVeh < routeState.numStopsOf(dVeh->vehicleId) - 1; stopIdxDVeh++) {
+                    //         const int stopIdDVeh = routeState.stopIdsFor(dVeh->vehicleId)[stopIdxDVeh];
+                    //         const auto &ellipseDVeh = edgeEllipses[idxOfStop[stopIdDVeh]];
 
-                            transferPoints[{stopIdxPVeh, stopIdxDVeh}] = getIntersectionOfEllipses(ellipsePVeh, ellipseDVeh, pVeh, dVeh, stopIdxPVeh, stopIdxDVeh);
-                        }
-                    }
-
-                    // calculateTransferPoints(pVeh, dVeh);
+                    //         transferPoints[{stopIdxPVeh, stopIdxDVeh}] = getIntersectionOfEllipses(ellipsePVeh, ellipseDVeh, pVeh, dVeh, stopIdxPVeh, stopIdxDVeh);
+                    //     }
+                    // }
+                    
+                    Timer searchTimer;
+                    calculateTransferPoints(pVeh, dVeh);
+                    searchTime += searchTimer.elapsed<std::chrono::nanoseconds>();
 
                     if (transferPointsSize() == 0)
                         continue;
