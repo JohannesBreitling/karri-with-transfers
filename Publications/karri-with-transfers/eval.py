@@ -246,6 +246,7 @@ def dispatch_quality(name, path):
 
 
 def walking_improved(name, path):
+    print("Evaluate no vehicle solutions.....", end='')
     df_asg_wt = pd.read_csv(path + '/wt/wt.bestassignmentswithtransfer.csv')
     df_asg_nt = pd.read_csv(path + '/wt/wt.bestassignments.csv')
     
@@ -256,7 +257,6 @@ def walking_improved(name, path):
     no_vehicle_wt = 0
     # ' true' is intended, as the value from the csv is a string with a space at the start
     no_vehicle_wot = df_asg_wot.loc[df_asg_wot['not_using_vehicle'] == ' true'].index.size
-    print(df_asg_wot.index.size)
 
 
     for i in range(n_reqs):
@@ -275,9 +275,13 @@ def walking_improved(name, path):
         if (cost_wot != 'inf' and cost_wot <= cost_wt):
             no_vehicle_wt += 1
 
-    print("Walking sol WOT " + repr(no_vehicle_wot))
-    print("Walking sol WT " + repr(no_vehicle_wt))
-
+    f_dq = open("./results/dispatch_quality.txt", "a")
+    f_dq.write("Improvement of No Vehicle Solutions" + name + "\n")
+    f_dq.write("No Vehicle solutions WOT: "  + repr(no_vehicle_wot) + "\n")
+    f_dq.write("No Vehicle solutions WT: "  + repr(no_vehicle_wt) + "\n")
+    f_dq.write("\n")
+    f_dq.close()
+    print(" done")
 
 
 def transfer_quality(name, path):
@@ -361,7 +365,7 @@ def transfer_quality(name, path):
     f_tq.close()
 
 def routelength(name, path):
-    print(name)
+    print("Analyze route lengths.....", end='')
     df_asg_wt = pd.read_csv(path + '/wt/wt.bestassignmentswithtransfer.csv')
     df_asg_nt = pd.read_csv(path + '/wt/wt.bestassignments.csv')
 
@@ -377,7 +381,6 @@ def routelength(name, path):
     total_insertions_wot = [0] * n_vehicles
 
     for i in range(n_reqs):
-        
         # Update the route for the case where transfers are turned off
         veh_id = df_asg_wot.loc[i, 'vehicle_id']
         stops = df_asg_wot.loc[i, 'num_stops']
@@ -409,19 +412,6 @@ def routelength(name, path):
             if stops > 0:
                 total_route_length_wt[dveh_id] += stops
                 total_insertions_wt[dveh_id] += 1
-        
-        # if 
-
-        # pveh_id = df_asg_wt.loc[i, 'pickup_vehicle_id']
-        # dveh_id = df_asg_wt.loc[i, 'dropoff_vehicle_id']
-
-
-        # total_route_length_wt[veh_id] += df_asg_wt.loc[i, 'route_length']
-        # total_insertions_wt[veh_id] += 1
-
-        # veh_id = df_asg_nt.loc[i, 'vehicle_id']
-        # total_route_length_wot[veh_id] += df_asg_nt.loc[i, 'route_length']
-        # total_insertions_wot[veh_id] += 1
 
     for i in range(0, n_vehicles):
         total_route_length_wt[i] = 0 if total_insertions_wt[i] == 0 else total_route_length_wt[i] / total_insertions_wt[i]
@@ -429,8 +419,14 @@ def routelength(name, path):
 
     avg_route_length_wt = sum(total_route_length_wt) / n_vehicles
     avg_route_length_wot = sum(total_route_length_wot) / n_vehicles
-    print(avg_route_length_wt)
-    print(avg_route_length_wot)
+
+    f_tq = open("./results/dispatch_quality.txt", "a")
+    f_tq.write("Avg route lengths for " + name + "\n")
+    f_tq.write("Avg route length wt: " + repr(avg_route_length_wt) + "\n")
+    f_tq.write("Avg route length wot: " + repr(avg_route_length_wot) + "\n")
+    f_tq.write("\n")
+    f_tq.close()
+    print(" done")
 
 
 def overall_perf(name, path):
@@ -463,6 +459,110 @@ def overall_perf(name, path):
     f_tp.close()
 
 
+def transfer_perf2(name, path):
+    df_ord_perf = pd.read_csv(path + '/wt/wt.perf_transf_ord.csv')
+    df_als_perf_p = pd.read_csv(path + '/wt/wt.perf_transf_als_pveh.csv')
+    df_als_perf_d = pd.read_csv(path + '/wt/wt.perf_transf_als_dveh.csv')
+
+    avg_veh_p_bns = int(df_ord_perf['num_vehs_pickup_bns'].mean())
+    avg_veh_p_ord = int(df_ord_perf['num_vehs_pickup_ord'].mean())
+    avg_veh_p_als = int(df_als_perf_p['num_vehs_pickup_als'].mean())
+    
+    avg_veh_d_bns = int(df_ord_perf['num_vehs_dropoff_bns'].mean())
+    avg_veh_d_ord = int(df_ord_perf['num_vehs_dropoff_ord'].mean())
+    avg_veh_d_als = int(df_ord_perf['num_vehs_dropoff_als'].mean())
+
+    vals_pickups_dropoffs = []
+    vals_pickups_dropoffs.append(name)
+    vals_pickups_dropoffs.append(repr(avg_veh_p_bns))
+    vals_pickups_dropoffs.append(repr(avg_veh_p_ord))
+    vals_pickups_dropoffs.append(repr(avg_veh_p_als))
+    vals_pickups_dropoffs.append(repr(avg_veh_d_bns))
+    vals_pickups_dropoffs.append(repr(avg_veh_d_ord))
+    vals_pickups_dropoffs.append(repr(avg_veh_d_als))
+    
+    total_time_ord = int(df_ord_perf['total_time'].mean())
+    total_time_als_p = int(df_als_perf_p['total_time'].mean())
+    total_time_als_d = int(df_als_perf_d['total_time'].mean())
+
+    try_assignment_time_ord = int(df_ord_perf['try_assignments_time'].mean())
+    try_assignment_time_als_p = int(df_als_perf_p['try_assignments_time'].mean())
+    try_assignment_time_als_d = int(df_als_perf_d['try_assignments_time'].mean())
+
+    num_tps_ord = int(df_ord_perf['num_transfer_points'].mean())
+    num_stop_pairs_ord = int(df_ord_perf['num_stop_pairs'].mean())
+    num_searches_ord = int(df_ord_perf['num_dijkstra_searches'].mean())
+    num_edges_ord = int(df_ord_perf['num_edges_relaxed'].mean())
+    num_vertices_ord = int(df_ord_perf['num_vertices_settled'].mean())
+    tp_search_time_ord = int(df_ord_perf['tp_search_time'].mean())
+
+    vals_ord = []
+    vals_ord.append(name)
+    vals_ord.append(repr(total_time_ord))
+    vals_ord.append(repr(try_assignment_time_ord))
+    vals_ord.append(repr(tp_search_time_ord))
+    vals_ord.append(repr(num_tps_ord))
+    vals_ord.append(repr(num_stop_pairs_ord))
+    vals_ord.append(repr(num_searches_ord))
+    vals_ord.append(repr(num_edges_ord))
+    vals_ord.append(repr(num_vertices_ord))
+    
+    num_tps_als_p = int(df_als_perf_p['num_transfer_points'].mean())
+    num_searches_als_p = int(df_als_perf_p['num_searches_last_stop_to_dveh'].mean())
+    num_edges_als_p = int(df_als_perf_p['num_edges_relaxed_last_stop_to_dveh'].mean()) + int(df_als_perf_p['num_edges_relaxed_pickup_to_dveh'].mean())
+    num_vertices_als_p = int(df_als_perf_p['num_vertices_settled_last_stop_to_dveh'].mean()) + int(df_als_perf_p['num_vertices_settled_pickup_to_dveh'].mean())
+    tp_search_time_als_p = int(df_als_perf_p['search_time_pickup_to_dveh'].mean())
+    
+    vals_als_p = []
+    vals_als_p.append(name)
+    vals_als_p.append(repr(total_time_als_p))
+    vals_als_p.append(repr(try_assignment_time_als_p))
+    vals_als_p.append(repr(tp_search_time_als_p))
+    vals_als_p.append(repr(num_tps_als_p))
+    vals_als_p.append(repr(num_searches_als_p))
+    vals_als_p.append(repr(num_edges_als_p))
+    vals_als_p.append(repr(num_vertices_als_p))
+
+    
+    num_tps_als_d = int(df_als_perf_d['num_transfer_points'].mean())
+    num_searches_als_d = int(df_als_perf_d['num_searches_last_stop_to_pveh'].mean())
+    num_edges_als_d = int(df_als_perf_d['num_edges_relaxed_last_stop_to_pveh'].mean())
+    num_vertices_als_d = int(df_als_perf_d['num_vertices_settled_last_stop_to_pveh'].mean())
+    tp_search_time_als_d = int(df_als_perf_d['search_time_last_stop_to_pveh'].mean())
+
+    vals_als_d = []
+    vals_als_d.append(name)
+    vals_als_d.append(repr(total_time_als_d))
+    vals_als_d.append(repr(try_assignment_time_als_d))
+    vals_als_d.append(repr(tp_search_time_als_d))
+    vals_als_d.append(repr(num_tps_als_d))
+    vals_als_d.append(repr(num_searches_als_d))
+    vals_als_d.append(repr(num_edges_als_d))
+    vals_als_d.append(repr(num_vertices_als_d))
+
+    row_pickups_dropoffs = get_table_row(vals_pickups_dropoffs)
+    row_ord = get_table_row(vals_ord)
+    row_als_p = get_table_row(vals_als_p)
+    row_als_d = get_table_row(vals_als_d)
+
+    f_tp = open("./results/all_transfer_perf.txt", "a")
+    f_tp.write("Pickups and Dropoffs (PBNS, PORD, PALS, DBNS, DORD, DALS)\n")
+    f_tp.write(row_pickups_dropoffs + "\n")
+
+    f_tp.write("ORD Performance (Total Time, Try Assignments Time, TP Search Time, Num TPs, Num Stop Pairs, Num Searches, Num Edges, Num Vertices)\n")
+    f_tp.write(row_ord + "\n")
+
+    f_tp.write("ALS Performance Pickup (Total Time, Try Assignments Time, TP Search Time, Num TPs, Num Searches, Num Edges, Num Vertices)\n")
+    f_tp.write(row_als_p + "\n")
+
+    f_tp.write("ALS Performance Dropoff (Total Time, Try Assignments Time, TP Search Time, Num TPs, Num Searches, Num Edges, Num Vertices)\n")
+    f_tp.write(row_als_d + "\n")
+
+    f_tp.close()
+
+    print("test")
+
+
 def transfer_perf(name, path):
     
     df_ord_perf = pd.read_csv(path + '/wt/wt.perf_transf_ord.csv')
@@ -472,8 +572,6 @@ def transfer_perf(name, path):
     df_aq = pd.read_csv(path + '/wt/wt.assignmentquality.csv')
     df_asg = pd.read_csv(path + '/wt/wt.bestassignmentswithtransfer.csv') 
     n_asg = df_asg.index.size
-
-        
 
     t_ord = 0
     t_als_pveh = 0
@@ -548,12 +646,13 @@ def transfer_perf(name, path):
 
 
 def evaluate_instance(name, path):
-    dispatch_quality(name, path)
-    transfer_quality(name, path)
-    transfer_perf(name, path)
-    routelength(name, path)
-    overall_perf(name, path)
-    walking_improved(name, path)
+    # dispatch_quality(name, path)
+    # transfer_quality(name, path)
+    # transfer_perf(name, path)
+    transfer_perf2(name, path)
+    # routelength(name, path)
+    # overall_perf(name, path)
+    # walking_improved(name, path)
 
 
 
@@ -581,6 +680,7 @@ TN_SCEN_HD = 'B1% Half Density'
 TN_SCEN_H2 = 'B1% Hour 2'
 TN_SCEN_H3 = 'B1% Hour 3'
 
+
 TP_400_ALL = FINAL_BASE + '/v-400_r-all' 
 TN_400_ALL = "B1\%-400-all"
 
@@ -593,18 +693,34 @@ TN_200_H3 = "B1\%-200-h3"
 TP_400_H2 = FINAL_BASE +'/v-400-h2_r-hour-2'
 TN_400_H2 = "B1\%-400-h2"
 
+TP_200_H3_DIJKSTRA = FINAL_BASE + '/v-200-h3_r-hour-3_dijkstra'
+TN_200_H3_DIJKSTRA = "B1\%-200-h3 dijkstra"
+
+TP_200_H3_NO_VEH_ONLY = FINAL_BASE + '/v-200-h3_r-hour-3_only_veh_sol'
+TN_200_H3_NO_VEH_ONLY = "B1\%-200-h3 no walking only" 
+
 clear_files()
 
-evaluate_request_set(TN_SCEN_ALL, TP_SCEN_ALL)
-evaluate_request_set(TN_SCEN_HD, TP_SCEN_HD)
-evaluate_request_set(TN_SCEN_H2, TP_SCEN_H2)
-evaluate_request_set(TN_SCEN_H3, TP_SCEN_H3)
+# evaluate_request_set(TN_SCEN_ALL, TP_SCEN_ALL)
+# evaluate_request_set(TN_SCEN_HD, TP_SCEN_HD)
+# evaluate_request_set(TN_SCEN_H2, TP_SCEN_H2)
+# evaluate_request_set(TN_SCEN_H3, TP_SCEN_H3)
 
 
 # Evaluate the instances:
 # evaluate_instance(TN_200_H3, TP_200_H3)
 # evaluate_instance(TN_400_H2, TP_400_H2)
 
-# evaluate_instance(TN_400_HD, TP_400_HD)
-evaluate_instance(TN_400_ALL, TP_400_ALL)
+f_tp = open("./results/all_transfer_perf.txt", "w")
+f_tp.close()
 
+transfer_perf2(TN_400_ALL, TP_400_ALL)
+transfer_perf2(TN_400_HD, TP_400_HD)
+
+
+# evaluate_instance(TN_200_H3_NO_VEH_ONLY, TP_200_H3_NO_VEH_ONLY)
+# evaluate_instance(TN_200_H3, TP_200_H3)
+
+
+# overall_perf(TN_200_H3, TP_200_H3)
+# overall_perf(TN_200_H3_NO_VEH_ONLY, TP_200_H3_NO_VEH_ONLY)
