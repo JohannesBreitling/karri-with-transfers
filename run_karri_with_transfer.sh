@@ -81,7 +81,7 @@ karriOutputDirWt=$karriOutputDir/wt/wt
 
 printf "Running without transfers...\n"
 
-$karriBinaryDir/Launchers/karri -trans 0 -w 300 -p-radius ${walkRadius} -d-radius ${walkRadius} -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDirWot -w ${waitTime}
+$karriBinaryDir/Launchers/karri -trans 0 -w 300 -p-radius ${walkRadius} -d-radius ${walkRadius} -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDirWot -w ${waitTime} -always-veh
 
 printf "\nRunning with transfers...\n"
-$karriBinaryDir/Launchers/karri -trans 1 -w 300 -p-radius ${walkRadius} -d-radius ${walkRadius} -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDirWt -w ${waitTime}
+$karriBinaryDir/Launchers/karri -trans 1 -w 300 -p-radius ${walkRadius} -d-radius ${walkRadius} -veh-g $vehGraph -psg-g $psgGraph -v $vehiclePath -r $requestPath -veh-h $vehCh -psg-h $psgCh -o $karriOutputDirWt -w ${waitTime} -always-veh

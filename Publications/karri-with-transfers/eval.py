@@ -186,6 +186,18 @@ def dispatch_quality(name, path):
 
     avg_cost_wt = df_aq_wt['cost'].mean()
     avg_cost_wot = df_aq_wot['cost'].mean()
+
+    
+    # Plot the vehicles stops
+    total_number_stops_wt.sort()
+    total_number_stops_wot.sort()
+
+    x_vals = []
+    for i in range(0, n_vehicles_wot):
+        x_vals.append(str(i))
+
+    wot_coords = generate_coordinates(x_vals, total_number_stops_wot)
+    wt_coords = generate_coordinates(x_vals, total_number_stops_wt)
     
     vals_wt = []
     vals_wt.append(name)
@@ -223,8 +235,49 @@ def dispatch_quality(name, path):
     
     f_dq.write(row_wt + "\n")
     f_dq.write(row_wot + "\n")
+    f_dq.write("\n")
+
+    f_dq.write("Coordinates for #stops of all vehicles wt and wot" + "\n")
+    f_dq.write(wt_coords + "\n")
+    f_dq.write(wot_coords + "\n")
+    f_dq.write("\n")
     f_dq.close()
     print(" done")
+
+
+def walking_improved(name, path):
+    df_asg_wt = pd.read_csv(path + '/wt/wt.bestassignmentswithtransfer.csv')
+    df_asg_nt = pd.read_csv(path + '/wt/wt.bestassignments.csv')
+    
+    df_asg_wot = pd.read_csv(path + '/wot/wot.bestassignments.csv')
+
+    n_reqs = df_asg_wt.index.size
+
+    no_vehicle_wt = 0
+    # ' true' is intended, as the value from the csv is a string with a space at the start
+    no_vehicle_wot = df_asg_wot.loc[df_asg_wot['not_using_vehicle'] == ' true'].index.size
+    print(df_asg_wot.index.size)
+
+
+    for i in range(n_reqs):
+        not_using_veh_str = (df_asg_nt.loc[i, 'not_using_vehicle']).strip()
+
+        if (not_using_veh_str != 'true'):
+            continue
+
+        cost_wot = df_asg_nt.loc[i, 'cost']
+        cost_wt = df_asg_wt.loc[i, 'cost']
+
+        if (cost_wt == 'inf'):
+            no_vehicle_wt += 1
+            continue
+            
+        if (cost_wot != 'inf' and cost_wot <= cost_wt):
+            no_vehicle_wt += 1
+
+    print("Walking sol WOT " + repr(no_vehicle_wot))
+    print("Walking sol WT " + repr(no_vehicle_wt))
+
 
 
 def transfer_quality(name, path):
@@ -500,6 +553,7 @@ def evaluate_instance(name, path):
     transfer_perf(name, path)
     routelength(name, path)
     overall_perf(name, path)
+    walking_improved(name, path)
 
 
 
@@ -550,6 +604,7 @@ evaluate_request_set(TN_SCEN_H3, TP_SCEN_H3)
 # Evaluate the instances:
 # evaluate_instance(TN_200_H3, TP_200_H3)
 # evaluate_instance(TN_400_H2, TP_400_H2)
-evaluate_instance(TN_400_HD, TP_400_HD)
+
+# evaluate_instance(TN_400_HD, TP_400_HD)
 evaluate_instance(TN_400_ALL, TP_400_ALL)
 
