@@ -42,6 +42,7 @@ namespace karri::TransferPointStrategies {
             distances = std::map<int, int[4]>{};
             maxLeewayPVeh = maxLeewayP;
             maxLeewayDVeh = maxLeewayD;
+            edgesFoundInFirstSearch = 0;
         }
 
         void nextSearch() {
@@ -53,6 +54,7 @@ namespace karri::TransferPointStrategies {
             if (currSearchIntersect == 0) {
                 edges[e] = 1;
                 distances[e][0] = distance;
+                edgesFoundInFirstSearch++;
                 return;
             }
 
@@ -67,6 +69,10 @@ namespace karri::TransferPointStrategies {
 
             edges[e] = (currSearchIntersect + 1);
             distances[e][currSearchIntersect] = distance;
+        }
+
+        int getEdgesFoundInFirstSearch() {
+            return edgesFoundInFirstSearch;
         }
 
         std::vector<TransferPoint> getIntersection() {
@@ -106,6 +112,7 @@ namespace karri::TransferPointStrategies {
         int maxLeewayDVeh;
         std::map<int, int> edges;
         std::map<int, int[4]> distances;
+        int edgesFoundInFirstSearch;
     };
 
 
@@ -130,7 +137,9 @@ namespace karri::TransferPointStrategies {
                 currSearch(0),
                 dijSearchTransferPointsFw(inputGraph, {*this, maxDetour, settledVertecies}, {}),
                 dijSearchTransferPointsBw(reverseGraph, {*this, maxDetour, settledVertecies}, {}),
-                transferPoints(transferPoints) {}
+                transferPoints(transferPoints),
+                dijkstraSearchLogger(LogManager<std::ofstream>::getLogger("dijkstra.csv",
+                    "size\n")) {}
 
         void findTransferPoints(
             const Vehicle &pVeh, const Vehicle &dVeh,
@@ -196,6 +205,8 @@ namespace karri::TransferPointStrategies {
             // assert(inputGraph.edgeTail(pNStopLoc) == reverseGraph.edgeHead(pNStopLoc));
             int dStopVertex = inputGraph.edgeHead(dStopLoc);
             int dNextStopVertex = inputGraph.edgeTail(dNStopLoc);
+
+            dijkstraSearchLogger << searchSpaceIntersection.getEdgesFoundInFirstSearch() << '\n';
 
             // Get max leeways for the current leg
             const int maxLeewayPVeh = routeState.leewayOfLegStartingAt(pStopId);
@@ -347,6 +358,8 @@ namespace karri::TransferPointStrategies {
         int64_t numSearchesRun;
         int64_t numEdgesRelaxed;
         int64_t numVerticesScanned;
+
+        std::ofstream &dijkstraSearchLogger;
     };
 
 }

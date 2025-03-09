@@ -4,6 +4,18 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        
+        {
+            "name": "Berlin-100-1000",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/Build/Release/Launchers/karri",
+            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-1pct-100.csv", "-r", "./Inputs/Requests/Berlin-1pct-1000.csv", "-o", "./Outputs/Berlin-100-1000", "-p-radius", "0", "-d-radius", "0"],
+            "environment": [{ "name": "config", "value": "Debug" }],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "karri-build"
+        },
+
         {
             "name": "Berlin-200-hour-3",
             "type": "cppdbg",

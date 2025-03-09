@@ -24,6 +24,8 @@
 
 #include "Algorithms/KaRRi/TransferPoints/VertexInEllipse.h"
 
+#include "Tools/Logging/LogManager.h"
+
 #pragma once
 
 namespace karri {
@@ -73,8 +75,13 @@ namespace karri {
             asserter(asserter),
             distanceFromVertexToNextStop(inputGraph.numVertices(), INFTY),
             transferPoints(transferPoints),
-            dVehIdsALS(Subset(0)) {}
-        
+            dVehIdsALS(Subset(0)),
+            ellipsesLogger(LogManager<std::ofstream>::getLogger("ellipses.csv",
+                "size\n")),
+            ellipseIntersectionLogger(LogManager<std::ofstream>::getLogger("ellipse-intersection.csv",
+                "size\n")) {}
+            
+
         void init() {
             totalTime = 0;
             numCandidateVehiclesPickupBNS = 0;
@@ -157,7 +164,8 @@ namespace karri {
             for (const auto& stopId : stopIdsForEllipses) {
                 const auto leeway = routeState.leewayOfLegStartingAt(stopId);
                 auto edgeEllipse = convertVertexEllipseIntoEdgeEllipse(vertexEllipses[idxOfStop[stopId]], leeway);
-
+                ellipsesLogger << edgeEllipse.size() << '\n';
+                
                 std::sort(edgeEllipse.begin(), edgeEllipse.end(), [](const EdgeInEllipse& e1, const EdgeInEllipse& e2) {
                     return e1.edge < e2.edge;
                 });
@@ -188,6 +196,7 @@ namespace karri {
                             const auto &ellipseDVeh = edgeEllipses[idxOfStop[stopIdDVeh]];
 
                             transferPoints[{stopIdxPVeh, stopIdxDVeh}] = getIntersectionOfEllipses(ellipsePVeh, ellipseDVeh, pVeh, dVeh, stopIdxPVeh, stopIdxDVeh);
+                            ellipseIntersectionLogger << transferPoints[{stopIdxPVeh, stopIdxDVeh}].size() << '\n';
                         }
                     }
                     
@@ -1122,5 +1131,9 @@ namespace karri {
         int64_t numEdgesRelaxed;
         int64_t numVerticesScanned;
         int64_t searchTime;
+    
+        std::ofstream &ellipsesLogger;
+        std::ofstream &ellipseIntersectionLogger;
+
     };
 }
