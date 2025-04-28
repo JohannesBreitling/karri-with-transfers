@@ -144,7 +144,7 @@ public:
         }
     }
 
-    int runAnyShortestPath(const std::vector<int> sources, const std::vector<int> targets) {
+    int runAnyShortestPath(const std::vector<int>& sources, const std::vector<int>& targets) {
         forwardSearch.init(sources);
         reverseSearch.init(targets);        
         

@@ -299,7 +299,7 @@ private:
         }
     }
 
-    void init(const std::vector<int> sources) {
+    void init(const std::vector<int>& sources) {
         numEdgeRelaxations = 0;
         numVerticesSettled = 0;
         distanceLabels.init();
@@ -310,9 +310,7 @@ private:
             parent.setVertex(s, s, true);
             parent.setEdge(s, INVALID_EDGE, true);
 
-            for (int k = 0; k < K; k++) {
-                distanceLabels[s][k] = 0;
-            }
+            distanceLabels[s] = 0;
 
             if (!queue.contains(s))
                 queue.insert(s, distanceLabels[s].getKey());

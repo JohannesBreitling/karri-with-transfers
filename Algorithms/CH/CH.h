@@ -130,10 +130,10 @@ class CH {
     return ranks[v];
   }
 
-  std::vector<int> allRanks(std::vector<int> nodes) const {
+  std::vector<int> allRanks(const std::vector<int>& nodes) const {
     std::vector<int> results = std::vector<int>{};
 
-    for (const auto node : nodes) {
+    for (const auto& node : nodes) {
       results.push_back(rank(node));
     }
   

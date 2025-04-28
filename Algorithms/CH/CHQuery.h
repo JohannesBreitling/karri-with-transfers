@@ -93,12 +93,12 @@ class CHQuery {
     search.run(sources, targets);
   }
 
-  int runAnyShortestPath(const std::vector<int> sources, const std::vector<int> targets) {
+  int runAnyShortestPath(const std::vector<int> &sources, const std::vector<int> &targets) {
     return search.runAnyShortestPath(sources, targets);
   }
 
   // Used for dropoff als / transfer als
-  std::vector<int> runOneToMany(const int source, const std::vector<int> targets, const std::vector<int> offsets) {
+  std::vector<int> runOneToMany(const int source, const std::vector<int> &targets, const std::vector<int> &offsets) {
     std::vector<int> distances = std::vector<int>{};
 
     for (int i = 0; i < targets.size(); i+= K) {
@@ -140,7 +140,7 @@ class CHQuery {
   }
 
   // Used for dropoff als / transfer als
-  std::vector<int> runManyToOne(const std::vector<int> sources, const int target, const int offset) {
+  std::vector<int> runManyToOne(const std::vector<int> &sources, const int target, const int offset) {
     std::vector<int> distances = std::vector<int>{};
 
     for (int i = 0; i < sources.size(); i+= K) {

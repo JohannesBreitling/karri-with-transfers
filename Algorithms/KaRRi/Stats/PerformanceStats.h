@@ -315,6 +315,13 @@ namespace karri::stats {
         int64_t numVerticesScanned;
         int64_t searchTime;
 
+        int64_t ptAnyToAny_numSearchesRun;
+        int64_t ptAnyToAny_sumNumSources;
+        int64_t ptAnyToAny_sumNumTargets;
+        int64_t tdAnyToAny_numSearchesRun;
+        int64_t tdAnyToAny_sumNumSources;
+        int64_t tdAnyToAny_sumNumTargets;
+
         static constexpr auto LOGGER_NAME = "perf_transf_ord.csv";
         static constexpr auto LOGGER_COLS =
                 "total_time,"
@@ -336,7 +343,13 @@ namespace karri::stats {
                 "num_dijkstra_searches,"
                 "num_edges_relaxed,"
                 "num_vertices_settled,"
-                "tp_search_time\n";
+                "tp_search_time,"
+                "ptAnyToAny_num_searches_run,"
+                "ptAnyToAny_sum_num_sources,"
+                "ptAnyToAny_sum_num_targets,"
+                "tdAnyToAny_num_searches_run,"
+                "tdAnyToAny_sum_num_sources,"
+                "tdAnyToAny_sum_num_targets\n";
 
         std::string getLoggerRow() const {
             std::stringstream ss;
@@ -359,7 +372,13 @@ namespace karri::stats {
                << numDijkstraSearchesRun << ", "
                << numEdgesRelaxed << ", "
                << numVerticesScanned << ", "
-               << searchTime;
+               << searchTime << ", "
+               << ptAnyToAny_numSearchesRun << ", "
+                << ptAnyToAny_sumNumSources << ", "
+                << ptAnyToAny_sumNumTargets << ", "
+                << tdAnyToAny_numSearchesRun << ", "
+                << tdAnyToAny_sumNumSources << ", "
+                << tdAnyToAny_sumNumTargets;
             return ss.str();
         }
         
@@ -388,6 +407,12 @@ namespace karri::stats {
             numEdgesRelaxed = 0;
             numVerticesScanned = 0;
             searchTime = 0;
+            ptAnyToAny_numSearchesRun = 0;
+            ptAnyToAny_sumNumSources = 0;
+            ptAnyToAny_sumNumTargets = 0;
+            tdAnyToAny_numSearchesRun = 0;
+            tdAnyToAny_sumNumSources = 0;
+            tdAnyToAny_sumNumTargets = 0;
         }
     };
 
