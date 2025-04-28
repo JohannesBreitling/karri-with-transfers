@@ -378,7 +378,7 @@ namespace karri::time_utils {
     }
 
     static INLINE int
-    calcInitialTransferDetourPVeh(const AssignmentWithTransfer &asgn, const bool transferAtExistingStop, const RouteState routeState) {
+    calcInitialTransferDetourPVeh(const AssignmentWithTransfer &asgn, const bool transferAtExistingStop, const RouteState& routeState) {
         if (transferAtExistingStop) return 0;
 
         const auto lengthOfReplacedLeg = calcLengthOfLegStartingAt(asgn.transferIdxPVeh, asgn.pVeh->vehicleId, routeState);
