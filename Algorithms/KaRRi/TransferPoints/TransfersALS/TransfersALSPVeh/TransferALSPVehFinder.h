@@ -381,6 +381,7 @@ namespace karri {
                         asgn.transferIdxDVeh = i;
 
                         const int distanceToDropoff = dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
+                        assert(distanceToDropoff > 0);
                         finishDistances(asgn, distancePVehToTransfer, distanceToPickup, 0, distanceToDropoff);
 
                         assert(asgn.distFromPickup == 0);
@@ -484,6 +485,21 @@ namespace karri {
 
             bool bnsLowerBoundUsed = false; 
             int distanceToPickup = pickup->distToPDLoc;
+            
+            // // TODO Debugging....
+            // const auto stopLocationsPVeh = routeState.stopLocationsFor(pVeh->vehicleId);
+            
+            // const auto pickupLoc = requestState.pickups[pickup->pdId].loc;
+            // (void) pickupLoc;
+            
+            // const auto stopLocBeforePick = stopLocationsPVeh[pickup->stopIndex];
+            // (void) stopLocBeforePick;
+            
+            // //! Problem: Manchmal haben wir auch Pickup at Stop
+            // assert(distanceToPickup > 0 || pickupLoc == stopLocBeforePick);
+            
+            
+            
             if (pickup->stopIndex == 0) {
                 bnsLowerBoundUsed = searches.knowsDistance(pVeh->vehicleId, pickup->pdId);
                 distanceToPickup = bnsLowerBoundUsed ? pickup->distToPDLoc : searches.getDistance(pVeh->vehicleId, pickup->pdId);
@@ -535,10 +551,13 @@ namespace karri {
                         asgn.distFromPickup = pickup->distFromPDLocToNextStop;
 
                         const int distanceToDropoff = dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
+                        assert(distanceToDropoff > 0);
                         finishDistances(asgn, 0, distancePVehToTransfer, 0, distanceToDropoff);
                         
                         assert(asgn.distFromTransferPVeh == 0);
                         assert(asgn.distFromDropoff == 0);
+                        assert(asgn.distFromPickup > 0 || asgn.pickupIdx == asgn.transferIdxPVeh);
+                        assert(asgn.distFromTransferDVeh > 0 || asgn.transferIdxDVeh == asgn.dropoffIdx);
 
                         asgn.dropoffType = AFTER_LAST_STOP;
                         asgn.pickupType = pickup->stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
@@ -557,6 +576,9 @@ namespace karri {
         }
 
         void finishDistances(AssignmentWithTransfer &asgn, const int pairedDistancePVeh, const int alsDistancePVeh, const int pairedDistanceDVeh, const int alsDistanceDVeh) {
+            // assert(pairedDistancePVeh > 0 && pairedDistanceDVeh > 0); Not correct
+            // assert(alsDistancePVeh > 0 && alsDistanceDVeh > 0);
+            
             const int pickupIdx = asgn.pickupIdx;
             const int transferIdxPVeh = asgn.transferIdxPVeh;
             const int transferIdxDVeh = asgn.transferIdxDVeh;
@@ -598,8 +620,10 @@ namespace karri {
             if (pairedPVeh || pickupAfterLastStop)
                 asgn.distFromPickup = 0;
 
-            if (pickupAfterLastStop && !pickupAtStop)
+            if (pickupAfterLastStop && !pickupAtStop) {
+                assert(alsDistancePVeh > 0);
                 asgn.distToPickup = alsDistancePVeh;
+            }
 
             if (pairedPVeh)
                 asgn.distFromPickup = 0;
@@ -640,27 +664,35 @@ namespace karri {
             if (pairedDVeh)
                 asgn.distFromTransferDVeh = 0;
 
-            if (pairedDVeh)
-                asgn.distToDropoff = pairedDistanceDVeh;
-
             if (transferAtStopDVeh && !pairedDVeh && !transferAfterLastStopDVeh)
                 asgn.distFromTransferDVeh = legTransferDVeh;
 
             //* Dropoff distances
-            if (pairedDVeh)
+            if (pairedDVeh && !dropoffAfterLastStop) { // TODO Added the !dropoffAfterLastStop check, needs evaluation
+                assert(pairedDistanceDVeh > 0);
                 asgn.distToDropoff = pairedDistanceDVeh;
+            }
 
-            if (!pairedDVeh && dropoffAfterLastStop)
+            if (!pairedDVeh && dropoffAfterLastStop) {
+                assert(alsDistanceDVeh > 0);
                 asgn.distToDropoff = alsDistanceDVeh;
+            }
 
             if (dropoffAfterLastStop)
                 asgn.distFromDropoff = 0;
 
-            if (dropoffAtStop && !pairedDVeh)
-                asgn.distToDropoff = 0;;
+            if (dropoffAtStop && !pairedDVeh) {
+                asgn.distToDropoff = 0;
+            }
+                
 
             if (dropoffAtStop)
                 asgn.distFromDropoff = legDropoff;
+        
+            assert(asgn.distFromDropoff > 0 || dropoffAfterLastStop);
+            assert(asgn.distFromTransferPVeh > 0 || transferAfterLastStopPVeh);
+            assert(asgn.distFromPickup > 0 || asgn.pickupIdx == asgn.transferIdxPVeh);
+            assert(asgn.distFromTransferDVeh > 0 || asgn.transferIdxDVeh == asgn.dropoffIdx);
         }
 
         void tryAssignment(AssignmentWithTransfer &asgn) {
