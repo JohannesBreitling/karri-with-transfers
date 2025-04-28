@@ -798,7 +798,7 @@ namespace karri {
 
         //* Utility methods to test if the insertion was correct
         bool assertRoutePVeh(const AssignmentWithTransfer &asgn) {
-            printRoute(asgn.pVeh->vehicleId);
+            // printRoute(asgn.pVeh->vehicleId);
             const auto numStopsPVeh = numStopsOf(asgn.pVeh->vehicleId);
             const auto stopLocationsPVeh = stopLocationsFor(asgn.pVeh->vehicleId);
             const auto schedDepTimesPVeh = schedDepTimesFor(asgn.pVeh->vehicleId);
@@ -827,6 +827,7 @@ namespace karri {
 
             assert(pickupBNS || pickupIdx == asgn.pickupIdx + pickupAsNewStop);
             if (!(pickupBNS || pickupIdx == asgn.pickupIdx + pickupAsNewStop))
+                return false;
                
             assert(correctedTransferIdx + transferAsNewStop == transferIdxPVeh);
             if (!(correctedTransferIdx + transferAsNewStop == transferIdxPVeh))
@@ -847,10 +848,11 @@ namespace karri {
             if (!(asgn.transferAtStopPVeh == !transferAsNewStop))
                 return false;
             
-
+            assert(!pickupAsNewStop || assertPickupNew(asgn, schedDepTimesPVeh, schedArrTimesPVeh, pickupIdx, transferIdxPVeh));
             if (pickupAsNewStop && !assertPickupNew(asgn, schedDepTimesPVeh, schedArrTimesPVeh, pickupIdx, transferIdxPVeh))
                 return false;
-
+                
+            assert(!transferAsNewStop || assertTransferNewPVeh(asgn, schedDepTimesPVeh, schedArrTimesPVeh, transferIdxPVeh, numStopsPVeh));
             if (transferAsNewStop && !assertTransferNewPVeh(asgn, schedDepTimesPVeh, schedArrTimesPVeh, transferIdxPVeh, numStopsPVeh))
                 return false;
 
@@ -860,8 +862,13 @@ namespace karri {
                 return false;
             }
 
+            assert(transferAsNewStop || (schedArrTimesPVeh[transferIdxPVeh] == asgn.arrAtTransferPoint));
             if (!transferAsNewStop && !(schedArrTimesPVeh[transferIdxPVeh] == asgn.arrAtTransferPoint))
                 return false;
+
+            assert(schedArrTimesPVeh[transferIdxPVeh] == asgn.arrAtTransferPoint);
+            assert(schedArrTimesPVeh[pickupIdx] + InputConfig::getInstance().stopTime <= schedDepTimesPVeh[pickupIdx]);
+            assert(schedArrTimesPVeh[transferIdxPVeh] + InputConfig::getInstance().stopTime <= schedDepTimesPVeh[transferIdxPVeh]);
 
             if (!(schedArrTimesPVeh[transferIdxPVeh] == asgn.arrAtTransferPoint)
              || !(schedArrTimesPVeh[pickupIdx] + InputConfig::getInstance().stopTime <= schedDepTimesPVeh[pickupIdx])
@@ -887,7 +894,7 @@ namespace karri {
         }
 
         bool assertRouteDVeh(const AssignmentWithTransfer &asgn) {
-            printRoute(asgn.dVeh->vehicleId);
+            // printRoute(asgn.dVeh->vehicleId);
             const auto numStopsDVeh = numStopsOf(asgn.dVeh->vehicleId);
             const auto stopLocationsDVeh = stopLocationsFor(asgn.dVeh->vehicleId);
             const auto schedDepTimesDVeh = schedDepTimesFor(asgn.dVeh->vehicleId);
