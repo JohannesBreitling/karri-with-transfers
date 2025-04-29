@@ -373,14 +373,16 @@ namespace karri {
                                                 routeState), 0);
 
 
-            bool transferAtExistingStop = false;
-
-            for (int i = 0; i < numStops; i++) {
-                int stopLocation = routeState.stopLocationsFor(vehId)[i];
-                if (stopLocation == asgn.transfer.loc) {
-                    transferAtExistingStop = true;
-                }
-            }
+            // TODO: Why loop?
+//            bool transferAtExistingStop = false;
+//
+//            for (int i = 0; i < numStops; i++) {
+//                int stopLocation = routeState.stopLocationsFor(vehId)[i];
+//                if (stopLocation == asgn.transfer.loc) {
+//                    transferAtExistingStop = true;
+//                }
+//            }
+            const bool transferAtExistingStop = isTransferAtExistingStopPVeh(asgn, routeState);
 
             const auto initalTransferDetour = std::max(
                     calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState), 0);

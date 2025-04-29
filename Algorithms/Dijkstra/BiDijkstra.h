@@ -136,26 +136,25 @@ public:
         bool advanceForward = false;
         while (!stoppingCriterion.stopForwardSearch() || !stoppingCriterion.stopReverseSearch()) {
             advanceForward = !advanceForward; // Alternate between the forward and reverse search.
-            if ((advanceForward && !stoppingCriterion.stopForwardSearch()) ||
-                stoppingCriterion.stopReverseSearch())
+            if ((advanceForward && !stoppingCriterion.stopForwardSearch()) || stoppingCriterion.stopReverseSearch())
                 updateTentativeDistances(forwardSearch.settleNextVertex());
             else
                 updateTentativeDistances(reverseSearch.settleNextVertex());
         }
     }
 
-    int runAnyShortestPath(const std::vector<int>& sources, const std::vector<int>& targets) {
-        forwardSearch.init(sources);
-        reverseSearch.init(targets);        
-        
+    int runAnyShortestPath(const std::vector<int> &sources, const std::vector<int> &targets, const std::vector<int>& targetOffsets) {
+        std::vector<int> sourceZeroOffsets(sources.size(), 0);
+        forwardSearch.init(sources, sourceZeroOffsets);
+        reverseSearch.init(targets, targetOffsets);
+
         tentativeDistances = INFTY;
         maxTentativeDistance = INFTY;
         bool advanceForward = false;
-        
+
         while (!stoppingCriterion.stopForwardSearch() || !stoppingCriterion.stopReverseSearch()) {
             advanceForward = !advanceForward; // Alternate between the forward and reverse search.
-            if ((advanceForward && !stoppingCriterion.stopForwardSearch()) ||
-                stoppingCriterion.stopReverseSearch())
+            if ((advanceForward && !stoppingCriterion.stopForwardSearch()) || stoppingCriterion.stopReverseSearch())
                 updateTentativeDistances(forwardSearch.settleNextVertex());
             else
                 updateTentativeDistances(reverseSearch.settleNextVertex());
@@ -185,13 +184,24 @@ public:
         return reverseSearch.getReverseEdgePath(meetingVertices.vertex(i), i);
     }
 
+    int getNumEdgeRelaxations() const {
+        return forwardSearch.getNumEdgeRelaxations() + reverseSearch.getNumEdgeRelaxations();
+    }
+
+    int getNumVerticesSettled() const {
+        return forwardSearch.getNumVerticesSettled() + reverseSearch.getNumVerticesSettled();
+    }
+
 private:
     // Checks whether the path via v improves the tentative distance for any search.
     void updateTentativeDistances(const int v) {
         const auto distances = forwardSearch.distanceLabels[v] + reverseSearch.distanceLabels[v];
-        meetingVertices.setVertex(v, distances < tentativeDistances);
-        tentativeDistances.min(distances);
-        maxTentativeDistance = tentativeDistances.horizontalMax();
+        const auto improved = distances < tentativeDistances;
+        if (anySet(improved)) {
+            meetingVertices.setVertex(v, improved);
+            tentativeDistances.setIf(distances, improved);
+            maxTentativeDistance = tentativeDistances.horizontalMax();
+        }
     }
 
 

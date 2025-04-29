@@ -318,9 +318,15 @@ namespace karri::stats {
         int64_t ptAnyToAny_numSearchesRun;
         int64_t ptAnyToAny_sumNumSources;
         int64_t ptAnyToAny_sumNumTargets;
+        int64_t ptAnyToAny_numVerticesSettled;
+        int64_t ptAnyToAny_numEdgeRelaxations;
+        int64_t ptAnyToAny_numResultZero;
         int64_t tdAnyToAny_numSearchesRun;
         int64_t tdAnyToAny_sumNumSources;
         int64_t tdAnyToAny_sumNumTargets;
+        int64_t tdAnyToAny_numVerticesSettled;
+        int64_t tdAnyToAny_numEdgeRelaxations;
+        int64_t tdAnyToAny_numResultZero;
 
         static constexpr auto LOGGER_NAME = "perf_transf_ord.csv";
         static constexpr auto LOGGER_COLS =
@@ -347,9 +353,15 @@ namespace karri::stats {
                 "ptAnyToAny_num_searches_run,"
                 "ptAnyToAny_sum_num_sources,"
                 "ptAnyToAny_sum_num_targets,"
+                "ptAnyToAny_num_vertices_settled,"
+                "ptAnyToAny_num_edge_relaxations,"
+                "ptAnyToAny_num_result_zero,"
                 "tdAnyToAny_num_searches_run,"
                 "tdAnyToAny_sum_num_sources,"
-                "tdAnyToAny_sum_num_targets\n";
+                "tdAnyToAny_sum_num_targets,"
+                "tdAnyToAny_num_vertices_settled,"
+                "tdAnyToAny_num_edge_relaxations,"
+                "tdAnyToAny_num_result_zero\n";
 
         std::string getLoggerRow() const {
             std::stringstream ss;
@@ -376,9 +388,15 @@ namespace karri::stats {
                << ptAnyToAny_numSearchesRun << ", "
                 << ptAnyToAny_sumNumSources << ", "
                 << ptAnyToAny_sumNumTargets << ", "
+                << ptAnyToAny_numVerticesSettled << ", "
+                << ptAnyToAny_numEdgeRelaxations << ", "
+                << ptAnyToAny_numResultZero << ", "
                 << tdAnyToAny_numSearchesRun << ", "
                 << tdAnyToAny_sumNumSources << ", "
-                << tdAnyToAny_sumNumTargets;
+                << tdAnyToAny_sumNumTargets << ", "
+                << tdAnyToAny_numVerticesSettled << ", "
+                << tdAnyToAny_numEdgeRelaxations << ", "
+                << tdAnyToAny_numResultZero;
             return ss.str();
         }
         
@@ -410,9 +428,15 @@ namespace karri::stats {
             ptAnyToAny_numSearchesRun = 0;
             ptAnyToAny_sumNumSources = 0;
             ptAnyToAny_sumNumTargets = 0;
+            ptAnyToAny_numVerticesSettled = 0;
+            ptAnyToAny_numEdgeRelaxations = 0;
+            ptAnyToAny_numResultZero = 0;
             tdAnyToAny_numSearchesRun = 0;
             tdAnyToAny_sumNumSources = 0;
             tdAnyToAny_sumNumTargets = 0;
+            tdAnyToAny_numVerticesSettled = 0;
+            tdAnyToAny_numEdgeRelaxations = 0;
+            tdAnyToAny_numResultZero = 0;
         }
     };
 

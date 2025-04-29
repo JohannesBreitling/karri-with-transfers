@@ -299,7 +299,9 @@ private:
         }
     }
 
-    void init(const std::vector<int>& sources) {
+    template<bool COND = K == 1>
+    void init(std::enable_if_t<COND, const std::vector<int>&> sources, const std::vector<int>& offsets) {
+        KASSERT(sources.size() == offsets.size());
         numEdgeRelaxations = 0;
         numVerticesSettled = 0;
         distanceLabels.init();
@@ -310,7 +312,7 @@ private:
             parent.setVertex(s, s, true);
             parent.setEdge(s, INVALID_EDGE, true);
 
-            distanceLabels[s] = 0;
+            distanceLabels[s] = offsets[i];
 
             if (!queue.contains(s))
                 queue.insert(s, distanceLabels[s].getKey());
