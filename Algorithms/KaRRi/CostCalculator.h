@@ -372,16 +372,6 @@ namespace karri {
                     calcAddedTripTimeInInterval(vehId, asgn.pickupIdx, asgn.transferIdxPVeh, initialPickupDetour,
                                                 routeState), 0);
 
-
-            // TODO: Why loop?
-//            bool transferAtExistingStop = false;
-//
-//            for (int i = 0; i < numStops; i++) {
-//                int stopLocation = routeState.stopLocationsFor(vehId)[i];
-//                if (stopLocation == asgn.transfer.loc) {
-//                    transferAtExistingStop = true;
-//                }
-//            }
             const bool transferAtExistingStop = isTransferAtExistingStopPVeh(asgn, routeState);
 
             const auto initalTransferDetour = std::max(
