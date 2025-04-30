@@ -453,7 +453,7 @@ namespace karri {
             const bool conditionTransferNotNewStop = pickup.loc != transfer.loc && transfer.loc == actualStopLocationTransfer;
             if (conditionTransferNotNewStop) {
                 assert(schedDepTimes[start + transferIdx] > asgn.arrAtTransferPoint);
-                maxArrTimes[start + transferIdx] = std::min(maxArrTimes[start + transferIdx], asgn.arrAtTransferPoint); // TODO This is not optimal, In this case we set the maxArrTime so, that the arrival can not be delayed, otherwise we would have to propagate the maxArrTime to the dropoffVehicle
+                maxArrTimes[start + transferIdx] = std::min(maxArrTimes[start + transferIdx], asgn.arrAtTransferPoint); // This is not optimal, In this case we set the maxArrTime so, that the arrival can not be delayed, otherwise we would have to propagate the maxArrTime to the dropoffVehicle
             } else {
                 // Insert transfer as new stop
                 ++transferIdx;
@@ -464,7 +464,7 @@ namespace karri {
                 schedArrTimes[start + transferIdx] = schedDepTimes[start + transferIdx - 1] + asgn.distToTransferPVeh;
                 schedDepTimes[start + transferIdx] = schedArrTimes[start + transferIdx] + InputConfig::getInstance().stopTime;
                 // compare maxVehArrTime to next stop later
-                maxArrTimes[start + transferIdx] = asgn.arrAtTransferPoint; // TODO Not optimal, In this case we set the maxArrTime so, that the arrival can not be delayed, otherwise we would have to propagate the maxArrTime to the dropoffVehicle
+                maxArrTimes[start + transferIdx] = asgn.arrAtTransferPoint; // Not optimal, In this case we set the maxArrTime so, that the arrival can not be delayed, otherwise we would have to propagate the maxArrTime to the dropoffVehicle
                 occupancies[start + transferIdx] = occupancies[start + transferIdx - 1];
                 numDropoffsPrefixSum[start + transferIdx] = numDropoffsPrefixSum[start + transferIdx - 1];
                 transferInsertedAsNewStop = true;
@@ -623,6 +623,7 @@ namespace karri {
                 stopLocations[start + dropoffIdx] = dropoff.loc;
                 schedArrTimes[start + dropoffIdx] =
                         schedDepTimes[start + dropoffIdx - 1] + asgn.distToDropoff;
+
                 schedDepTimes[start + dropoffIdx] = schedArrTimes[start + dropoffIdx] + InputConfig::getInstance().stopTime;
                 // compare maxVehArrTime to next stop later
                 maxArrTimes[start + dropoffIdx] = requestState.getMaxArrTimeAtDropoff(asgn.pickup->id, dropoff.id);
@@ -635,6 +636,7 @@ namespace karri {
             if (start + dropoffIdx < end - 1) {
                 // At this point minDepTimes[start + dropoffIndex] is correct. If dropoff has been inserted not as the last
                 // stop, propagate the changes to minDep and minArr times forward until the last stop.
+                assert(asgn.distFromDropoff > 0);
                 propagateSchedArrAndDepForward(start + dropoffIdx + 1, end - 1, asgn.distFromDropoff);
 
                 // If there are stops after the dropoff, consider them for propagating changes to the maxArrTimes
@@ -794,6 +796,7 @@ namespace karri {
 
         //* Utility methods to test if the insertion was correct
         bool assertRoutePVeh(const AssignmentWithTransfer &asgn) {
+            // printRoute(asgn.pVeh->vehicleId);
             const auto numStopsPVeh = numStopsOf(asgn.pVeh->vehicleId);
             const auto stopLocationsPVeh = stopLocationsFor(asgn.pVeh->vehicleId);
             const auto schedDepTimesPVeh = schedDepTimesFor(asgn.pVeh->vehicleId);
@@ -822,6 +825,7 @@ namespace karri {
 
             assert(pickupBNS || pickupIdx == asgn.pickupIdx + pickupAsNewStop);
             if (!(pickupBNS || pickupIdx == asgn.pickupIdx + pickupAsNewStop))
+                return false;
                
             assert(correctedTransferIdx + transferAsNewStop == transferIdxPVeh);
             if (!(correctedTransferIdx + transferAsNewStop == transferIdxPVeh))
@@ -842,10 +846,11 @@ namespace karri {
             if (!(asgn.transferAtStopPVeh == !transferAsNewStop))
                 return false;
             
-
+            assert(!pickupAsNewStop || assertPickupNew(asgn, schedDepTimesPVeh, schedArrTimesPVeh, pickupIdx, transferIdxPVeh));
             if (pickupAsNewStop && !assertPickupNew(asgn, schedDepTimesPVeh, schedArrTimesPVeh, pickupIdx, transferIdxPVeh))
                 return false;
-
+                
+            assert(!transferAsNewStop || assertTransferNewPVeh(asgn, schedDepTimesPVeh, schedArrTimesPVeh, transferIdxPVeh, numStopsPVeh));
             if (transferAsNewStop && !assertTransferNewPVeh(asgn, schedDepTimesPVeh, schedArrTimesPVeh, transferIdxPVeh, numStopsPVeh))
                 return false;
 
@@ -855,18 +860,39 @@ namespace karri {
                 return false;
             }
 
+            assert(transferAsNewStop || (schedArrTimesPVeh[transferIdxPVeh] == asgn.arrAtTransferPoint));
             if (!transferAsNewStop && !(schedArrTimesPVeh[transferIdxPVeh] == asgn.arrAtTransferPoint))
                 return false;
+
+            assert(schedArrTimesPVeh[transferIdxPVeh] == asgn.arrAtTransferPoint);
+            assert(schedArrTimesPVeh[pickupIdx] + InputConfig::getInstance().stopTime <= schedDepTimesPVeh[pickupIdx]);
+            assert(schedArrTimesPVeh[transferIdxPVeh] + InputConfig::getInstance().stopTime <= schedDepTimesPVeh[transferIdxPVeh]);
 
             if (!(schedArrTimesPVeh[transferIdxPVeh] == asgn.arrAtTransferPoint)
              || !(schedArrTimesPVeh[pickupIdx] + InputConfig::getInstance().stopTime <= schedDepTimesPVeh[pickupIdx])
              || !(schedArrTimesPVeh[transferIdxPVeh] + InputConfig::getInstance().stopTime <= schedDepTimesPVeh[transferIdxPVeh]))
                 return false;
+
+            
+            for (int i = 1; i < numStopsPVeh; i++) {
+                const auto lastStopLoc = stopLocationsPVeh[i - 1];
+                const auto lastStopDep = schedDepTimesPVeh[i - 1];
+                const auto stopLoc = stopLocationsPVeh[i];
+                const auto stopArr = schedArrTimesPVeh[i];
+                
+                assert(lastStopLoc == stopLoc || stopArr > lastStopDep);
+
+                if (!(lastStopLoc == stopLoc || stopArr > lastStopDep))
+                    return false;
+            }
+
+            
             
             return true;
         }
 
         bool assertRouteDVeh(const AssignmentWithTransfer &asgn) {
+            // printRoute(asgn.dVeh->vehicleId);
             const auto numStopsDVeh = numStopsOf(asgn.dVeh->vehicleId);
             const auto stopLocationsDVeh = stopLocationsFor(asgn.dVeh->vehicleId);
             const auto schedDepTimesDVeh = schedDepTimesFor(asgn.dVeh->vehicleId);
@@ -919,23 +945,41 @@ namespace karri {
              || !(schedArrTimesDVeh[dropoffIdx] + InputConfig::getInstance().stopTime <= schedDepTimesDVeh[dropoffIdx]))
                 return false;
 
+            for (int i = 1; i < numStopsDVeh; i++) {
+                const auto lastStopLoc = stopLocationsDVeh[i - 1];
+                const auto lastStopDep = schedDepTimesDVeh[i - 1];
+                const auto stopLoc = stopLocationsDVeh[i];
+                const auto stopArr = schedArrTimesDVeh[i];
+                
+                assert(lastStopLoc == stopLoc || stopArr > lastStopDep);
+
+                if (!(lastStopLoc == stopLoc || stopArr > lastStopDep))
+                    return false;
+            }
+
             return true;
         }
 
         bool assertPickupNew(const AssignmentWithTransfer &asgn, ConstantVectorRange<int> schedDepTimesPVeh, ConstantVectorRange<int> schedArrTimesPVeh, const int pickupIdx, const int transferIdxPVeh) {
-            const bool bns = asgn.pickupIdx == 0;
+            // const bool bns = asgn.pickupIdx == 0;
             const bool paired = asgn.pickupIdx == asgn.transferIdxPVeh;
 
+            
+            assert((!paired || pickupIdx + 1 == transferIdxPVeh));
             if (!(!paired || pickupIdx + 1 == transferIdxPVeh))
                 return false;
 
-            if (!bns && !(pickupIdx > 1 || schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[pickupIdx - 1] == asgn.distToPickup)) {
-                // Pickup is not first stop
-                return false;
-            } else if (!(pickupIdx >= 0 && pickupIdx <= 2) || !(schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[0] == asgn.distToPickup)) {
-                return false;
-            }
+            // TODO Find a fix for this condition
+            // assert(bns || (pickupIdx > 1 || schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[pickupIdx - 1] == asgn.distToPickup));
+            // assert(!bns || (pickupIdx >= 0 && pickupIdx <= 2) && (schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[0] == asgn.distToPickup));
+            // if (!bns && !(pickupIdx > 1 || schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[pickupIdx - 1] == asgn.distToPickup)) {
+            //     // Pickup is not first stop
+            //     return false;
+            // } else if (bns && !(pickupIdx >= 0 && pickupIdx <= 2) || !(schedArrTimesPVeh[pickupIdx] - schedDepTimesPVeh[0] == asgn.distToPickup)) {
+            //     return false;
+            // }
 
+            assert(paired || (schedArrTimesPVeh[pickupIdx + 1] - schedDepTimesPVeh[pickupIdx] == asgn.distFromPickup));
             if (!paired && !(schedArrTimesPVeh[pickupIdx + 1] - schedDepTimesPVeh[pickupIdx] == asgn.distFromPickup)) {
                 return false;
             }
@@ -989,6 +1033,21 @@ namespace karri {
             }
 
             return true;
+        }
+
+        void printRoute(const int vehId) const {
+            std::cout << "Route of vehicle " << vehId << ": ";
+            
+            const auto locs = stopLocationsFor(vehId);
+            const auto deps = schedDepTimesFor(vehId);
+            auto sep = "";
+            
+            for (int i = 0; i < locs.size(); i++) {
+                std::cout << sep << locs[i] << " (" << deps[i] << ")";
+                sep = ", ";
+            }
+
+            std::cout << std::endl;
         }
 
         // Scheduled stop interface for event simulation

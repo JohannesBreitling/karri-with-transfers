@@ -170,7 +170,6 @@ namespace karri {
         
             // Write the stats
             auto &stats = requestState.stats().transferALSPVehStats;
-
             stats.totalTime = total.elapsed<std::chrono::nanoseconds>();
             stats.numCandidateVehiclesPickupBNS += numCandidateVehiclesPickupBNS;
             stats.numCandidateVehiclesPickupORD += numCandidateVehiclesPickupORD;
@@ -198,9 +197,8 @@ namespace karri {
 
         void findAssignmentsWithPickupORD() {
             //* In this case we consider all vehicles that are able to perform the pickup ORD
-            if (relORDPickups.getVehiclesWithRelevantPDLocs().size() == 0) {
+            if (relORDPickups.getVehiclesWithRelevantPDLocs().size() == 0)
                 return;
-            }
 
             // Loop over all possible vehicles and pickups
             for (const auto pVehId : relORDPickups.getVehiclesWithRelevantPDLocs()) {
@@ -309,10 +307,6 @@ namespace karri {
 
                         asgn.distToDropoff = dropoff.distToPDLoc;
                         asgn.distFromDropoff = dropoff.distFromPDLocToNextStop;
-                        finishDistances(asgn, distancePVehToTransfer, distanceToPickup, dropoff.distToPDLoc, 0);
-
-                        assert(asgn.distFromPickup == 0);
-                        assert(asgn.distFromTransferPVeh == 0);
 
                         asgn.pickupType = AFTER_LAST_STOP;
                         asgn.dropoffType = ORDINARY;
@@ -323,6 +317,9 @@ namespace karri {
                         if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
                             continue;
 
+                        finishDistances(asgn, distancePVehToTransfer, distanceToPickup, dropoff.distToPDLoc, 0);
+                        assert(asgn.distFromPickup == 0);
+                        assert(asgn.distFromTransferPVeh == 0);
                         assert(asgn.distFromDropoff > 0);
 
                         // Try the finished assignment with ORD dropoff
@@ -381,11 +378,7 @@ namespace karri {
                         asgn.transferIdxDVeh = i;
 
                         const int distanceToDropoff = dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
-                        finishDistances(asgn, distancePVehToTransfer, distanceToPickup, 0, distanceToDropoff);
-
-                        assert(asgn.distFromPickup == 0);
-                        assert(asgn.distFromTransferPVeh == 0);
-                        assert(asgn.distFromDropoff == 0);
+                        assert(distanceToDropoff > 0);
             
                         asgn.pickupType = AFTER_LAST_STOP;
                         asgn.dropoffType = AFTER_LAST_STOP;
@@ -396,6 +389,11 @@ namespace karri {
                         if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
                             continue;
 
+                        finishDistances(asgn, distancePVehToTransfer, distanceToPickup, 0, distanceToDropoff);
+                        assert(asgn.distFromPickup == 0);
+                        assert(asgn.distFromTransferPVeh == 0);
+                        assert(asgn.distFromDropoff == 0);
+                        
                         // Try the finished assignment with ORD dropoff
                         tryAssignment(asgn);
                     }
@@ -424,13 +422,18 @@ namespace karri {
                     continue;
 
                 const auto *dVeh = &fleet[dVehId];
+                const auto numStopsDVeh = routeState.numStopsOf(dVehId);
                 const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
                 
                 for (const auto &dropoff : relORDDropoffs.relevantSpotsFor(dVehId)) {
                     const auto *dropoffPDLoc = &requestState.dropoffs[dropoff.pdId];
 
+                    if (dropoff.stopIndex == numStopsDVeh - 1)
+                        continue;
+
                     // Try all possible transfer points
                     for (int i = dropoff.stopIndex; i > 0; i--) {
+
                         // Build the transfer point
                         const int transferLoc = stopLocationsDVeh[i];
                         const int distancePVehToTransfer = lastStopDistances[pVeh->vehicleId][dVeh->vehicleId][i - 1];
@@ -456,8 +459,6 @@ namespace karri {
                         asgn.distFromPickup = pickup->distFromPDLocToNextStop;
                         asgn.distToDropoff = dropoff.distToPDLoc;
                         asgn.distFromDropoff = dropoff.distFromPDLocToNextStop;
-                        
-                        finishDistances(asgn, 0, distancePVehToTransfer, dropoff.distToPDLoc, 0);
                     
                         asgn.pickupType = pickup->stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
                         asgn.dropoffType = ORDINARY;
@@ -467,6 +468,8 @@ namespace karri {
                         // If the pickup or dropoff conincides with the transfer, we skip the assignment
                         if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
                             continue;
+
+                        finishDistances(asgn, 0, distancePVehToTransfer, dropoff.distToPDLoc, 0);
 
                         // Try the finished assignment with ORD dropoff
                         tryAssignment(asgn);
@@ -484,6 +487,7 @@ namespace karri {
 
             bool bnsLowerBoundUsed = false; 
             int distanceToPickup = pickup->distToPDLoc;
+            
             if (pickup->stopIndex == 0) {
                 bnsLowerBoundUsed = searches.knowsDistance(pVeh->vehicleId, pickup->pdId);
                 distanceToPickup = bnsLowerBoundUsed ? pickup->distToPDLoc : searches.getDistance(pVeh->vehicleId, pickup->pdId);
@@ -535,11 +539,8 @@ namespace karri {
                         asgn.distFromPickup = pickup->distFromPDLocToNextStop;
 
                         const int distanceToDropoff = dropoffALSStrategy.getDistanceToDropoff(dVehId, dropoff.id);
-                        finishDistances(asgn, 0, distancePVehToTransfer, 0, distanceToDropoff);
+                        assert(distanceToDropoff > 0);
                         
-                        assert(asgn.distFromTransferPVeh == 0);
-                        assert(asgn.distFromDropoff == 0);
-
                         asgn.dropoffType = AFTER_LAST_STOP;
                         asgn.pickupType = pickup->stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
                         asgn.transferTypePVeh = AFTER_LAST_STOP;
@@ -549,6 +550,12 @@ namespace karri {
                         if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
                             continue;
 
+                        finishDistances(asgn, 0, distancePVehToTransfer, 0, distanceToDropoff);
+                        assert(asgn.distFromTransferPVeh == 0);
+                        assert(asgn.distFromDropoff == 0);
+                        assert(asgn.distFromPickup > 0 || asgn.pickupIdx == asgn.transferIdxPVeh);
+                        assert(asgn.distFromTransferDVeh > 0 || asgn.transferIdxDVeh == asgn.dropoffIdx);
+
                         // Try the finished assignment with ORD dropoff
                         tryAssignment(asgn);
                     }
@@ -557,6 +564,9 @@ namespace karri {
         }
 
         void finishDistances(AssignmentWithTransfer &asgn, const int pairedDistancePVeh, const int alsDistancePVeh, const int pairedDistanceDVeh, const int alsDistanceDVeh) {
+            // assert(pairedDistancePVeh > 0 && pairedDistanceDVeh > 0); Not correct
+            // assert(alsDistancePVeh > 0 && alsDistanceDVeh > 0);
+            
             const int pickupIdx = asgn.pickupIdx;
             const int transferIdxPVeh = asgn.transferIdxPVeh;
             const int transferIdxDVeh = asgn.transferIdxDVeh;
@@ -592,84 +602,85 @@ namespace karri {
             const bool dropoffAfterLastStop = dropoffIdx == numStopsDVeh - 1;
             
             //* Pickup distances
+            // Distance to pickup
             if (pickupAtStop)
                 asgn.distToPickup = 0;
 
-            if (pairedPVeh || pickupAfterLastStop)
-                asgn.distFromPickup = 0;
-
-            if (pickupAfterLastStop && !pickupAtStop)
+            if (!pickupAtStop && pickupAfterLastStop)
                 asgn.distToPickup = alsDistancePVeh;
 
-            if (pairedPVeh)
+            // Distance from pickup
+            if (pairedPVeh || pickupAfterLastStop)
                 asgn.distFromPickup = 0;
-
-            if (pairedPVeh)
-                asgn.distToTransferPVeh = pairedDistancePVeh;
-
-            if (pickupAtStop && !pairedPVeh && !pickupAfterLastStop)
+            
+            if (!pairedPVeh && pickupAtStop)
                 asgn.distFromPickup = legPickup;
 
-            //* Transfer distances pVeh
+            // Distance to transfer pVeh
+            if (transferAtStopPVeh)
+                asgn.distToTransferPVeh = 0;
+            
             if (pairedPVeh)
                 asgn.distToTransferPVeh = pairedDistancePVeh;
 
-            if (!pairedPVeh && transferAfterLastStopPVeh)
+            if ((!pickupAfterLastStop && transferAfterLastStopPVeh) || (pickupAfterLastStop && pickupAtStop))
                 asgn.distToTransferPVeh = alsDistancePVeh;
+
+            // Distance from transfer pVeh
+            if (transferAtStopPVeh)
+                asgn.distFromTransferPVeh = legTransferPVeh;
 
             if (transferAfterLastStopPVeh)
                 asgn.distFromTransferPVeh = 0;
 
-            if (transferAtStopPVeh && !pairedPVeh)
-                asgn.distToTransferPVeh = 0;
-
-            if (transferAtStopPVeh)
-                asgn.distFromTransferPVeh = legTransferPVeh;
-
-
-            //* Transfer distances dVeh
+            //* Dropoff Distances
+            // Distance to transfer dVeh
             if (transferAtStopDVeh)
                 asgn.distToTransferDVeh = 0;
 
-            if (pairedDVeh || transferAfterLastStopDVeh)
-                asgn.distFromTransferDVeh = 0;
-
-            if (transferAfterLastStopDVeh && !transferAtStopDVeh)
+            if (!transferAtStopDVeh && transferAfterLastStopDVeh)
                 asgn.distToTransferDVeh = alsDistanceDVeh;
 
-            if (pairedDVeh)
+            // Distance from transfer dVeh
+            if (pairedDVeh || transferAfterLastStopDVeh)
                 asgn.distFromTransferDVeh = 0;
-
-            if (pairedDVeh)
-                asgn.distToDropoff = pairedDistanceDVeh;
-
-            if (transferAtStopDVeh && !pairedDVeh && !transferAfterLastStopDVeh)
+            
+            if (!pairedDVeh && transferAtStopDVeh)
                 asgn.distFromTransferDVeh = legTransferDVeh;
-
-            //* Dropoff distances
-            if (pairedDVeh)
+            
+            // Distance to dropoff
+            if (dropoffAtStop)
+                asgn.distToDropoff = 0;
+        
+            if (pairedDVeh && !dropoffAfterLastStop)
                 asgn.distToDropoff = pairedDistanceDVeh;
 
-            if (!pairedDVeh && dropoffAfterLastStop)
+            if ((!transferAfterLastStopDVeh && dropoffAfterLastStop) || (transferAfterLastStopDVeh && transferAtStopDVeh))
                 asgn.distToDropoff = alsDistanceDVeh;
+
+            // Distance from dropoff
+            if (dropoffAtStop)
+                asgn.distFromDropoff = legDropoff;
 
             if (dropoffAfterLastStop)
                 asgn.distFromDropoff = 0;
+        
+            assert(asgn.distFromDropoff > 0 || dropoffAfterLastStop);
+            assert(asgn.distFromTransferPVeh > 0 || transferAfterLastStopPVeh);
+            assert(asgn.distFromPickup > 0 || asgn.pickupIdx == asgn.transferIdxPVeh);
+            assert(asgn.distFromTransferDVeh > 0 || asgn.transferIdxDVeh == asgn.dropoffIdx);
 
-            if (dropoffAtStop && !pairedDVeh)
-                asgn.distToDropoff = 0;;
-
-            if (dropoffAtStop)
-                asgn.distFromDropoff = legDropoff;
+            assert(asgn.distToPickup > 0 || asgn.distFromPickup > 0 || asgn.distToTransferPVeh > 0 || asgn.distFromTransferPVeh > 0);
+            assert(asgn.distToTransferDVeh > 0 || asgn.distFromTransferDVeh > 0 || asgn.distToDropoff > 0 || asgn.distFromDropoff > 0);
         }
 
         void tryAssignment(AssignmentWithTransfer &asgn) {
-            // Skip unecessary assignments
             const int numStopsPVeh = routeState.numStopsOf(asgn.pVeh->vehicleId);
             const int numStopsDVeh = routeState.numStopsOf(asgn.dVeh->vehicleId);
             const auto stopLocationsPVeh = routeState.stopLocationsFor(asgn.pVeh->vehicleId);
             const auto stopLocationsDVeh = routeState.stopLocationsFor(asgn.dVeh->vehicleId);
 
+            // Skip unecessary assignments (e.g. if the pickup or dropoff is already at the next stop)
             if ((asgn.pickupIdx < numStopsPVeh - 1 && asgn.pickup->loc == stopLocationsPVeh[asgn.pickupIdx + 1])
              || (asgn.transferIdxDVeh < numStopsDVeh - 1 && asgn.transfer.loc == stopLocationsDVeh[asgn.transferIdxDVeh + 1])
              || (asgn.dropoffIdx < numStopsDVeh - 1 && asgn.dropoff->loc == stopLocationsDVeh[asgn.dropoffIdx + 1]))
@@ -751,7 +762,6 @@ namespace karri {
         std::map<int, std::map<int, std::vector<int>>> lastStopDistances;
 
         Subset dVehIds;
-
 
 
         //* Statistics for the transfer als pveh assignment finder

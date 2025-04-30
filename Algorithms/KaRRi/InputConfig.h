@@ -54,6 +54,7 @@ namespace karri {
         int beta = -1;
         bool alwaysUseVehicle = false;
         bool includeTransfers = false;
+        bool includeOrdinaryTransfers = false;
     };
 
 }

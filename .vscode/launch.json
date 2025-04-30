@@ -69,6 +69,17 @@
             "environment": [{ "name": "config", "value": "Debug" }],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "karri-build"
+        },
+
+        {
+            "name": "Berlin-1pct",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/Build/Release/Launchers/karri",
+            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-1pct-all.csv", "-r", "./Inputs/Requests/Berlin-1pct-all.csv", "-o", "./Outputs/Berlin-1pct", "-p-radius", "0", "-d-radius", "0"],
+            "environment": [{ "name": "config", "value": "Debug" }],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "karri-build"
         }
     ]
 }
