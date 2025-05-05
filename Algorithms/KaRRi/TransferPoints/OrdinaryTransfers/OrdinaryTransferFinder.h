@@ -979,11 +979,11 @@ namespace karri {
             std::vector<EdgeInEllipse> result;
             result.reserve(vertexEllipse.size() * 2);
 
-            for (auto vertexInEllipse: vertexEllipse) {
+            distanceFromVertexToNextStop.clear();
+            for (const auto& vertexInEllipse: vertexEllipse)
                 distanceFromVertexToNextStop[vertexInEllipse.vertex] = vertexInEllipse.distFromVertex;
-            }
 
-            for (auto vertexInEllipse: vertexEllipse) {
+            for (const auto& vertexInEllipse: vertexEllipse) {
 
                 FORALL_INCIDENT_EDGES(inputGraph, vertexInEllipse.vertex, e) {
 
@@ -993,12 +993,12 @@ namespace karri {
                     const int distFromHead = distanceFromVertexToNextStop[edgeHead];
 
                     if (distToTail + travelTime + distFromHead < leeway) {
-                        result.push_back(EdgeInEllipse{e, distToTail, distFromHead});
+                        result.emplace_back(e, distToTail, distFromHead);
                     }
                 }
             }
 
-            distanceFromVertexToNextStop.clear();
+            result.shrink_to_fit();
             return result;
         }
 
@@ -1007,25 +1007,25 @@ namespace karri {
                                                              const Vehicle *pVeh, const Vehicle *dVeh,
                                                              const int stopIdxPVeh, const int stopIdxDVeh) {
             std::vector<TransferPoint> result;
+            result.reserve(ellipsePVeh.size() + ellipseDVeh.size());
             int posPVeh = 0, posDVeh = 0;
 
             const auto numEdgesPVeh = ellipsePVeh.size();
             const auto numEdgesDVeh = ellipseDVeh.size();
             while (posPVeh < numEdgesPVeh && posDVeh < numEdgesDVeh) {
-                if (ellipsePVeh[posPVeh].edge < ellipseDVeh[posDVeh].edge) {
+                const auto& edgePVeh = ellipsePVeh[posPVeh];
+                const auto& edgeDVeh = ellipseDVeh[posDVeh];
+                if (edgePVeh.edge < edgeDVeh.edge) {
                     posPVeh++;
                     continue;
                 }
 
-                if (ellipsePVeh[posPVeh].edge > ellipseDVeh[posDVeh].edge) {
+                if (edgePVeh.edge > edgeDVeh.edge) {
                     posDVeh++;
                     continue;
                 }
 
-                const auto edgePVeh = ellipsePVeh[posPVeh];
-                const auto edgeDVeh = ellipseDVeh[posDVeh];
                 const int loc = edgePVeh.edge;
-
 
                 const int distPVehToTransfer = edgePVeh.distToTail + inputGraph.travelTime(loc);
                 const int distPVehFromTransfer = edgePVeh.distFromHead;
@@ -1039,6 +1039,7 @@ namespace karri {
                 ++posDVeh;
             }
 
+            result.shrink_to_fit();
             return result;
         }
 

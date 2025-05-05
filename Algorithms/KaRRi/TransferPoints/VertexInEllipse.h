@@ -35,6 +35,10 @@ struct VertexInEllipse {
 };
 
 struct EdgeInEllipse {
+
+    EdgeInEllipse(const int edge, const int distToTail, const int distFromHead)
+            : edge(edge), distToTail(distToTail), distFromHead(distFromHead) {};
+
     int edge = INVALID_EDGE;
     int distToTail = INFTY;
     int distFromHead = INFTY;
