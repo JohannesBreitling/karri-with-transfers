@@ -119,6 +119,7 @@
 #if KARRI_DALS_STRATEGY == KARRI_COL
 
 #include "Algorithms/KaRRi/DalsAssignments/CollectiveBCHStrategy.h"
+#include "Algorithms/KaRRi/TransferPoints/OrdinaryTransfers/DirectTransferDistances/BCHDirectTransferDistancesFinder.h"
 
 #elif KARRI_DALS_STRATEGY == KARRI_IND
 
@@ -430,7 +431,7 @@ int main(int argc, char *argv[]) {
         VehicleLocatorImpl locator(vehicleInputGraph, *vehChEnv, routeState);
 
         CostCalculator calc(routeState);
-        
+
         std::vector<AssignmentWithTransfer> postponedAssignments = std::vector<AssignmentWithTransfer>{};
 
         RequestState reqState(calc, postponedAssignments);
@@ -512,7 +513,7 @@ int main(int argc, char *argv[]) {
         // Construct ordinary assignments finder:
         PickupVehicles pVehs = PickupVehicles();
         DropoffVehicles dVehs = DropoffVehicles();
-    
+
         using OrdinaryAssignmentsFinderImpl = OrdinaryAssignmentsFinder<PDDistancesImpl>;
         OrdinaryAssignmentsFinderImpl ordinaryInsertionsFinder(relOrdinaryPickups, relOrdinaryDropoffs,
                                                                pdDistances, fleet, pVehs, dVehs,
@@ -598,7 +599,7 @@ int main(int argc, char *argv[]) {
         using RequestStateInitializerImpl = RequestStateInitializer<VehicleInputGraph, PsgInputGraph, VehCHEnv, PsgCHEnv, VehicleToPDLocQueryImpl>;
         RequestStateInitializerImpl requestStateInitializer(vehicleInputGraph, psgInputGraph, *vehChEnv, *psgChEnv,
                                                             reqState, vehicleToPdLocQuery);
-        
+
         using TransferPointsLabelSet = BasicLabelSet<1, ParentInfo::NO_PARENT_INFO>;
         using TransferPointStrategy = TransferPointStrategies::DijkstraTransferPointStrategy<VehicleInputGraph, TransferPointsLabelSet>;
 
@@ -611,9 +612,11 @@ int main(int argc, char *argv[]) {
         CHEllipseReconstructorImpl chEllipseReconstructor(*vehChEnv, ellipticBucketsEnv, routeState);
 
         std::map<std::tuple<int, int>, std::vector<TransferPoint>> transferPoints = std::map<std::tuple<int, int>, std::vector<TransferPoint>>{};
-        TransferPointStrategy transferPointStrategy = TransferPointStrategy(routeState, vehicleInputGraph, revVehicleGraph, transferPoints);
+        TransferPointStrategy transferPointStrategy = TransferPointStrategy(routeState, vehicleInputGraph,
+                                                                            revVehicleGraph, transferPoints);
         using TransferPointFinderImpl = TransferPointFinder<TransferPointStrategy>;
-        TransferPointFinderImpl transferPointFinder = TransferPointFinder(transferPointStrategy, routeState, transferPoints);
+        TransferPointFinderImpl transferPointFinder = TransferPointFinder(transferPointStrategy, routeState,
+                                                                          transferPoints);
 
 
         using TransferStrategyALSImpl = CHStrategyALS<VehicleInputGraph, VehCHEnv>;
@@ -623,29 +626,80 @@ int main(int argc, char *argv[]) {
                 SimdLabelSet<KARRI_DALS_LOG_K, ParentInfo::NO_PARENT_INFO>,
                 BasicLabelSet<KARRI_DALS_LOG_K, ParentInfo::NO_PARENT_INFO>>;
         using TransfersDropoffALSStrategy = Transfers::TransfersDropoffALSBCHStrategy<VehicleInputGraph, VehCHEnv, LastStopBucketsEnv, DALSLabelSet>;
-        TransfersDropoffALSStrategy transferDropoffALSStrategy = TransfersDropoffALSStrategy(vehicleInputGraph, fleet, *vehChEnv, calc, lastStopBucketsEnv, routeState, reqState);        
-        
+        TransfersDropoffALSStrategy transferDropoffALSStrategy = TransfersDropoffALSStrategy(vehicleInputGraph, fleet,
+                                                                                             *vehChEnv, calc,
+                                                                                             lastStopBucketsEnv,
+                                                                                             routeState, reqState);
+
         using PALSLabelSet = std::conditional_t<KARRI_PALS_USE_SIMD,
                 SimdLabelSet<KARRI_PALS_LOG_K, ParentInfo::NO_PARENT_INFO>,
                 BasicLabelSet<KARRI_PALS_LOG_K, ParentInfo::NO_PARENT_INFO>>;
-        
+
         using TransfersPickupALSStrategy = Transfers::TransfersPickupALSBCHStrategy<VehicleInputGraph, VehCHEnv, LastStopBucketsEnv, PDDistancesImpl, PALSLabelSet>;
-        TransfersPickupALSStrategy transferPickupALSStrategy = TransfersPickupALSStrategy(vehicleInputGraph, fleet, *vehChEnv, calc, lastStopBucketsEnv, pdDistances, routeState, reqState, reqState.getBestCost());
-        
+        TransfersPickupALSStrategy transferPickupALSStrategy = TransfersPickupALSStrategy(vehicleInputGraph, fleet,
+                                                                                          *vehChEnv, calc,
+                                                                                          lastStopBucketsEnv,
+                                                                                          pdDistances, routeState,
+                                                                                          reqState,
+                                                                                          reqState.getBestCost());
+
         using TransferAsserterImpl = InsertionAsserter<VehicleInputGraph, VehCHEnv>;
         TransferAsserterImpl asserter(routeState, vehicleInputGraph, *vehChEnv);
-        
-        using OrdinaryTransferInsertionsImpl =  OrdinaryTransferFinder<TransferPointFinderImpl, TransfersDropoffALSStrategy, VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, TransferAsserterImpl, CHEllipseReconstructorImpl>;
-        OrdinaryTransferInsertionsImpl ordinaryTransferInsertions = OrdinaryTransferInsertionsImpl(transferPointFinder, transferDropoffALSStrategy, chEllipseReconstructor, vehicleInputGraph, *vehChEnv, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, relOrdinaryDropoffs, relDropoffsBeforeNextStop, postponedAssignments, fleet, routeState, reqState, calc, asserter, transferPoints);
+
+        using DirectTransferDistancesLabelSet = std::conditional_t<KARRI_DIRECT_TRANSFER_DISTANCES_USE_SIMD,
+                SimdLabelSet<KARRI_DIRECT_TRANSFER_DISTANCES_LOG_K, ParentInfo::NO_PARENT_INFO>,
+                BasicLabelSet<KARRI_DIRECT_TRANSFER_DISTANCES_LOG_K, ParentInfo::NO_PARENT_INFO>>;
+        using DirectTransferDistancesFinder = BCHDirectTransferDistancesFinder<VehCHEnv, DirectTransferDistancesLabelSet>;
+        DirectTransferDistancesFinder pickupToTransferDistancesFinder(vehicleInputGraph.numVertices(), *vehChEnv,
+                                                                      PDLocType::PICKUP);
+        DirectTransferDistancesFinder transferToDropoffDistancesFinder(vehicleInputGraph.numVertices(), *vehChEnv,
+                                                                       PDLocType::DROPOFF);
+
+        using OrdinaryTransferInsertionsImpl = OrdinaryTransferFinder<TransferPointFinderImpl, TransfersDropoffALSStrategy, VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, TransferAsserterImpl, CHEllipseReconstructorImpl, DirectTransferDistancesFinder>;
+        OrdinaryTransferInsertionsImpl ordinaryTransferInsertions = OrdinaryTransferInsertionsImpl(transferPointFinder,
+                                                                                                   transferDropoffALSStrategy,
+                                                                                                   chEllipseReconstructor,
+                                                                                                   vehicleInputGraph,
+                                                                                                   *vehChEnv,
+                                                                                                   curVehLocToPickupSearches,
+                                                                                                   relOrdinaryPickups,
+                                                                                                   relPickupsBeforeNextStop,
+                                                                                                   relOrdinaryDropoffs,
+                                                                                                   relDropoffsBeforeNextStop,
+                                                                                                   pickupToTransferDistancesFinder,
+                                                                                                   transferToDropoffDistancesFinder,
+                                                                                                   postponedAssignments,
+                                                                                                   fleet, routeState,
+                                                                                                   reqState, calc,
+                                                                                                   asserter,
+                                                                                                   transferPoints);
 
         using TransferALSPVehFinderImpl = TransferALSPVehFinder<TransferStrategyALSImpl, TransfersPickupALSStrategy, TransfersDropoffALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
-        TransferALSPVehFinderImpl transferALSPVehInsertions = TransferALSPVehFinderImpl(transferALSStrategy, transferPickupALSStrategy, transferDropoffALSStrategy, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, relOrdinaryDropoffs, postponedAssignments, fleet, routeState, reqState, calc, asserter);
+        TransferALSPVehFinderImpl transferALSPVehInsertions = TransferALSPVehFinderImpl(transferALSStrategy,
+                                                                                        transferPickupALSStrategy,
+                                                                                        transferDropoffALSStrategy,
+                                                                                        curVehLocToPickupSearches,
+                                                                                        relOrdinaryPickups,
+                                                                                        relPickupsBeforeNextStop,
+                                                                                        relOrdinaryDropoffs,
+                                                                                        postponedAssignments, fleet,
+                                                                                        routeState, reqState, calc,
+                                                                                        asserter);
 
         using TransferALSDVehFinderImpl = TransferALSDVehFinder<TransferStrategyALSImpl, TransfersDropoffALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
-        TransferALSDVehFinderImpl transferALSDVehInsertions = TransferALSDVehFinderImpl(transferALSStrategy, transferDropoffALSStrategy, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, postponedAssignments, fleet, routeState, reqState, calc, asserter);
-        
+        TransferALSDVehFinderImpl transferALSDVehInsertions = TransferALSDVehFinderImpl(transferALSStrategy,
+                                                                                        transferDropoffALSStrategy,
+                                                                                        curVehLocToPickupSearches,
+                                                                                        relOrdinaryPickups,
+                                                                                        relPickupsBeforeNextStop,
+                                                                                        postponedAssignments, fleet,
+                                                                                        routeState, reqState, calc,
+                                                                                        asserter);
+
         using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<OrdinaryTransferInsertionsImpl, TransferALSPVehFinderImpl, TransferALSDVehFinderImpl, TransferAsserterImpl>;
-        AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(ordinaryTransferInsertions, transferALSPVehInsertions, transferALSDVehInsertions, reqState, asserter);
+        AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(ordinaryTransferInsertions,
+                                                                       transferALSPVehInsertions,
+                                                                       transferALSDVehInsertions, reqState, asserter);
 
         using InsertionFinderImpl = AssignmentFinder<RequestStateInitializerImpl,
                 EllipticBCHSearchesImpl,
@@ -657,10 +711,11 @@ int main(int argc, char *argv[]) {
                 RelevantPDLocsFilterImpl,
                 TransferPointFinderImpl,
                 AssignmentsWithTransferFinderImpl
-                >;
+        >;
         InsertionFinderImpl insertionFinder(reqState, requestStateInitializer, ellipticSearches, pdDistanceQuery,
                                             ordinaryInsertionsFinder, pbnsInsertionsFinder, palsInsertionsFinder,
-                                            dalsInsertionsFinder, relevantPdLocsFilter, transferPointFinder, insertionsWithTransferFinder);
+                                            dalsInsertionsFinder, relevantPdLocsFilter, transferPointFinder,
+                                            insertionsWithTransferFinder);
 
 
 #if KARRI_OUTPUT_VEHICLE_PATHS

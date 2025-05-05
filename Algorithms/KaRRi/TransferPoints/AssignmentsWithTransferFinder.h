@@ -66,7 +66,7 @@ namespace karri {
             transfersALSPVeh.findAssignments();
 
             // * ORDINARY TRANSFER
-            // ordinaryTransfers.findAssignments();
+             ordinaryTransfers.findAssignments();
             
             // * TRANSFER AFTER LAST STOP (PVeh)
             transfersALSDVeh.findAssignments();
