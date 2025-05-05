@@ -102,7 +102,6 @@ namespace karri {
             asserter(asserter),
             distanceFromVertexToNextStop(inputGraph.numVertices(), INFTY),
             transferPoints(transferPoints),
-            unionOfTransferPointLocs(inputGraph.numEdges()),
             dVehIdsALS(Subset(0)),
             edgesSubset(inputGraph.numEdges()),
             ellipsesLogger(LogManager<std::ofstream>::getLogger("ellipses.csv",
@@ -145,14 +144,14 @@ namespace karri {
             numCandidateVehiclesDropoffBNS += relBNSDropoffs.getVehiclesWithRelevantPDLocs().size();
             numCandidateVehiclesDropoffORD += relORDDropoffs.getVehiclesWithRelevantPDLocs().size();
 
-            promisingPartials = std::vector<AssignmentWithTransfer>{};
+            promisingPartials.clear();
 
             // Construct the set of possible pickup and dropoff vehicles
             std::vector<int> pVehIds = constructPVehSet();
             std::vector<int> dVehIds = constructDVehSet();
 
-            std::vector<const Vehicle *> pVehs = std::vector<const Vehicle *>{};
-            std::vector<const Vehicle *> dVehs = std::vector<const Vehicle *>{};
+            std::vector<const Vehicle *> pVehs;
+            std::vector<const Vehicle *> dVehs;
 
             for (const int pVehId: pVehIds) {
                 pVehs.push_back(&fleet[pVehId]);
@@ -252,7 +251,6 @@ namespace karri {
 
                     // Populate the map
                     transferPoints.clear();
-                    unionOfTransferPointLocs.clear();
                     for (int stopIdxPVeh = 0; stopIdxPVeh < routeState.numStopsOf(pVeh->vehicleId) - 1; stopIdxPVeh++) {
                         const int stopIdPVeh = routeState.stopIdsFor(pVeh->vehicleId)[stopIdxPVeh];
                         const auto &ellipsePVeh = edgeEllipses[idxOfStop[stopIdPVeh]];
@@ -266,11 +264,6 @@ namespace karri {
                                                                                                    ellipseDVeh, pVeh,
                                                                                                    dVeh, stopIdxPVeh,
                                                                                                    stopIdxDVeh);
-
-
-                            for (const auto &tp: transferPoints[{stopIdxPVeh, stopIdxDVeh}]) {
-                                unionOfTransferPointLocs.insert(tp.loc);
-                            }
 
                             ellipseIntersectionLogger << transferPoints[{stopIdxPVeh, stopIdxDVeh}].size() << '\n';
                         }
@@ -929,7 +922,7 @@ namespace karri {
 
         std::vector<int> constructPVehSet() {
             std::vector<bool> markedVehs(fleet.size(), false);
-            std::vector<int> pVehIds = std::vector<int>{};
+            std::vector<int> pVehIds;
 
             for (const int pVehId: relORDPickups.getVehiclesWithRelevantPDLocs()) {
                 if (markedVehs[pVehId])
@@ -952,7 +945,7 @@ namespace karri {
 
         std::vector<int> constructDVehSet() {
             alsDropoffVehs = std::vector<bool>(fleet.size(), false);
-            std::vector<int> dVehIds = std::vector<int>{};
+            std::vector<int> dVehIds;
 
             for (const int dVehId: relBNSDropoffs.getVehiclesWithRelevantPDLocs()) {
                 if (alsDropoffVehs[dVehId])
@@ -979,74 +972,6 @@ namespace karri {
             }
 
             return dVehIds;
-        }
-
-        int calculateLowerBoundPairedPT(const Vehicle *pVeh) {
-            std::vector<int> sourceRanks;
-            std::vector<int> targetRanks;
-            std::vector<int> targetOffsets;
-
-            edgesSubset.clear();
-            for (const auto &pickup: relBNSPickups.relevantSpotsFor(pVeh->vehicleId)) {
-                edgesSubset.insert(requestState.pickups[pickup.pdId].loc);
-            }
-
-            for (const auto &pickup: relORDPickups.relevantSpotsFor(pVeh->vehicleId)) {
-                edgesSubset.insert(requestState.pickups[pickup.pdId].loc);
-            }
-
-            for (const auto &pickupEdge: edgesSubset) {
-                const auto head = inputGraph.edgeHead(pickupEdge);
-                const auto headRank = vehCh.rank(head);
-                sourceRanks.push_back(headRank);
-            }
-
-            assert(sourceRanks.size() > 0);
-
-            for (const auto &loc: unionOfTransferPointLocs) {
-                const auto tail = inputGraph.edgeTail(loc);
-                const auto tailRank = vehCh.rank(tail);
-                const auto offset = inputGraph.travelTime(loc);
-                targetRanks.push_back(tailRank);
-                targetOffsets.push_back(offset);
-            }
-
-            assert(targetRanks.size() > 0);
-
-            return vehChQuery.runAnyShortestPath(sourceRanks, targetRanks, targetOffsets);
-        }
-
-        int calculateLowerBoundPairedTD(const Vehicle *dVeh) {
-            std::vector<int> sourceRanks;
-            std::vector<int> targetRanks;
-            std::vector<int> targetOffsets;
-
-            edgesSubset.clear();
-            for (const auto &dropoff: relBNSDropoffs.relevantSpotsFor(dVeh->vehicleId)) {
-                edgesSubset.insert(requestState.dropoffs[dropoff.pdId].loc);
-            }
-
-            for (const auto &dropoff: relORDDropoffs.relevantSpotsFor(dVeh->vehicleId)) {
-                edgesSubset.insert(requestState.dropoffs[dropoff.pdId].loc);
-            }
-
-            for (const auto &dropoffEdge: edgesSubset) {
-                const auto tail = inputGraph.edgeTail(dropoffEdge);
-                const auto tailRank = vehCh.rank(tail);
-                const auto offset = inputGraph.travelTime(dropoffEdge);
-                targetRanks.push_back(tailRank);
-                targetOffsets.push_back(offset);
-            }
-
-            // We dont have to consider the als dropoffs, because a paired assignemnt with dropoff als would imply that the transfer is als
-
-            for (const auto &loc: unionOfTransferPointLocs) {
-                const auto head = inputGraph.edgeHead(loc);
-                const auto headRank = vehCh.rank(head);
-                sourceRanks.push_back(headRank);
-            }
-
-            return vehChQuery.runAnyShortestPath(sourceRanks, targetRanks, targetOffsets);
         }
 
         std::vector<EdgeInEllipse>
@@ -1221,8 +1146,6 @@ namespace karri {
 
         TimestampedVector<int> distanceFromVertexToNextStop;
         std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints;
-
-        LightweightSubset unionOfTransferPointLocs;
 
         std::vector<bool> alsDropoffVehs;
         Subset dVehIdsALS;
