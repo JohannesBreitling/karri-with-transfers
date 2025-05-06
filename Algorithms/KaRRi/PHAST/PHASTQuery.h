@@ -28,6 +28,7 @@
 #include <array>
 #include <vector>
 #include "Algorithms/Dijkstra/DagShortestPaths.h"
+#include "DataStructures/Containers/FastResetFlagArray.h"
 #include "DataStructures/Labels/Containers/StampedDistanceLabelContainer.h"
 #include "RPHASTSelectionPhase.h"
 

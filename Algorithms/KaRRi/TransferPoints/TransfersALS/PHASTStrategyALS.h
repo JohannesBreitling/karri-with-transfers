@@ -2,8 +2,8 @@
 
 namespace karri {
 
-    template<typename InputGraphT, typename VehCHEnvT>    
-    class CHStrategyALS {
+    template<typename InputGraphT, typename RPHASTEnv>    
+    class PHASTStrategyALS {
 
     public:
 
@@ -11,12 +11,18 @@ namespace karri {
             const RouteState &routeState,
             const Fleet &fleet,
             const InputGraphT &inputGraph,
-            const VehCHEnvT &vehChEnv
+            const RPHASTEnv &rphastEnv
+            //const VehCHEnvT &vehChEnv
             ) : routeState(routeState),
                 fleet(fleet),
                 inputGraph(inputGraph),
-                vehCh(vehChEnv.getCH()),
-                vehChQuery(vehChEnv.template getFullCHQuery<>()) {}
+                // vehCh(vehChEnv.getCH()),
+                // vehChQuery(vehChEnv.template getFullCHQuery<>())
+                rphastEnv(rphastEnv),
+                targetsSelection(rphastEnv.getTargetsSelectionPhase()),
+                sourcesSelection(rphastEnv.getSourcesSelectionPhase()),
+                forwardQuery(rphastEnv.getForwardRPHASTQuery()),
+                reverseQuery(rphastEnv.getReverseRPHASTQuery()) {}
 
         // NEW METHODS FOR ALS TO COMPUTE WITH FASTER ALGORITHMS
         
@@ -25,6 +31,14 @@ namespace karri {
         std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromLastStopsToAllStops(std::vector<int> vehIdsLastStop, std::vector<int> vehIdsAllStops) {
             std::map<int, std::map<int, std::vector<int>>> result;
             
+            // Collect all last stops and run selection for those stops
+            for (const auto vehIdLastStop : vehIdsLastStop) {
+                const auto numStops = routeState.numStopsOf(vehIdsLastStop);
+                const auto lastStopLoc = routeState.stopLocationsFor(vehIdsLastStop)[numStops - 1];
+
+                
+            }
+
             return result;
         }
         
@@ -56,13 +70,27 @@ namespace karri {
 
     private:
     
-        using VehCHQuery = typename VehCHEnvT::template FullCHQuery<>;
+        // using VehCHQuery = typename VehCHEnvT::template FullCHQuery<>;
 
         const RouteState &routeState;
         const Fleet &fleet;
         const InputGraphT &inputGraph;
-        const CH &vehCh;
-        VehCHQuery vehChQuery;
+
+        using RPHASTSelection = RPHASTSelectionPhase<dij::NoCriterion>; 
+
+        const RPHASTEnv &rphastEnv;
+
+        RPHASTSelection targetsSelection;
+        RPHASTSelection sourcesSelection;
+
+        using Query = PHASTQuery<CH::SearchGraph, CH::Weight, BasicLabelSet<0, ParentInfo::NO_PARENT_INFO>, dij::NoCriterion>;
+        Query forwardQuery;
+        Query reverseQuery;
+        
+        // const CH &vehCh;
+        // VehCHQuery vehChQuery;
+
+        
 
         int64_t numSearchesRun;
         int64_t searchTime;

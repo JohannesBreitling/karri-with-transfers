@@ -55,6 +55,8 @@
 
 #include "Algorithms/KaRRi/TransferPoints/InsertionAsserter.h"
 
+#include "Algorithms/KaRRi/PHAST/RPHASTEnvironment.h"
+
 #include "Algorithms/KaRRi/RequestState/RequestState.h"
 #include "Algorithms/KaRRi/RequestState/RelevantPDLocs.h"
 #include "Algorithms/KaRRi/PDDistanceQueries/PDDistances.h"
@@ -74,6 +76,7 @@
 #include "Algorithms/KaRRi/TransferPoints/DropoffALS/TransfersDropoffALSBCHStrategy.h"
 #include "Algorithms/KaRRi/TransferPoints/OrdinaryTransfers/OrdinaryTransferFinder.h"
 #include "Algorithms/KaRRi/TransferPoints/TransfersALS/CHStrategyALS.h"
+#include "Algorithms/KaRRi/TransferPoints/TransfersALS/PHASTStrategyALS.h"
 #include "Algorithms/KaRRi/TransferPoints/TransfersALS/TransfersALSPVeh/TransferALSPVehFinder.h"
 #include "Algorithms/KaRRi/TransferPoints/TransfersALS/TransfersALSDVeh/TransferALSDVehFinder.h"
 
@@ -584,7 +587,11 @@ int main(int argc, char *argv[]) {
 #endif
 
         // Create RPHAST Environment
-        // RPHASTEnvironment rphastEnv(vehChEnv->getCH());
+        RPHASTEnvironment rphastEnv(vehChEnv->getCH());
+        using PHASTTransferStrategyALSImpl = PHASTStrategyALS<VehicleInputGraph, RPHASTEnvironment>;
+        PHASTTransferStrategyALSImpl phastTransferALSStrategy(routeState, fleet, vehicleInputGraph, rphastEnv);
+
+        (void) rphastEnv;
         // using EllipticSearchSpacesImpl = EllipticSearchSpaces<VehicleInputGraph, VehCHEnv>;
         // EllipticSearchSpacesImpl ellipticSearchSpaces(vehicleInputGraph, *vehChEnv, routeState);
         // using OrdinaryStopsRPHASTSelectionImpl = OrdinaryStopsRPHASTSelection<VehicleInputGraph, EllipticSearchSpacesImpl, std::ofstream>;
