@@ -85,6 +85,7 @@ namespace karri {
             dropoffALSStrategy(dropoffALSStrategy),
             chEllipseReconstructor(chEllipseReconstructor),
             inputGraph(inputGraph),
+            inputGraphWithEllipseVertexIds(inputGraph),
             vehCh(vehChEnv.getCH()),
             vehChQuery(vehChEnv.template getFullCHQuery<VehCHQueryLabelSet>()),
             searches(searches),
@@ -107,7 +108,13 @@ namespace karri {
             ellipsesLogger(LogManager<std::ofstream>::getLogger("ellipses.csv",
                                                                 "size\n")),
             ellipseIntersectionLogger(LogManager<std::ofstream>::getLogger("ellipse-intersection.csv",
-                                                                           "size\n")) {}
+                                                                           "size\n")) {
+
+            // Construct input graph permuted by vertex IDs used by ellipse reconstructor and inverse mapping of edges.
+            inputGraphWithEllipseVertexIds.permuteVertices(chEllipseReconstructor.getVertexPermutation(),
+                                                            ellipseEdgeIdsToOriginalEdgeIds);
+            ellipseEdgeIdsToOriginalEdgeIds.invert();
+        }
 
 
         void init() {
@@ -192,14 +199,17 @@ namespace karri {
 
             // Convert the ellipses of vertices to ellipses of edges
             std::vector<std::vector<EdgeInEllipse>> edgeEllipses;
-            for (const auto &stopId: stopIdsForEllipses) {
+            for (int i = 0; i < stopIdsForEllipses.size(); ++i) {
+//            for (const auto &stopId: stopIdsForEllipses) {
+                const auto& stopId = stopIdsForEllipses[i];
+                KASSERT(i == idxOfStop[stopId]);
                 auto &vertexEllipse = vertexEllipses[idxOfStop[stopId]];
 
-                // Sort vertex ellipse, which will also lead to sorted edge ellipse (if the edges in the graph are sorted).
-                std::sort(vertexEllipse.begin(), vertexEllipse.end(),
-                          [](const VertexInEllipse &v1, const VertexInEllipse &v2) {
-                              return v1.vertex < v2.vertex;
-                          });
+//                // Sort vertex ellipse, which will also lead to sorted edge ellipse (if the edges in the graph are sorted).
+//                std::sort(vertexEllipse.begin(), vertexEllipse.end(),
+//                          [](const VertexInEllipse &v1, const VertexInEllipse &v2) {
+//                              return v1.vertex < v2.vertex;
+//                          });
 
                 const auto leeway = routeState.leewayOfLegStartingAt(stopId);
 
@@ -985,6 +995,8 @@ namespace karri {
             return dVehIds;
         }
 
+        // Takes set of vertices in an ellipse (with vertex IDs used by ellipse reconstructor) and returns edges in
+        // ellipse (with edge IDs of input graph permuted by ellipse vertex IDs).
         std::vector<EdgeInEllipse>
         convertVertexEllipseIntoEdgeEllipse(const std::vector<VertexInEllipse> &vertexEllipse, const int leeway) {
             std::vector<EdgeInEllipse> result;
@@ -996,10 +1008,10 @@ namespace karri {
 
             for (const auto &vertexInEllipse: vertexEllipse) {
 
-                FORALL_INCIDENT_EDGES(inputGraph, vertexInEllipse.vertex, e) {
+                FORALL_INCIDENT_EDGES(inputGraphWithEllipseVertexIds, vertexInEllipse.vertex, e) {
 
-                    const int travelTime = inputGraph.travelTime(e);
-                    const int edgeHead = inputGraph.edgeHead(e);
+                    const int travelTime = inputGraphWithEllipseVertexIds.travelTime(e);
+                    const int edgeHead = inputGraphWithEllipseVertexIds.edgeHead(e);
                     const int distToTail = vertexInEllipse.distToVertex;
                     const int distFromHead = distanceFromVertexToNextStop[edgeHead];
 
@@ -1013,6 +1025,9 @@ namespace karri {
             return result;
         }
 
+        // Computes intersection of two ellipses. Ellipses are expected to be sorted by edge IDs in input graph
+        // permuted by vertex IDs of the ellipse reconstructor.
+        // The result is a vector of transfer points specified with edge IDs of the original input graph.
         std::vector<TransferPoint> getIntersectionOfEllipses(const std::vector<EdgeInEllipse> &ellipsePVeh,
                                                              const std::vector<EdgeInEllipse> &ellipseDVeh,
                                                              const Vehicle *pVeh, const Vehicle *dVeh,
@@ -1036,14 +1051,15 @@ namespace karri {
                     continue;
                 }
 
-                const int loc = edgePVeh.edge;
+                const int locInPermutedGraph = edgePVeh.edge;
+                const int locInOriginalGraph = ellipseEdgeIdsToOriginalEdgeIds[locInPermutedGraph];
 
-                const int distPVehToTransfer = edgePVeh.distToTail + inputGraph.travelTime(loc);
+                const int distPVehToTransfer = edgePVeh.distToTail + inputGraph.travelTime(locInOriginalGraph);
                 const int distPVehFromTransfer = edgePVeh.distFromHead;
-                const int distDVehToTransfer = edgeDVeh.distToTail + inputGraph.travelTime(loc);
+                const int distDVehToTransfer = edgeDVeh.distToTail + inputGraph.travelTime(locInOriginalGraph);
                 const int distDVehFromTransfer = edgeDVeh.distFromHead;
 
-                result.emplace_back(loc, pVeh, dVeh, stopIdxPVeh, stopIdxDVeh, distPVehToTransfer, distPVehFromTransfer,
+                result.emplace_back(locInOriginalGraph, pVeh, dVeh, stopIdxPVeh, stopIdxDVeh, distPVehToTransfer, distPVehFromTransfer,
                                     distDVehToTransfer, distDVehFromTransfer);
 
                 ++posPVeh;
@@ -1133,6 +1149,14 @@ namespace karri {
         CHEllipseReconstructorT &chEllipseReconstructor;
 
         const InputGraphT &inputGraph;
+
+
+        // Identical to input graph but vertex IDs permuted by representation used in ellipse reconstructor.
+        InputGraphT inputGraphWithEllipseVertexIds;
+
+        // Permutation that maps edge IDs in permuted input graph to edge IDs in original input graph.
+        Permutation ellipseEdgeIdsToOriginalEdgeIds;
+
         const CH &vehCh;
         VehCHQuery vehChQuery;
 

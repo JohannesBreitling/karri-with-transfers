@@ -113,8 +113,8 @@ namespace karri {
             timer.restart();
             std::vector<std::vector<VertexInEllipse>> ellipses(numEllipses);
             for (const auto &r: verticesInAnyEllipse) {
-                const auto originalRank = numVertices - r - 1; // Reverse permutation in search graphs
-                const int vertex = ch.contractionOrder(originalRank);
+//                const auto originalRank = numVertices - r - 1; // Reverse permutation in search graphs
+//                const int vertex = ch.contractionOrder(originalRank);
 
                 const auto &distToVertex = distTo[r];
                 const auto &distFromVertex = distFrom[r];
@@ -123,7 +123,7 @@ namespace karri {
                 for (int j = 0; j < numEllipses; ++j) {
                     if (!breaksLeeway[j]) {
                         KASSERT(distToVertex[j] < INFTY && distFromVertex[j] < INFTY);
-                        ellipses[j].push_back({vertex, distToVertex[j], distFromVertex[j]});
+                        ellipses[j].push_back({r, distToVertex[j], distFromVertex[j]});
                     }
                 }
             }

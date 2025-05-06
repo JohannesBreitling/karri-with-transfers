@@ -74,6 +74,18 @@ namespace karri {
             upGraph.permuteVertices(topDownRankPermutation);
         }
 
+        // Return the permutation of vertex IDs used by the ellipse reconstructor.
+        // This permutation maps vertex IDs in the input graph to vertex IDs in the top-down-permuted CH search graphs.
+        // Vertices in ellipses returned by getVerticesInEllipsesOfLegsAfterStops() can be expected to be sorted in
+        // increasing order of these vertex IDs.
+        Permutation getVertexPermutation() const {
+            Permutation temp(upGraph.numVertices());
+            for (int v = 0; v < upGraph.numVertices(); ++v)
+                temp[v] = topDownRankPermutation[ch.rank(v)];
+            KASSERT(temp.validate());
+            return temp;
+        }
+
         std::vector<std::vector<VertexInEllipse>>
         getVerticesInEllipsesOfLegsAfterStops(const std::vector<int> &stopIds, int64_t &totalNumVerticesSettled,
                                               int64_t &totalNumEdgesRelaxed) {
@@ -94,6 +106,10 @@ namespace karri {
                 }
                 auto batchResult = query.run(batchStopIds, queryStats);
                 for (int j = 0; j < K && i * K + j < numEllipses; ++j) {
+                    KASSERT(std::is_sorted(batchResult[j].begin(), batchResult[j].end(),
+                                           [](const VertexInEllipse &v1, const VertexInEllipse &v2) {
+                                               return v1.vertex < v2.vertex;
+                                           }));
                     ellipses[i * K + j].swap(batchResult[j]);
                 }
             }
