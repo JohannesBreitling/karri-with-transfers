@@ -11,13 +11,88 @@ namespace karri {
 
         CHStrategyALS(
             const RouteState &routeState,
+            const Fleet &fleet,
             const InputGraphT &inputGraph,
             const VehCHEnvT &vehChEnv
             ) : routeState(routeState),
+                fleet(fleet),
                 inputGraph(inputGraph),
                 vehCh(vehChEnv.getCH()),
                 vehChQuery(vehChEnv.template getFullCHQuery<>()) {}
 
+        // NEW METHODS FOR ALS TO COMPUTE WITH FASTER ALGORITHMS
+        
+        // Calculate distances from last stop of every pickup vehicle to all stops of dropoff vehicles
+        // Result is of form: vehLastStop - vehAllStops - stop
+        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromLastStopsToAllStops(std::vector<int> vehIdsLastStop, std::vector<int> vehIdsAllStops) {
+            std::map<int, std::map<int, std::vector<int>>> result;
+            numSearchesRun = 0;
+
+            for (const auto vehIdLastStop : vehIdsLastStop) {
+                const auto numStops = routeState.numStopsOf(vehIdLastStop);
+                const auto lastStopLoc = routeState.stopLocationsFor(vehIdLastStop)[numStops - 1];
+                const auto sourceRank = vehCh.rank(inputGraph.edgeHead(lastStopLoc));
+
+                for (const auto vehIdAllStops : vehIdsAllStops) {
+                    const auto &vehAllStops = fleet[vehIdAllStops];
+                    result[vehIdLastStop][vehIdAllStops] = runFromSourceToAllStops(sourceRank, vehAllStops);
+                }
+            }
+
+            return result;
+        }
+        
+
+        // Calculate distances from pickup to all stops of dropoff vehicles
+        // Result is of form: veh - pickup - stop
+        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromAllPickupsToAllStops(std::vector<PDLoc> &pickups, std::vector<int> dVehIds) {
+            std::map<int, std::map<int, std::vector<int>>> result;
+
+            for (const auto pickup : pickups) {
+                const auto pickupLoc = pickup.loc;
+                const auto pickupRank = vehCh.rank(inputGraph.edgeHead(pickupLoc));
+                
+                for (const auto dVehId : dVehIds) {
+                    const auto dVeh = &fleet[dVehId];
+                    result[dVehId][pickup.id] = runFromSourceToAllStops(pickupRank, *dVeh);
+                }
+            }
+
+            return result;
+        }
+        
+        // Calculate distances from all stops of pickup vehicles to all dropoffs
+        // Result is of form: veh - stop - dropoff
+        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromAllStopsToAllDropoffs(std::vector<int> pVehIds, std::vector<PDLoc> &dropoffs) {
+            std::map<int, std::map<int, std::vector<int>>> result;
+        
+            for (const auto pVehId : pVehIds) {
+                const auto &pVeh = &fleet[pVehId];
+                const int numStopsPVeh = routeState.numStopsOf(pVehId);
+                const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
+
+                for (const auto &dropoff : dropoffs) {
+                    std::vector<int> sources = std::vector<int>{};
+                    for (int i = 1; i < numStopsPVeh; i++) {
+                        sources.push_back(vehCh.rank(inputGraph.edgeHead(stopLocationsPVeh[i])));
+                    }
+
+                    const int targetRank = vehCh.rank(inputGraph.edgeTail(dropoff.loc));
+                    const int offset = inputGraph.travelTime(dropoff.loc);
+
+                    numSearchesRun = sources.size();
+    
+                    Timer searchTimer;
+                    result[pVehId][dropoff.id] = vehChQuery.runManyToOne(sources, targetRank, offset);
+                    searchTime = searchTimer.elapsed<std::chrono::nanoseconds>();
+                }
+            }
+
+            return result;
+        }
+        
+
+        // OLD METHODS FOR ALS
         std::vector<int> calculateDistancesFromLastStopToAllStops(const Vehicle &pVeh, const Vehicle &dVeh) {
             numSearchesRun = 0;
             const auto numStopsPVeh = routeState.numStopsOf(pVeh.vehicleId);
@@ -92,6 +167,7 @@ namespace karri {
         using VehCHQuery = typename VehCHEnvT::template FullCHQuery<>;
 
         const RouteState &routeState;
+        const Fleet &fleet;
         const InputGraphT &inputGraph;
         const CH &vehCh;
         VehCHQuery vehChQuery;
