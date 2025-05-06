@@ -603,13 +603,11 @@ int main(int argc, char *argv[]) {
         using TransferPointsLabelSet = BasicLabelSet<1, ParentInfo::NO_PARENT_INFO>;
         using TransferPointStrategy = TransferPointStrategies::DijkstraTransferPointStrategy<VehicleInputGraph, TransferPointsLabelSet>;
 
-        static constexpr bool ELLIPSE_RECONSTRUCTOR_USE_SIMD = true;
-        static constexpr int ELLIPSE_RECONSTRUCTOR_LOG_K = 3;
-        using CHEllipseReconstructorLabelSet = std::conditional_t<ELLIPSE_RECONSTRUCTOR_USE_SIMD,
-                SimdLabelSet<ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>,
-                BasicLabelSet<ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>>;
-        using CHEllipseReconstructorImpl = CHEllipseReconstructor<VehCHEnv, EllipticBucketsEnv, TraversalCostAttribute, CHEllipseReconstructorLabelSet, std::ofstream>;
-        CHEllipseReconstructorImpl chEllipseReconstructor(*vehChEnv, ellipticBucketsEnv, routeState);
+        using CHEllipseReconstructorLabelSet = std::conditional_t<KARRI_ELLIPSE_RECONSTRUCTOR_USE_SIMD,
+                SimdLabelSet<KARRI_ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>,
+                BasicLabelSet<KARRI_ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>>;
+        using CHEllipseReconstructorImpl = CHEllipseReconstructor<VehicleInputGraph, VehCHEnv, EllipticBucketsEnv, TraversalCostAttribute, CHEllipseReconstructorLabelSet, std::ofstream>;
+        CHEllipseReconstructorImpl chEllipseReconstructor(vehicleInputGraph, *vehChEnv, ellipticBucketsEnv, routeState);
 
         std::map<std::tuple<int, int>, std::vector<TransferPoint>> transferPoints = std::map<std::tuple<int, int>, std::vector<TransferPoint>>{};
         TransferPointStrategy transferPointStrategy = TransferPointStrategy(routeState, vehicleInputGraph,

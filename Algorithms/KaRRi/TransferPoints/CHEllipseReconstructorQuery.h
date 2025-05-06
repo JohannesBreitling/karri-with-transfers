@@ -29,6 +29,7 @@
 #include "DataStructures/Labels/BasicLabelSet.h"
 #include "Algorithms/Dijkstra/Dijkstra.h"
 #include "VertexInEllipse.h"
+#include "CHEllipseReconstructorStats.h"
 #include "DataStructures/Containers/TimestampedVector.h"
 #include "DataStructures/Containers/FastResetFlagArray.h"
 
@@ -44,22 +45,6 @@ namespace karri {
         static constexpr int K = LabelSet::K;
 
     public:
-
-        struct QueryStats {
-            int numVerticesSettled = 0;
-            int numEdgesRelaxed = 0;
-            int64_t initTime = 0;
-            int64_t topoSearchTime = 0;
-            int64_t postprocessTime = 0;
-
-            void reset() {
-                numVerticesSettled = 0;
-                numEdgesRelaxed = 0;
-                initTime = 0;
-                topoSearchTime = 0;
-                postprocessTime = 0;
-            }
-        };
 
         CHEllipseReconstructorQuery(const CH &ch,
                                     const typename CH::SearchGraph &downGraph,
@@ -86,7 +71,7 @@ namespace karri {
         }
 
         std::vector<std::vector<VertexInEllipse>> run(const std::vector<int> &stopIds,
-                                                      QueryStats& stats) {
+                                                      CHEllipseReconstructorStats& stats) {
             KASSERT(stopIds.size() <= K);
 
             Timer timer;
@@ -123,7 +108,7 @@ namespace karri {
                 for (int j = 0; j < numEllipses; ++j) {
                     if (!breaksLeeway[j]) {
                         KASSERT(distToVertex[j] < INFTY && distFromVertex[j] < INFTY);
-                        ellipses[j].push_back({r, distToVertex[j], distFromVertex[j]});
+                        ellipses[j].emplace_back(r, distToVertex[j], distFromVertex[j]);
                     }
                 }
             }

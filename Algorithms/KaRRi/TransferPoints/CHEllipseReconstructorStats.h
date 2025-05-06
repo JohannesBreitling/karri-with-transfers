@@ -24,26 +24,31 @@
 
 #pragma once
 
-#include "Tools/Constants.h"
+#include "Algorithms/KaRRi/RouteState.h"
+#include "Algorithms/CH/CH.h"
+#include "DataStructures/Labels/BasicLabelSet.h"
+#include "Algorithms/Dijkstra/Dijkstra.h"
+#include "VertexInEllipse.h"
+#include "DataStructures/Containers/TimestampedVector.h"
+#include "DataStructures/Containers/FastResetFlagArray.h"
 
-// Represents a vertex in a detour ellipse with according distances from previous stop to vertex and from vertex to
-// next stop.
-struct VertexInEllipse {
+namespace karri {
 
-    VertexInEllipse(const int vertex, const int distToVertex, const int distFromVertex)
-            : vertex(vertex), distToVertex(distToVertex), distFromVertex(distFromVertex) {};
+        struct CHEllipseReconstructorStats {
+            int numVerticesSettled = 0;
+            int numEdgesRelaxed = 0;
+            int64_t initTime = 0;
+            int64_t topoSearchTime = 0;
+            int64_t postprocessTime = 0;
 
-    int vertex = INVALID_VERTEX;
-    int distToVertex = INFTY;
-    int distFromVertex = INFTY;
-};
+            void reset() {
+                numVerticesSettled = 0;
+                numEdgesRelaxed = 0;
+                initTime = 0;
+                topoSearchTime = 0;
+                postprocessTime = 0;
+            }
+        };
 
-struct EdgeInEllipse {
 
-    EdgeInEllipse(const int edge, const int distToTail, const int distFromHead)
-            : edge(edge), distToTail(distToTail), distFromHead(distFromHead) {};
-
-    int edge = INVALID_EDGE;
-    int distToTail = INFTY;
-    int distFromHead = INFTY;
-};
+} // karri

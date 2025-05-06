@@ -185,10 +185,21 @@ endif (KARRI_COL_PALS_ONLY_PROMISING_DROPOFFS)
 
 
 ## Compile time parameters for transfers
+set(KARRI_ELLIPSE_RECONSTRUCTOR_LOG_K 3 CACHE STRING "Given value i, KaRRi runs 2^i ellipse reconstruction searches simultaneously as bundled search.")
+target_compile_definitions(karri PRIVATE KARRI_ELLIPSE_RECONSTRUCTOR_LOG_K=${KARRI_ELLIPSE_RECONSTRUCTOR_LOG_K})
+
+option(KARRI_ELLIPSE_RECONSTRUCTOR_USE_SIMD "Use SIMD instructions for bundled ellipse reconstruction searches." ON)
+if (KARRI_ELLIPSE_RECONSTRUCTOR_USE_SIMD)
+    target_compile_definitions(karri PRIVATE KARRI_ELLIPSE_RECONSTRUCTOR_USE_SIMD=true)
+else(KARRI_ELLIPSE_RECONSTRUCTOR_USE_SIMD)
+    target_compile_definitions(karri PRIVATE KARRI_ELLIPSE_RECONSTRUCTOR_USE_SIMD=false)
+endif (KARRI_ELLIPSE_RECONSTRUCTOR_USE_SIMD)
+
+
 set(KARRI_DIRECT_TRANSFER_DISTANCES_LOG_K 0 CACHE STRING "Given value i, KaRRi runs 2^i direct transfer distance searches simultaneously as bundled search.")
 target_compile_definitions(karri PRIVATE KARRI_DIRECT_TRANSFER_DISTANCES_LOG_K=${KARRI_DIRECT_TRANSFER_DISTANCES_LOG_K})
 
-option(KARRI_DIRECT_TRANSFER_DISTANCES_USE_SIMD "Use SIMD instructions for bundled direct trasnfer distance searches." OFF)
+option(KARRI_DIRECT_TRANSFER_DISTANCES_USE_SIMD "Use SIMD instructions for bundled direct transfer distance searches." OFF)
 if (KARRI_DIRECT_TRANSFER_DISTANCES_USE_SIMD)
     target_compile_definitions(karri PRIVATE KARRI_DIRECT_TRANSFER_DISTANCES_USE_SIMD=true)
 else(KARRI_DIRECT_TRANSFER_DISTANCES_USE_SIMD)
