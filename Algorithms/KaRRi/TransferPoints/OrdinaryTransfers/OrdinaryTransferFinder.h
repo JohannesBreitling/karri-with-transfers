@@ -202,6 +202,7 @@ namespace karri {
                           });
 
                 const auto leeway = routeState.leewayOfLegStartingAt(stopId);
+
                 const auto edgeEllipse = convertVertexEllipseIntoEdgeEllipse(vertexEllipse, leeway);
                 ellipsesLogger << edgeEllipse.size() << '\n';
 
@@ -221,7 +222,7 @@ namespace karri {
             std::vector<int> pdLocOffsets;
             pdLocRanks.reserve(requestState.numPickups());
             pdLocOffsets.reserve(requestState.numPickups());
-            for (const auto& p : requestState.pickups) {
+            for (const auto &p: requestState.pickups) {
                 pdLocRanks.push_back(vehCh.rank(inputGraph.edgeHead(p.loc)));
                 pdLocOffsets.push_back(0);
             }
@@ -231,7 +232,7 @@ namespace karri {
             pdLocOffsets.clear();
             pdLocRanks.reserve(requestState.numDropoffs());
             pdLocOffsets.reserve(requestState.numDropoffs());
-            for (const auto& d : requestState.dropoffs) {
+            for (const auto &d: requestState.dropoffs) {
                 pdLocRanks.push_back(vehCh.rank(inputGraph.edgeTail(d.loc)));
                 pdLocOffsets.push_back(inputGraph.travelTime(d.loc));
             }
@@ -253,17 +254,24 @@ namespace karri {
                     transferPoints.clear();
                     for (int stopIdxPVeh = 0; stopIdxPVeh < routeState.numStopsOf(pVeh->vehicleId) - 1; stopIdxPVeh++) {
                         const int stopIdPVeh = routeState.stopIdsFor(pVeh->vehicleId)[stopIdxPVeh];
+                        if (idxOfStop[stopIdPVeh] == INVALID_INDEX)
+                            continue;
+
                         const auto &ellipsePVeh = edgeEllipses[idxOfStop[stopIdPVeh]];
 
                         for (int stopIdxDVeh = 0;
                              stopIdxDVeh < routeState.numStopsOf(dVeh->vehicleId) - 1; stopIdxDVeh++) {
                             const int stopIdDVeh = routeState.stopIdsFor(dVeh->vehicleId)[stopIdxDVeh];
+                            if (idxOfStop[stopIdDVeh] == INVALID_INDEX)
+                                continue;
+
                             const auto &ellipseDVeh = edgeEllipses[idxOfStop[stopIdDVeh]];
 
-                            transferPoints[{stopIdxPVeh, stopIdxDVeh}] = getIntersectionOfEllipses(ellipsePVeh,
-                                                                                                   ellipseDVeh, pVeh,
-                                                                                                   dVeh, stopIdxPVeh,
-                                                                                                   stopIdxDVeh);
+                            const auto intersection = getIntersectionOfEllipses(ellipsePVeh,
+                                                                                ellipseDVeh, pVeh,
+                                                                                dVeh, stopIdxPVeh,
+                                                                                stopIdxDVeh);
+                            transferPoints[{stopIdxPVeh, stopIdxDVeh}] = intersection;
 
                             ellipseIntersectionLogger << transferPoints[{stopIdxPVeh, stopIdxDVeh}].size() << '\n';
                         }
@@ -660,7 +668,9 @@ namespace karri {
                     const int transferRank = vehCh.rank(inputGraph.edgeTail(asgn.transfer.loc));
                     const int transferOffset = inputGraph.travelTime(asgn.transfer.loc);
                     pickupToTransferDistancesFinder.runQueryForTransferRank(transferRank);
-                    const int distance = pickupToTransferDistancesFinder.getDistances().getDistance(asgn.pickup->id, transferRank) + transferOffset;
+                    const int distance =
+                            pickupToTransferDistancesFinder.getDistances().getDistance(asgn.pickup->id, transferRank) +
+                            transferOffset;
 
                     asgn.distToTransferPVeh = distance;
                     asgn.pickupPairedLowerBoundUsed = false;
@@ -735,7 +745,8 @@ namespace karri {
 
                 const int transferRank = vehCh.rank(inputGraph.edgeHead(asgn.transfer.loc));
                 transferToDropoffDistancesFinder.runQueryForTransferRank(transferRank);
-                const int distance = transferToDropoffDistancesFinder.getDistances().getDistance(asgn.dropoff->id, transferRank);
+                const int distance = transferToDropoffDistancesFinder.getDistances().getDistance(asgn.dropoff->id,
+                                                                                                 transferRank);
 
                 asgn.distToDropoff = distance;
                 asgn.dropoffPairedLowerBoundUsed = false;
@@ -980,10 +991,10 @@ namespace karri {
             result.reserve(vertexEllipse.size() * 2);
 
             distanceFromVertexToNextStop.clear();
-            for (const auto& vertexInEllipse: vertexEllipse)
+            for (const auto &vertexInEllipse: vertexEllipse)
                 distanceFromVertexToNextStop[vertexInEllipse.vertex] = vertexInEllipse.distFromVertex;
 
-            for (const auto& vertexInEllipse: vertexEllipse) {
+            for (const auto &vertexInEllipse: vertexEllipse) {
 
                 FORALL_INCIDENT_EDGES(inputGraph, vertexInEllipse.vertex, e) {
 
@@ -992,7 +1003,7 @@ namespace karri {
                     const int distToTail = vertexInEllipse.distToVertex;
                     const int distFromHead = distanceFromVertexToNextStop[edgeHead];
 
-                    if (distToTail + travelTime + distFromHead < leeway) {
+                    if (distToTail + travelTime + distFromHead <= leeway) {
                         result.emplace_back(e, distToTail, distFromHead);
                     }
                 }
@@ -1013,8 +1024,8 @@ namespace karri {
             const auto numEdgesPVeh = ellipsePVeh.size();
             const auto numEdgesDVeh = ellipseDVeh.size();
             while (posPVeh < numEdgesPVeh && posDVeh < numEdgesDVeh) {
-                const auto& edgePVeh = ellipsePVeh[posPVeh];
-                const auto& edgeDVeh = ellipseDVeh[posDVeh];
+                const auto &edgePVeh = ellipsePVeh[posPVeh];
+                const auto &edgeDVeh = ellipseDVeh[posDVeh];
                 if (edgePVeh.edge < edgeDVeh.edge) {
                     posPVeh++;
                     continue;
