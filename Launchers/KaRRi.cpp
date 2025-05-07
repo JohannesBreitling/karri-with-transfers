@@ -618,7 +618,7 @@ int main(int argc, char *argv[]) {
 
 
         using TransferStrategyALSImpl = CHStrategyALS<VehicleInputGraph, VehCHEnv>;
-        TransferStrategyALSImpl transferALSStrategy = CHStrategyALS(routeState, vehicleInputGraph, *vehChEnv);
+        TransferStrategyALSImpl transferALSStrategy = CHStrategyALS(routeState, fleet, vehicleInputGraph, *vehChEnv);
 
         using DALSLabelSet = std::conditional_t<KARRI_DALS_USE_SIMD,
                 SimdLabelSet<KARRI_DALS_LOG_K, ParentInfo::NO_PARENT_INFO>,

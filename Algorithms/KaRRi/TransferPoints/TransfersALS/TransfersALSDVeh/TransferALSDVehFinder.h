@@ -115,6 +115,12 @@ class TransferALSDVehFinder {
             if (dVehIds.size() == 0)
                 return;
 
+            
+            
+            
+            // TODO Hier ansetzten um die nötigen Distanzen zu bestimmen...
+            
+            
             for (const auto dVehId : dVehIds) {
                 const auto *dVeh = &fleet[dVehId];
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);

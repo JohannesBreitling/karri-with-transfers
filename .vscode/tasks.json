@@ -17,6 +17,24 @@
           "isDefault": true
         },
         "detail": "Build the karri target with cmake."
+      },
+
+      {
+        "type": "shell",
+        "label": "karri-build-debug",
+        "command": "cmake",
+        "args": [
+          "--build",
+          "./Build/Debug/",
+          "--target",
+          "karri"
+        ],
+        "problemMatcher": ["$msCompile"],
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "detail": "Build the karri target with cmake."
       }
     ]
   }

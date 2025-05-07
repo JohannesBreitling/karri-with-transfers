@@ -102,6 +102,30 @@ namespace karri {
             //* Calculate the distances from the last stop of the pickup vehicles to all possible stops of the dropoff vehicles (for the case that the pickup is ORD or BNS)
             dVehIds = dropoffALSStrategy.findDropoffsAfterLastStop();
             numCandidateVehiclesDropoffALS += dVehIds.size();
+
+
+            //* More versatile calculation of the last stop distances
+            std::vector<int> relevantPVehIds;
+            std::vector<int> relevantDVehIds;
+
+            for (const auto pVehId : relORDPickups.getVehiclesWithRelevantPDLocs()) {
+                relevantPVehIds.push_back(pVehId);
+            }
+
+            for (const auto pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
+                relevantPVehIds.push_back(pVehId);
+            }
+
+            for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
+                relevantDVehIds.push_back(dVehId);
+            }
+
+            for (const auto dVehId : dVehIds) {
+                relevantDVehIds.push_back(dVehId);
+            }
+
+            auto newLastStopDistances = strategy.calculateDistancesFromLastStopsToAllStops(relevantPVehIds, relevantDVehIds);
+
             
             for (const auto pVehId : relORDPickups.getVehiclesWithRelevantPDLocs()) {
                 const auto &pVeh = &fleet[pVehId];
@@ -115,6 +139,12 @@ namespace karri {
 
                     // Save the distances for building the assignments later
                     lastStopDistances[pVehId][dVehId] = distances;
+
+                    // Assert calculations
+                    for (int i = 0; i < distances.size(); i++) {
+                        const auto newDistances = newLastStopDistances[pVehId][dVehId];
+                        assert(newDistances[i] == distances[i]);
+                    }
                 }
 
                 for (const auto dVehId : dVehIds) {
@@ -126,6 +156,11 @@ namespace karri {
 
                     // Save the distances for building the assignments later
                     lastStopDistances[pVehId][dVehId] = distances;
+
+                    // Assert calculations
+                    for (int i = 0; i < distances.size(); i++) {
+                        assert(newLastStopDistances[pVehId][dVehId][i] == distances[i]);
+                    }
                 }
             }
 
@@ -142,6 +177,11 @@ namespace karri {
                     // Save the distances for building the assignments later
                     lastStopDistances[pVehId][dVehId] = distances;
                     numTransferPoints += distances.size();
+
+                    // Assert calculations
+                    for (int i = 0; i < distances.size(); i++) {
+                        assert(newLastStopDistances[pVehId][dVehId][i] == distances[i]);
+                    }
                 }
 
                 for (const auto dVehId : dVehIds) {
@@ -154,6 +194,11 @@ namespace karri {
                     // Save the distances for building the assignments later
                     lastStopDistances[pVehId][dVehId] = distances;
                     numTransferPoints += distances.size();
+
+                    // Assert calculations
+                    for (int i = 0; i < distances.size(); i++) {
+                        assert(newLastStopDistances[pVehId][dVehId][i] == distances[i]);
+                    }
                 }
             }
 
@@ -243,6 +288,20 @@ namespace karri {
             if (pVehIds.size() == 0)
                 return;
 
+            //* More versatile distance calculation
+            std::vector<int> relevantDVehIds;
+            for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
+                relevantDVehIds.push_back(dVehId);
+            }
+
+
+            for (const auto dVehId : dVehIds) {
+                relevantDVehIds.push_back(dVehId);
+            }
+
+            // Calculate the distances from all pickups to all stops of relevant dropoff vehicles
+            fastTransferDistances = strategy.calculateDistancesFromAllPickupsToAllStops(requestState.pickups, relevantDVehIds);
+
             for (const auto pVehId : pVehIds) {
                 const auto *pVeh = &fleet[pVehId];
 
@@ -290,6 +349,8 @@ namespace karri {
                         // Build the transfer point
                         const int transferLoc = stopLocationsDVeh[i];
                         const int distancePVehToTransfer = distancesToTransfer[i - 1];
+
+                        assert(distancePVehToTransfer == fastTransferDistances[dVehId][pickup->id][i - 1]);
                         
                         TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh - 1, i, distancePVehToTransfer, 0, 0, 0);
 
@@ -363,6 +424,8 @@ namespace karri {
                         // Build the transfer point
                         const int transferLoc = stopLocationsDVeh[i];
                         const int distancePVehToTransfer = distancesToTransfer[i - 1];
+
+                        assert(distancePVehToTransfer == fastTransferDistances[dVehId][pickup->id][i - 1]);
 
                         TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh, i, distancePVehToTransfer, 0, 0, 0);
 
@@ -623,7 +686,7 @@ namespace karri {
             if (pairedPVeh)
                 asgn.distToTransferPVeh = pairedDistancePVeh;
 
-            if ((!pickupAfterLastStop && transferAfterLastStopPVeh) || (pickupAfterLastStop && pickupAtStop))
+            if (!pickupAfterLastStop && transferAfterLastStopPVeh)
                 asgn.distToTransferPVeh = alsDistancePVeh;
 
             // Distance from transfer pVeh
@@ -760,6 +823,9 @@ namespace karri {
         
         // Stores for each pickup vehicle, the distances to all possible stops of dropoff vehicles
         std::map<int, std::map<int, std::vector<int>>> lastStopDistances;
+
+        std::map<int, std::map<int, std::vector<int>>> fastLastStopDistances;
+        std::map<int, std::map<int, std::vector<int>>> fastTransferDistances;
 
         Subset dVehIds;
 
