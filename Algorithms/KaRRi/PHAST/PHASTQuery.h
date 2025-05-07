@@ -77,12 +77,19 @@ public:
               upDists(),
               upwardSearch(sourceGraph, SetDistanceInDownwardArray(upDists)) {}
 
-    void
-    run(const RPHASTSelection &selection, const std::array<int, K> &sources, const std::array<int, K> &offsets = {}) {
+    
+    
+    void run(const RPHASTSelection &selection, const int source, const int offset = 0) {
         sanityCheckTargetGraphValidity(selection);
-        runUpwardSearchAndInitializeDownwardDistances(selection, sources, offsets);
+        runUpwardSearchAndInitializeDownwardDistances(selection, source, offset);
         runDownwardSweep(selection);
     }
+
+    // void run(const RPHASTSelection &selection, const std::array<int, K> &sources, const std::array<int, K> &offsets = {}) {
+    //     sanityCheckTargetGraphValidity(selection);
+    //     runUpwardSearchAndInitializeDownwardDistances(selection, sources, offsets);
+    //     runDownwardSweep(selection);
+    // }
 
     // Returns distance from i-th source to vertex v found in last call to run().
     // Vertex ID of v has to be ID in subgraph of selection passed to last call of run().
@@ -120,9 +127,32 @@ public:
 
 private:
 
+    // void runUpwardSearchAndInitializeDownwardDistances(const RPHASTSelection &selection,
+    //                                                    const std::array<int, K> &sources,
+    //                                                    const std::array<int, K> &offsets = {}) {
+    //     KASSERT(selection.fullToSubMapping.size() == sourceGraph.numVertices());
+    //     distances.resize(selection.subGraph.numVertices());
+    //     if (upDists.size() < selection.subGraph.numVertices() + 1) {
+    //         upDists.resize(selection.subGraph.numVertices() + 1, INFTY);
+    //     }
+    //     KASSERT(std::all_of(upDists.begin(), upDists.end(), [](const auto &dist) { return allSet(dist == INFTY); }));
+    //     if constexpr (StoreMeetingVertices) {
+    //         meetingVertices.resize(selection.subGraph.numVertices());
+    //     }
+
+    //     upwardSearch.getPruningCriterion().setSourceToTargetMapping(&selection.fullToSubMapping);
+    //     upwardSearch.runWithOffset(sources, offsets);
+
+    //     // All vertices which are not present in target graph have distance INFTY.
+    //     upDists[selection.subGraph.numVertices()] = INFTY;
+
+    //     numVerticesSettled = upwardSearch.getNumVerticesSettled();
+    //     numEdgesRelaxed = upwardSearch.getNumEdgeRelaxations();
+    // }
+
     void runUpwardSearchAndInitializeDownwardDistances(const RPHASTSelection &selection,
-                                                       const std::array<int, K> &sources,
-                                                       const std::array<int, K> &offsets = {}) {
+                                                        const int source,
+                                                        const int offset = 0) {
         KASSERT(selection.fullToSubMapping.size() == sourceGraph.numVertices());
         distances.resize(selection.subGraph.numVertices());
         if (upDists.size() < selection.subGraph.numVertices() + 1) {
@@ -134,7 +164,7 @@ private:
         }
 
         upwardSearch.getPruningCriterion().setSourceToTargetMapping(&selection.fullToSubMapping);
-        upwardSearch.runWithOffset(sources, offsets);
+        upwardSearch.runWithOffset(source, offset);
 
         // All vertices which are not present in target graph have distance INFTY.
         upDists[selection.subGraph.numVertices()] = INFTY;

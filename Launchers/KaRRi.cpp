@@ -588,16 +588,8 @@ int main(int argc, char *argv[]) {
 
         // Create RPHAST Environment
         RPHASTEnvironment rphastEnv(vehChEnv->getCH());
-        using PHASTTransferStrategyALSImpl = PHASTStrategyALS<VehicleInputGraph, RPHASTEnvironment>;
-        PHASTTransferStrategyALSImpl phastTransferALSStrategy(routeState, fleet, vehicleInputGraph, rphastEnv);
-
-        (void) rphastEnv;
-        // using EllipticSearchSpacesImpl = EllipticSearchSpaces<VehicleInputGraph, VehCHEnv>;
-        // EllipticSearchSpacesImpl ellipticSearchSpaces(vehicleInputGraph, *vehChEnv, routeState);
-        // using OrdinaryStopsRPHASTSelectionImpl = OrdinaryStopsRPHASTSelection<VehicleInputGraph, EllipticSearchSpacesImpl, std::ofstream>;
-        // OrdinaryStopsRPHASTSelectionImpl ordinaryStopsRphastSelection(vehicleInputGraph, vehChEnv->getCH(), fleet,
-        //                                                               routeState, ellipticSearchSpaces, rphastEnv);
-
+        using PHASTTransferStrategyALSImpl = PHASTStrategyALS<VehicleInputGraph, VehCHEnv, RPHASTEnvironment>;
+        PHASTTransferStrategyALSImpl phastTransferALSStrategy(routeState, fleet, vehicleInputGraph, *vehChEnv, rphastEnv);
 
         using DALSInsertionsFinderImpl = DALSAssignmentsFinder<DALSStrategy>;
         DALSInsertionsFinderImpl dalsInsertionsFinder(dalsStrategy);
@@ -645,8 +637,8 @@ int main(int argc, char *argv[]) {
         using OrdinaryTransferInsertionsImpl =  OrdinaryTransferFinder<TransferPointFinderImpl, TransfersDropoffALSStrategy, VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, TransferAsserterImpl, CHEllipseReconstructorImpl>;
         OrdinaryTransferInsertionsImpl ordinaryTransferInsertions = OrdinaryTransferInsertionsImpl(transferPointFinder, transferDropoffALSStrategy, chEllipseReconstructor, vehicleInputGraph, *vehChEnv, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, relOrdinaryDropoffs, relDropoffsBeforeNextStop, postponedAssignments, fleet, routeState, reqState, calc, asserter, transferPoints);
 
-        using TransferALSPVehFinderImpl = TransferALSPVehFinder<TransferStrategyALSImpl, TransfersPickupALSStrategy, TransfersDropoffALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
-        TransferALSPVehFinderImpl transferALSPVehInsertions = TransferALSPVehFinderImpl(transferALSStrategy, transferPickupALSStrategy, transferDropoffALSStrategy, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, relOrdinaryDropoffs, postponedAssignments, fleet, routeState, reqState, calc, asserter);
+        using TransferALSPVehFinderImpl = TransferALSPVehFinder<TransferStrategyALSImpl, PHASTTransferStrategyALSImpl, TransfersPickupALSStrategy, TransfersDropoffALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
+        TransferALSPVehFinderImpl transferALSPVehInsertions = TransferALSPVehFinderImpl(transferALSStrategy, phastTransferALSStrategy, transferPickupALSStrategy, transferDropoffALSStrategy, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, relOrdinaryDropoffs, postponedAssignments, fleet, routeState, reqState, calc, asserter);
 
         using TransferALSDVehFinderImpl = TransferALSDVehFinder<TransferStrategyALSImpl, TransfersDropoffALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
         TransferALSDVehFinderImpl transferALSDVehInsertions = TransferALSDVehFinderImpl(transferALSStrategy, transferDropoffALSStrategy, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, postponedAssignments, fleet, routeState, reqState, calc, asserter);

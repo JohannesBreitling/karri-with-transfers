@@ -29,7 +29,7 @@
 
 namespace karri {
 
-    template<typename TransferALSStrategyT, typename TransfersPickupALSStrategyT, typename TransfersDropoffALSStrategyT, typename CurVehLocToPickupSearchesT, typename InsertionAsserterT>
+    template<typename TransferALSStrategyT, typename FastTransferALSStrategyT, typename TransfersPickupALSStrategyT, typename TransfersDropoffALSStrategyT, typename CurVehLocToPickupSearchesT, typename InsertionAsserterT>
     class TransferALSPVehFinder {
         
     // The pVeh drives the detour to the transfer point
@@ -42,6 +42,7 @@ namespace karri {
 
         TransferALSPVehFinder(
             TransferALSStrategyT &strategy,
+            FastTransferALSStrategyT &fastStrategy,
             TransfersPickupALSStrategyT &pickupALSStrategy,
             TransfersDropoffALSStrategyT &dropoffALSStrategy,
             CurVehLocToPickupSearchesT &searches,
@@ -55,6 +56,7 @@ namespace karri {
             CostCalculator &calc,
             InsertionAsserterT &asserter
         ) : strategy(strategy),
+            fastStrategy(fastStrategy),
             pickupALSStrategy(pickupALSStrategy),
             dropoffALSStrategy(dropoffALSStrategy),
             searches(searches),
@@ -103,103 +105,174 @@ namespace karri {
             dVehIds = dropoffALSStrategy.findDropoffsAfterLastStop();
             numCandidateVehiclesDropoffALS += dVehIds.size();
 
-
             //* More versatile calculation of the last stop distances
             std::vector<int> relevantPVehIds;
             std::vector<int> relevantDVehIds;
 
+
+            std::vector<bool> pVehIdFlags(fleet.size(), false);
+            std::vector<bool> dVehIdFlags(fleet.size(), false);
+
             for (const auto pVehId : relORDPickups.getVehiclesWithRelevantPDLocs()) {
                 relevantPVehIds.push_back(pVehId);
+                pVehIdFlags[pVehId] = true;
             }
 
             for (const auto pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
-                relevantPVehIds.push_back(pVehId);
+                if (!pVehIdFlags[pVehId]) {
+                    relevantPVehIds.push_back(pVehId);
+                    pVehIdFlags[pVehId] = true;
+                }
             }
 
-            for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
-                relevantDVehIds.push_back(dVehId);
-            }
-
-            for (const auto dVehId : dVehIds) {
-                relevantDVehIds.push_back(dVehId);
-            }
-
-            auto newLastStopDistances = strategy.calculateDistancesFromLastStopsToAllStops(relevantPVehIds, relevantDVehIds);
-
-            
-            for (const auto pVehId : relORDPickups.getVehiclesWithRelevantPDLocs()) {
-                const auto &pVeh = &fleet[pVehId];
+            if (relevantPVehIds.size() > 0) {
+                for (const auto dVehId : dVehIds) {
+                    relevantDVehIds.push_back(dVehId);
+                    dVehIdFlags[dVehId] = true;
+                }
                 
                 for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
-                    const auto &dVeh = &fleet[dVehId];
-                    Timer searchTime;
-                    const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
-                    searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
-                    numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
-
-                    // Save the distances for building the assignments later
-                    lastStopDistances[pVehId][dVehId] = distances;
-
-                    // Assert calculations
-                    for (int i = 0; i < distances.size(); i++) {
-                        const auto newDistances = newLastStopDistances[pVehId][dVehId];
-                        assert(newDistances[i] == distances[i]);
-                    }
-                }
-
-                for (const auto dVehId : dVehIds) {
-                    const auto &dVeh = &fleet[dVehId];
-                    Timer searchTime;
-                    const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
-                    searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
-                    numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
-
-                    // Save the distances for building the assignments later
-                    lastStopDistances[pVehId][dVehId] = distances;
-
-                    // Assert calculations
-                    for (int i = 0; i < distances.size(); i++) {
-                        assert(newLastStopDistances[pVehId][dVehId][i] == distances[i]);
+                    if (!dVehIdFlags[dVehId]) {
+                        relevantDVehIds.push_back(dVehId);
+                        dVehIdFlags[dVehId] = true;
                     }
                 }
             }
 
-            for (const auto pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
-                const auto *pVeh = &fleet[pVehId];
+
+            int phastTime;
+            int collectiveCHTime;
+
+            std::map<int, std::map<int, std::vector<int>>> newLastStopDistances;
+            std::map<int, std::map<int, std::vector<int>>> fastLastStopDistances;
+            // int numSearchesNew = 0;
+            if (relevantPVehIds.size() > 0 && relevantDVehIds.size() > 0) {
+                std::cout << "- - - - Overview Runtimes for the different strategies\n";
                 
-                for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
-                    const auto *dVeh = &fleet[dVehId];
-                    Timer searchTime;
-                    const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
-                    searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
-                    numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
+                Timer newTime;
+                newLastStopDistances = strategy.calculateDistancesFromLastStopsToAllStops(relevantPVehIds, relevantDVehIds);
+                collectiveCHTime = newTime.elapsed<std::chrono::milliseconds>();
 
-                    // Save the distances for building the assignments later
-                    lastStopDistances[pVehId][dVehId] = distances;
-                    numTransferPoints += distances.size();
+                Timer fastTime;
+                fastLastStopDistances = fastStrategy.calculateDistancesFromLastStopsToAllStops(relevantPVehIds, relevantDVehIds);
+                phastTime = fastTime.elapsed<std::chrono::milliseconds>();
 
-                    // Assert calculations
-                    for (int i = 0; i < distances.size(); i++) {
-                        assert(newLastStopDistances[pVehId][dVehId][i] == distances[i]);
+                // numSearchesNew = strategy.getNumSearchesRun();
+            }
+            //* End of the more versatile distance calculation
+
+            //* Start of old distance calculation
+            Timer oldTime;
+            int numSearchesOld = 0;
+            if (relORDPickups.getVehiclesWithRelevantPDLocs().size() != 0) {
+                for (const auto pVehId : relORDPickups.getVehiclesWithRelevantPDLocs()) {
+                    const auto &pVeh = &fleet[pVehId];
+                    
+                    for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
+                        const auto &dVeh = &fleet[dVehId];
+                        Timer searchTime;
+                        const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
+                        numSearchesOld++;
+                        searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
+                        numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
+
+                        // Save the distances for building the assignments later
+                        lastStopDistances[pVehId][dVehId] = distances;
+
+                        for (int i = 0; i < distances.size(); i++) {
+                            assert(distances.size() == newLastStopDistances[pVehId][dVehId].size());
+                            assert(distances.size() == fastLastStopDistances[pVehId][dVehId].size());
+                            assert(distances[i] == newLastStopDistances[pVehId][dVehId][i]);
+                            assert(distances[i] == fastLastStopDistances[pVehId][dVehId][i]);
+                        }
+                    }
+
+                    for (const auto dVehId : dVehIds) {
+                        const auto &dVeh = &fleet[dVehId];
+                        Timer searchTime;
+                        const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
+                        numSearchesOld++;
+                        searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
+                        numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
+
+                        // Save the distances for building the assignments later
+                        lastStopDistances[pVehId][dVehId] = distances;
+
+                        for (int i = 0; i < distances.size(); i++) {
+                            assert(distances.size() == newLastStopDistances[pVehId][dVehId].size());
+                            assert(distances.size() == fastLastStopDistances[pVehId][dVehId].size());
+                            assert(distances[i] == newLastStopDistances[pVehId][dVehId][i]);
+                            assert(distances[i] == fastLastStopDistances[pVehId][dVehId][i]);
+                        }
                     }
                 }
+            }
 
-                for (const auto dVehId : dVehIds) {
-                    const auto *dVeh = &fleet[dVehId];
-                    Timer searchTime;
-                    const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
-                    searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
-                    numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
+            if (relBNSPickups.getVehiclesWithRelevantPDLocs().size() != 0) {
+                for (const auto pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
+                    const auto *pVeh = &fleet[pVehId];
+                    
+                    for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
+                        const auto *dVeh = &fleet[dVehId];
+                        Timer searchTime;
+                        const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
+                        numSearchesOld++;
+                        searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
+                        numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
 
-                    // Save the distances for building the assignments later
-                    lastStopDistances[pVehId][dVehId] = distances;
-                    numTransferPoints += distances.size();
+                        // Save the distances for building the assignments later
+                        lastStopDistances[pVehId][dVehId] = distances;
+                        numTransferPoints += distances.size();
 
-                    // Assert calculations
-                    for (int i = 0; i < distances.size(); i++) {
-                        assert(newLastStopDistances[pVehId][dVehId][i] == distances[i]);
+                        for (int i = 0; i < distances.size(); i++) {
+                            assert(distances.size() == newLastStopDistances[pVehId][dVehId].size());
+                            assert(distances.size() == fastLastStopDistances[pVehId][dVehId].size());
+                            assert(distances[i] == newLastStopDistances[pVehId][dVehId][i]);
+                            assert(distances[i] == fastLastStopDistances[pVehId][dVehId][i]);
+                        }
+                    }
+
+                    for (const auto dVehId : dVehIds) {
+                        const auto *dVeh = &fleet[dVehId];
+                        Timer searchTime;
+                        const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
+                        numSearchesOld++;
+                        searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
+                        numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
+
+                        // Save the distances for building the assignments later
+                        lastStopDistances[pVehId][dVehId] = distances;
+                        numTransferPoints += distances.size();
+
+                        for (int i = 0; i < distances.size(); i++) {
+                            assert(distances.size() == newLastStopDistances[pVehId][dVehId].size());
+                            assert(distances.size() == fastLastStopDistances[pVehId][dVehId].size());
+                            assert(distances[i] == newLastStopDistances[pVehId][dVehId][i]);
+                            assert(distances[i] == fastLastStopDistances[pVehId][dVehId][i]);
+                        }
                     }
                 }
+            }
+
+            const auto individualCHTime = oldTime.elapsed<std::chrono::milliseconds>();
+            //* End of old distance calculation
+
+            // Compare the two different times for the calculation
+
+            if (relevantPVehIds.size() > 0 && relevantDVehIds.size() > 0) {
+                std::cout << "- - Overview All Runtimes\n";
+                std::cout << "Individual Time:       " << individualCHTime << "ms\n";
+                std::cout << "Collective Time:       " << collectiveCHTime << "ms\n";
+                std::cout << "Fast Time:             " << phastTime << "ms\n";
+
+                std::cout << "Number Relevant pVehs: " << relevantPVehIds.size() << std::endl;
+                std::cout << "Number Relevant dVehs: " << relevantDVehIds.size() << std::endl;
+
+                // std::cout << "Searches Ran Individual: " << numSearchesOld << "\n";
+                // std::cout << "Searches Ran Collective: " << numSearchesNew << "\n";
+
+                // std::cout << "Difference: " << (individualCHTime - collectiveCHTime) << "mics\n"; 
+                // std::cout << "Factor: " << (collectiveCHTime / individualCHTime) << "\n";
             }
 
             numCandidateVehiclesPickupBNS += relBNSPickups.getVehiclesWithRelevantPDLocs().size();
@@ -239,6 +312,18 @@ namespace karri {
         }
 
     private:
+
+        void printDistances(std::vector<int> distances) {
+            std::string sep = "";
+            std::cout << "Distances : ";
+            for (auto distance : distances) {
+                std::cout << sep;
+                std::cout << distance;
+                sep = ", ";
+            }
+
+            std::cout << "\n";
+        }
 
         void findAssignmentsWithPickupORD() {
             //* In this case we consider all vehicles that are able to perform the pickup ORD
@@ -804,6 +889,7 @@ namespace karri {
         }
 
         TransferALSStrategyT &strategy;
+        FastTransferALSStrategyT &fastStrategy;
         TransfersPickupALSStrategyT &pickupALSStrategy;
         TransfersDropoffALSStrategyT &dropoffALSStrategy;
 
