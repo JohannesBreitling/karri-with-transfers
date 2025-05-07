@@ -72,7 +72,7 @@ namespace karri {
             transfersALSDVeh.findAssignments();
 
             //* Test the best assignment found
-            // assert(asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
+             KASSERT(asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
         }
 
 

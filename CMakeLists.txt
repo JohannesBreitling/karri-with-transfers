@@ -84,11 +84,13 @@ find_library(RoutingKit_LIBRARY routingkit PATHS External/RoutingKit/lib REQUIRE
 include_directories(External/RoutingKit/include)
 
 # Add kassert library from git submodule
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(KASSERT_ASSERTION_LEVEL 40)
-else()
-  set(KASSERT_ASSERTION_LEVEL 20)
-endif ()
+if (NOT DEFINED KASSERT_ASSERTION_LEVEL)
+  if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(KASSERT_ASSERTION_LEVEL 40)
+  else()
+    set(KASSERT_ASSERTION_LEVEL 20)
+  endif ()
+endif()
 add_subdirectory(External/kassert)
 
 # Include headers for header-only libraries from git submodules and embedded dependencies

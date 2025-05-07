@@ -19,15 +19,13 @@ namespace karri {
         bool assertAssignment(const AssignmentWithTransfer &asgn) {
             if (asgn.cost.total >= INFTY)
                 return true;
-        
-            return true; // TODO
 
             // Assert the distances
             if (!assertPVeh(asgn) || !assertDVeh(asgn))
                 return false;
 
             // Assert the times
-            assert(asgn.requestTime <= asgn.depAtPickup && asgn.arrAtTransferPoint > asgn.depAtPickup);
+            KASSERT(asgn.requestTime <= asgn.depAtPickup && asgn.arrAtTransferPoint > asgn.depAtPickup);
 
             return true;
         }
@@ -55,8 +53,10 @@ namespace karri {
             if (asgn.pickupIdx > 0) {
                 const int distToPickup = stopBeforePickup != pickup ? getDistanceBetweenLocations(stopBeforePickup, pickup) : 0;
                 
-                if (distToPickup != asgn.distToPickup)
+                if (distToPickup != asgn.distToPickup) {
+                    KASSERT(false);
                     return false;
+                }
             }
             
             if (asgn.pickupIdx != asgn.transferIdxPVeh && asgn.pickupIdx < numStopsPVeh - 1) {
@@ -64,15 +64,19 @@ namespace karri {
                 const int stopAfterPickup = stopLocationsPVeh[asgn.pickupIdx + 1];
                 const int distFromPickup = getDistanceBetweenLocations(pickup, stopAfterPickup);
                 
-                if (stopAfterPickup == pickup || distFromPickup != asgn.distFromPickup)
+                if (stopAfterPickup == pickup || distFromPickup != asgn.distFromPickup) {
+                    KASSERT(false);
                     return false;
+                }
             }
 
             if (asgn.pickupIdx == asgn.transferIdxPVeh) {
                 // Assert paired distance
                 const int pairedDistance = getDistanceBetweenLocations(pickup, transfer);
-                if (pickup == transfer || asgn.distFromPickup > 0 || asgn.distToTransferPVeh != pairedDistance)
+                if (pickup == transfer || asgn.distFromPickup > 0 || asgn.distToTransferPVeh != pairedDistance) {
+                    KASSERT(false);
                     return false;
+                }
             }
 
             /* // TODO BNS
@@ -88,8 +92,10 @@ namespace karri {
                 const bool sameLoc = stopBeforeTransfer == transfer;
                 const int distanceToTransfer = !sameLoc ? getDistanceBetweenLocations(stopBeforeTransfer, transfer) : 0;
 
-                if (distanceToTransfer != asgn.distToTransferPVeh)
+                if (distanceToTransfer != asgn.distToTransferPVeh) {
+                    KASSERT(false);
                     return false;
+                }
             }
 
             if (asgn.transferIdxPVeh < numStopsPVeh - 1) {
@@ -97,8 +103,10 @@ namespace karri {
                 const int stopAfterTransfer = stopLocationsPVeh[asgn.transferIdxPVeh + 1];
                 const int distanceFromTransfer = getDistanceBetweenLocations(transfer, stopAfterTransfer);
                 
-                if (stopAfterTransfer == transfer || distanceFromTransfer != asgn.distFromTransferPVeh)
+                if (stopAfterTransfer == transfer || distanceFromTransfer != asgn.distFromTransferPVeh) {
+                    KASSERT(false);
                     return false;
+                }
             }
 
             return true;
@@ -115,8 +123,10 @@ namespace karri {
             if (asgn.transferIdxDVeh > 0) {
                 // Assert the distance to the transfer
                 const int distToTransfer = stopBeforeTransfer != transfer ? getDistanceBetweenLocations(stopBeforeTransfer, transfer) : 0;
-                if (distToTransfer != asgn.distToTransferDVeh)
+                if (distToTransfer != asgn.distToTransferDVeh) {
+                    KASSERT(false);
                     return false;
+                }
             }
             
             if (asgn.transferIdxDVeh != asgn.dropoffIdx && asgn.transferIdxDVeh < numStopsDVeh - 1) {
@@ -124,8 +134,10 @@ namespace karri {
                 const int stopAfterTransfer = stopLocationsDVeh[asgn.transferIdxDVeh + 1];
                 const int distFromTransfer = getDistanceBetweenLocations(transfer, stopAfterTransfer);
                 
-                if (stopAfterTransfer == transfer || distFromTransfer != asgn.distFromTransferDVeh)
+                if (stopAfterTransfer == transfer || distFromTransfer != asgn.distFromTransferDVeh) {
+                    KASSERT(false);
                     return false;
+                }
             }
 
             if (asgn.transferIdxDVeh == asgn.dropoffIdx) {
@@ -134,8 +146,10 @@ namespace karri {
                 const int pairedDistance = getDistanceBetweenLocations(transfer, dropoff);
                 assert(asgn.distFromTransferDVeh == 0 && asgn.distToDropoff == pairedDistance);
 
-                if (asgn.distFromTransferDVeh > 0 || asgn.distToDropoff != pairedDistance)
+                if (asgn.distFromTransferDVeh > 0 || asgn.distToDropoff != pairedDistance) {
+                    KASSERT(false);
                     return false;
+                }
             }
 
             /* // TODO BNS
@@ -150,21 +164,25 @@ namespace karri {
                 const int stopBeforeDropoff = stopLocationsDVeh[asgn.dropoffIdx];
                 const bool sameLoc = stopBeforeDropoff == dropoff;
                 const int distanceToDropoff = !sameLoc ? getDistanceBetweenLocations(stopBeforeDropoff, dropoff) : 0;
-                assert(distanceToDropoff == asgn.distToDropoff);
+                KASSERT(distanceToDropoff == asgn.distToDropoff);
 
-                if (distanceToDropoff != asgn.distToDropoff)
+                if (distanceToDropoff != asgn.distToDropoff) {
+                    KASSERT(false);
                     return false;
+                }
             }
 
             if (asgn.dropoffIdx < numStopsDVeh - 1) {
                 // Assert the distance from the dropoff (dropoff is not als)
                 const int stopAfterDropoff = stopLocationsDVeh[asgn.dropoffIdx + 1];
                 const int distanceFromDropoff = getDistanceBetweenLocations(dropoff, stopAfterDropoff);
-                assert(stopAfterDropoff != dropoff);
-                assert(distanceFromDropoff == asgn.distFromDropoff);
+                KASSERT(stopAfterDropoff != dropoff);
+                KASSERT(distanceFromDropoff == asgn.distFromDropoff);
             
-                if (stopAfterDropoff == dropoff || distanceFromDropoff != asgn.distFromDropoff)
+                if (stopAfterDropoff == dropoff || distanceFromDropoff != asgn.distFromDropoff) {
+                    KASSERT(false);
                     return false;
+                }
             }
 
             return true;

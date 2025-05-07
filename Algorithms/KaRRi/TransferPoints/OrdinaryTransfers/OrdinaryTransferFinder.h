@@ -200,16 +200,9 @@ namespace karri {
             // Convert the ellipses of vertices to ellipses of edges
             std::vector<std::vector<EdgeInEllipse>> edgeEllipses;
             for (int i = 0; i < stopIdsForEllipses.size(); ++i) {
-//            for (const auto &stopId: stopIdsForEllipses) {
                 const auto& stopId = stopIdsForEllipses[i];
                 KASSERT(i == idxOfStop[stopId]);
                 auto &vertexEllipse = vertexEllipses[idxOfStop[stopId]];
-
-//                // Sort vertex ellipse, which will also lead to sorted edge ellipse (if the edges in the graph are sorted).
-//                std::sort(vertexEllipse.begin(), vertexEllipse.end(),
-//                          [](const VertexInEllipse &v1, const VertexInEllipse &v2) {
-//                              return v1.vertex < v2.vertex;
-//                          });
 
                 const auto leeway = routeState.leewayOfLegStartingAt(stopId);
 
@@ -440,6 +433,7 @@ namespace karri {
 
                     AssignmentWithTransfer asgn(pVeh, dVeh, tp, pickupPDLoc, pickup.stopIndex, pickup.distToPDLoc,
                                                 pickup.distFromPDLocToNextStop, trIdxPVeh, trIdxDVeh);
+
                     finishDistancesPVeh(asgn);
 
                     asgn.pickupType = ORDINARY;
@@ -677,6 +671,7 @@ namespace karri {
                 if (asgn.pickupPairedLowerBoundUsed) {
                     const int transferRank = vehCh.rank(inputGraph.edgeTail(asgn.transfer.loc));
                     const int transferOffset = inputGraph.travelTime(asgn.transfer.loc);
+
                     pickupToTransferDistancesFinder.runQueryForTransferRank(transferRank);
                     const int distance =
                             pickupToTransferDistancesFinder.getDistances().getDistance(asgn.pickup->id, transferRank) +
