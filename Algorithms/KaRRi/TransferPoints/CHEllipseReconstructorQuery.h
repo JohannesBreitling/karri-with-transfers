@@ -97,9 +97,9 @@ namespace karri {
             // Accumulate result per ellipse
             timer.restart();
             std::vector<std::vector<VertexInEllipse>> ellipses(numEllipses);
+            for (auto& ellipse : ellipses)
+                ellipse.reserve(verticesInAnyEllipse.size());
             for (const auto &r: verticesInAnyEllipse) {
-//                const auto originalRank = numVertices - r - 1; // Reverse permutation in search graphs
-//                const int vertex = ch.contractionOrder(originalRank);
 
                 const auto &distToVertex = distTo[r];
                 const auto &distFromVertex = distFrom[r];
@@ -112,6 +112,8 @@ namespace karri {
                     }
                 }
             }
+            for (auto& ellipse : ellipses)
+                ellipse.shrink_to_fit();
             stats.postprocessTime += timer.elapsed<std::chrono::nanoseconds>();
 
             return ellipses;

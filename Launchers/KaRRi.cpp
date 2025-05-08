@@ -599,22 +599,22 @@ int main(int argc, char *argv[]) {
         using RequestStateInitializerImpl = RequestStateInitializer<VehicleInputGraph, PsgInputGraph, VehCHEnv, PsgCHEnv, VehicleToPDLocQueryImpl>;
         RequestStateInitializerImpl requestStateInitializer(vehicleInputGraph, psgInputGraph, *vehChEnv, *psgChEnv,
                                                             reqState, vehicleToPdLocQuery);
-
-        using TransferPointsLabelSet = BasicLabelSet<1, ParentInfo::NO_PARENT_INFO>;
-        using TransferPointStrategy = TransferPointStrategies::DijkstraTransferPointStrategy<VehicleInputGraph, TransferPointsLabelSet>;
+//
+//        using TransferPointsLabelSet = BasicLabelSet<1, ParentInfo::NO_PARENT_INFO>;
+//        using TransferPointStrategy = TransferPointStrategies::DijkstraTransferPointStrategy<VehicleInputGraph, TransferPointsLabelSet>;
 
         using CHEllipseReconstructorLabelSet = std::conditional_t<KARRI_ELLIPSE_RECONSTRUCTOR_USE_SIMD,
                 SimdLabelSet<KARRI_ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>,
                 BasicLabelSet<KARRI_ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>>;
         using CHEllipseReconstructorImpl = CHEllipseReconstructor<VehicleInputGraph, VehCHEnv, EllipticBucketsEnv, TraversalCostAttribute, CHEllipseReconstructorLabelSet, std::ofstream>;
         CHEllipseReconstructorImpl chEllipseReconstructor(vehicleInputGraph, *vehChEnv, ellipticBucketsEnv, routeState);
-
-        std::map<std::tuple<int, int>, std::vector<TransferPoint>> transferPoints = std::map<std::tuple<int, int>, std::vector<TransferPoint>>{};
-        TransferPointStrategy transferPointStrategy = TransferPointStrategy(routeState, vehicleInputGraph,
-                                                                            revVehicleGraph, transferPoints);
-        using TransferPointFinderImpl = TransferPointFinder<TransferPointStrategy>;
-        TransferPointFinderImpl transferPointFinder = TransferPointFinder(transferPointStrategy, routeState,
-                                                                          transferPoints);
+//
+//        std::map<std::tuple<int, int>, std::vector<TransferPoint>> transferPoints = std::map<std::tuple<int, int>, std::vector<TransferPoint>>{};
+//        TransferPointStrategy transferPointStrategy = TransferPointStrategy(routeState, vehicleInputGraph,
+//                                                                            revVehicleGraph, transferPoints);
+//        using TransferPointFinderImpl = TransferPointFinder<TransferPointStrategy>;
+//        TransferPointFinderImpl transferPointFinder = TransferPointFinder(transferPointStrategy, routeState,
+//                                                                          transferPoints);
 
 
         using TransferStrategyALSImpl = CHStrategyALS<VehicleInputGraph, VehCHEnv>;
@@ -653,8 +653,9 @@ int main(int argc, char *argv[]) {
         DirectTransferDistancesFinder transferToDropoffDistancesFinder(vehicleInputGraph.numVertices(), *vehChEnv,
                                                                        PDLocType::DROPOFF);
 
-        using OrdinaryTransferInsertionsImpl = OrdinaryTransferFinder<TransferPointFinderImpl, TransfersDropoffALSStrategy, VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, TransferAsserterImpl, CHEllipseReconstructorImpl, DirectTransferDistancesFinder>;
-        OrdinaryTransferInsertionsImpl ordinaryTransferInsertions = OrdinaryTransferInsertionsImpl(transferPointFinder,
+        using OrdinaryTransferInsertionsImpl = OrdinaryTransferFinder<TransfersDropoffALSStrategy, VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, TransferAsserterImpl, CHEllipseReconstructorImpl, DirectTransferDistancesFinder>;
+        OrdinaryTransferInsertionsImpl ordinaryTransferInsertions = OrdinaryTransferInsertionsImpl(
+//                transferPointFinder,
                                                                                                    transferDropoffALSStrategy,
                                                                                                    chEllipseReconstructor,
                                                                                                    vehicleInputGraph,
@@ -669,8 +670,9 @@ int main(int argc, char *argv[]) {
                                                                                                    postponedAssignments,
                                                                                                    fleet, routeState,
                                                                                                    reqState, calc,
-                                                                                                   asserter,
-                                                                                                   transferPoints);
+                                                                                                   asserter
+//                                                                                                   transferPoints
+                                                                                                   );
 
         using TransferALSPVehFinderImpl = TransferALSPVehFinder<TransferStrategyALSImpl, TransfersPickupALSStrategy, TransfersDropoffALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
         TransferALSPVehFinderImpl transferALSPVehInsertions = TransferALSPVehFinderImpl(transferALSStrategy,
@@ -707,12 +709,11 @@ int main(int argc, char *argv[]) {
                 PALSInsertionsFinderImpl,
                 DALSInsertionsFinderImpl,
                 RelevantPDLocsFilterImpl,
-                TransferPointFinderImpl,
                 AssignmentsWithTransferFinderImpl
         >;
         InsertionFinderImpl insertionFinder(reqState, requestStateInitializer, ellipticSearches, pdDistanceQuery,
                                             ordinaryInsertionsFinder, pbnsInsertionsFinder, palsInsertionsFinder,
-                                            dalsInsertionsFinder, relevantPdLocsFilter, transferPointFinder,
+                                            dalsInsertionsFinder, relevantPdLocsFilter,
                                             insertionsWithTransferFinder);
 
 

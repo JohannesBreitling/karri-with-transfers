@@ -44,7 +44,6 @@ namespace karri {
             typename PalsAssignmentsT,
             typename DalsAssignmentsT,
             typename RelevantPDLocsFilterT,
-            typename TransferPointFinderT,
             typename AssignmentsWithTransferT
     >
     class AssignmentFinder {
@@ -60,7 +59,6 @@ namespace karri {
                          PalsAssignmentsT &palsAssignments,
                          DalsAssignmentsT &dalsAssignments,
                          RelevantPDLocsFilterT &relevantPdLocsFilter,
-                         TransferPointFinderT &transferPoints,
                          AssignmentsWithTransferT &assignmentsWithTransfer
                          )
                 : reqState(requestState),
@@ -72,7 +70,6 @@ namespace karri {
                   palsAssignments(palsAssignments),
                   dalsAssignments(dalsAssignments),
                   relevantPdLocsFilter(relevantPdLocsFilter),
-                  transferPoints(transferPoints),
                   assignmentsWithTransfer(assignmentsWithTransfer) {}
 
         const RequestState &findBestAssignment(const Request &req) {
@@ -153,7 +150,6 @@ namespace karri {
             pbnsAssignments.init();
             palsAssignments.init();
             dalsAssignments.init();
-            transferPoints.init();
             assignmentsWithTransfer.init();
         }
 
@@ -166,7 +162,6 @@ namespace karri {
         PalsAssignmentsT &palsAssignments; // Tries PALS assignments where pickup and dropoff are inserted after the last stop.
         DalsAssignmentsT &dalsAssignments; // Tries DALS assignments where only the dropoff is inserted after the last stop.
         RelevantPDLocsFilterT &relevantPdLocsFilter; // Additionally filters feasible pickups/dropoffs found by elliptic BCH searches.
-        TransferPointFinderT &transferPoints;
         AssignmentsWithTransferT &assignmentsWithTransfer;
     };
 }

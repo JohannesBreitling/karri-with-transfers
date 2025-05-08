@@ -126,10 +126,11 @@ namespace karri {
                 }
             }
 
+            std::vector<std::vector<VertexInEllipse>> ellipses(numEllipses);
+
             // Construct ellipses without leeway by running point-to-point CH queries.
             Timer p2pTimer;
             const size_t numEllipsesWithoutLeeway = indicesWithoutLeeway.size();
-            std::vector<std::vector<VertexInEllipse>> ellipsesWithoutLeeway(numEllipsesWithoutLeeway);
             std::vector<int> edgePathInInputGraph;
             for (int i = 0; i < numEllipsesWithoutLeeway; ++i) {
                 // Reconstruct shortest path between stops by running point-to-point CH query.
@@ -147,7 +148,7 @@ namespace karri {
 
                 // Add all vertices along path to ellipse.
                 // Convert vertex IDs to output format of ellipse reconstructor and sort the vertices as expected.
-                auto &ellipse = ellipsesWithoutLeeway[i];
+                auto &ellipse = ellipses[indicesWithoutLeeway[i]];
                 ellipse.reserve(edgePathInInputGraph.size() + 1);
                 int distFromFirstStopToHead = 0;
                 int distFromHeadToSecondStop = p2pQuery.getDistance() + inputGraph.travelTime(stopLocs[stopIdx + 1]);
@@ -172,7 +173,6 @@ namespace karri {
             // Construct ellipses with leeway by running topological downward sweep in CH.
             const size_t numEllipsesWithLeeway = indicesWithLeeway.size();
             const size_t numBatchesWithLeeway = numEllipsesWithLeeway / K + (numEllipsesWithLeeway % K != 0);
-            std::vector<std::vector<VertexInEllipse>> ellipsesWithLeeway(numEllipsesWithLeeway);
             for (int i = 0; i < numBatchesWithLeeway; ++i) {
                 std::vector<int> batchStopIds;
                 for (int j = 0; j < K && i * K + j < numEllipsesWithLeeway; ++j) {
@@ -180,19 +180,8 @@ namespace karri {
                 }
                 auto batchResult = query.run(batchStopIds, queryStats);
                 for (int j = 0; j < K && i * K + j < numEllipsesWithLeeway; ++j) {
-                    ellipsesWithLeeway[i * K + j].swap(batchResult[j]);
+                    ellipses[indicesWithLeeway[i * K + j]].swap(batchResult[j]);
                 }
-            }
-
-            // Combine ellipses with and without leeway in order.
-            std::vector<std::vector<VertexInEllipse>> ellipses(numEllipses);
-            for (int i = 0; i < indicesWithoutLeeway.size(); ++i) {
-                const int idx = indicesWithoutLeeway[i];
-                ellipses[idx].swap(ellipsesWithoutLeeway[i]);
-            }
-            for (int i = 0; i < indicesWithLeeway.size(); ++i) {
-                const int idx = indicesWithLeeway[i];
-                ellipses[idx].swap(ellipsesWithLeeway[i]);
             }
 
             KASSERT(sanityCheckEllipses(stopIds, ellipses));
