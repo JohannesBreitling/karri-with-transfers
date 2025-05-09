@@ -34,12 +34,8 @@ namespace karri {
             if (vehIdsLastStop.size() == 0 || vehIdsAllStops.size() == 0)
                 return result;
 
-            std::cout << std::endl;
-            std::cout << "- - Overview Runtimes for the RPAHST Strategy\n";
-
             // Collect all target stops and run selection for those stops
             std::vector<int> targets;
-            std::vector<int> offsets;
             for (const auto vehIdAllStops : vehIdsAllStops) {
                 const auto stopLocations = routeState.stopLocationsFor(vehIdAllStops);
 
@@ -50,8 +46,7 @@ namespace karri {
 
             Timer selectionTimer;
             RPHASTSelection allStopsSelection = targetsSelection.run(targets);
-            const auto selectionTime = selectionTimer.elapsed<std::chrono::milliseconds>();
-            std::cout << "Selection Time:        " << selectionTime << "ms\n";
+            // const auto selectionTime = selectionTimer.elapsed<std::chrono::microseconds>();
 
             // Run one PHAST query for every last stop and populate map
             int queryNumber = 1;
@@ -63,7 +58,6 @@ namespace karri {
 
                 Timer queryTimer;
                 forwardQuery.run(allStopsSelection, lastStopRank);
-                std::cout << "Query " << queryNumber << " Time:          " << queryTimer.elapsed<std::chrono::milliseconds>() << "ms\n";
                 
                 // Construct the result
                 for (const auto vehIdAllStops : vehIdsAllStops) {
@@ -95,6 +89,51 @@ namespace karri {
         // Result is of form: veh - pickup - stop
         std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromAllPickupsToAllStops(std::vector<PDLoc> &pickups, std::vector<int> dVehIds) {
             std::map<int, std::map<int, std::vector<int>>> result;
+
+            if (pickups.size() == 0 || dVehIds.size() == 0)
+                return result;
+
+            // Collect all target stops and run selection for those stops
+            std::vector<int> targets;
+            for (const auto dVehId : dVehIds) {
+                const auto stopLocations = routeState.stopLocationsFor(dVehId);
+
+                for (int i = 1; i < stopLocations.size(); i++) {
+                    targets.push_back(vehCh.rank(inputGraph.edgeTail(stopLocations[i])));
+                }
+            }
+
+            Timer selectionTimer;
+            RPHASTSelection allStopsSelection = targetsSelection.run(targets);
+
+            // Run one PHAST query for every pickup and populate map
+            int queryNumber = 1;
+            for (const auto &pickup : pickups) { // TODO : Do the search for k last stops at the same time
+                const auto pickupLoc = pickup.loc;
+                const auto pickupVertex = inputGraph.edgeHead(pickupLoc);
+                const auto pickupRank = vehCh.rank(pickupVertex);
+
+                // Timer queryTimer;
+                forwardQuery.run(allStopsSelection, pickupRank);
+                for (const auto dVehId : dVehIds) {
+                    const auto stopLocations = routeState.stopLocationsFor(dVehId);
+                    std::vector<int> distances;
+                    
+                    for (int i = 1; i < stopLocations.size(); i++) {
+                        const auto vertex = inputGraph.edgeTail(stopLocations[i]);
+                        const auto rank = vehCh.rank(vertex);
+                        const auto rankInSelection = allStopsSelection.fullToSubMapping[rank];
+                        
+                        const auto distance = forwardQuery.getDistance(rankInSelection);
+                        const int offset = inputGraph.travelTime(stopLocations[i]);
+                        distances.push_back(distance + offset);
+                    }
+
+                    result[dVehId][pickup.id] = distances;
+                }
+                
+                queryNumber++;
+            }
 
             return result;
         }

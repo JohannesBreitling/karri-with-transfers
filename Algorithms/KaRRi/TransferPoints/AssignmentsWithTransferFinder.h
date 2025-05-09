@@ -69,7 +69,7 @@ namespace karri {
             // ordinaryTransfers.findAssignments();
             
             // * TRANSFER AFTER LAST STOP (PVeh)
-            transfersALSDVeh.findAssignments();
+            // transfersALSDVeh.findAssignments();
 
             //* Test the best assignment found
             // assert(asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
