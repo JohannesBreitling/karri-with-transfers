@@ -278,6 +278,65 @@ namespace karri {
         }
 
         template<typename RequestContext>
+        RequestCost calcMinCostForTransferPoint(const TransferPoint &tp, const RequestContext &context) const {
+            using namespace time_utils;
+            RequestCost cost = {0,0,0,0,0,0};
+            const auto pVehId = tp.pVeh->vehicleId;
+            const auto numStopsPVeh = routeState.numStopsOf(pVehId);
+            const bool transferAtExistingStopPVeh =
+                    tp.loc == routeState.stopLocationsFor(pVehId)[tp.pickupFromTransferStopIdx];
+            int initialDetourPVeh = 0;
+            if (!transferAtExistingStopPVeh) {
+
+                const auto legLengthPVeh = calcLengthOfLegStartingAt(tp.pickupFromTransferStopIdx, pVehId,
+                                                                     routeState);
+                initialDetourPVeh = tp.distancePVehToTransfer + InputConfig::getInstance().stopTime +
+                                    tp.distancePVehFromTransfer - legLengthPVeh;
+            }
+            const auto residualDetourPVeh = calcResidualPickupDetour(pVehId, tp.pickupFromTransferStopIdx, numStopsPVeh,
+                                                                     initialDetourPVeh, routeState);
+            cost.vehCost += F::calcVehicleCost(residualDetourPVeh);
+            const auto addedTripTimePVeh = calcAddedTripTimeInInterval(pVehId, tp.pickupFromTransferStopIdx,
+                                                                       numStopsPVeh - 1, initialDetourPVeh, routeState);
+            cost.changeInTripCostsOfOthers += F::calcChangeInTripCostsOfExistingPassengers(addedTripTimePVeh);
+
+            const auto dVehId = tp.dVeh->vehicleId;
+            const auto numStopsDVeh = routeState.numStopsOf(dVehId);
+            const bool transferAtExistingStopDVeh =
+                    tp.loc == routeState.stopLocationsFor(dVehId)[tp.dropoffAtTransferStopIdx];
+            int initialDetourDVeh = 0;
+            if (!transferAtExistingStopDVeh) {
+                const auto legLengthDVeh = calcLengthOfLegStartingAt(tp.dropoffAtTransferStopIdx, dVehId,
+                                                                     routeState);
+                initialDetourDVeh = tp.distanceDVehToTransfer + InputConfig::getInstance().stopTime +
+                                    tp.distanceDVehFromTransfer - legLengthDVeh;
+            }
+            const auto residualDetourDVeh = calcResidualPickupDetour(dVehId, tp.dropoffAtTransferStopIdx,
+                                                                     numStopsDVeh, initialDetourDVeh, routeState);
+            cost.vehCost += F::calcVehicleCost(residualDetourDVeh);
+            const auto addedTripTimeDVeh = calcAddedTripTimeInInterval(dVehId, tp.dropoffAtTransferStopIdx,
+                                                                       numStopsDVeh - 1, initialDetourDVeh, routeState);
+            cost.changeInTripCostsOfOthers += F::calcChangeInTripCostsOfExistingPassengers(addedTripTimeDVeh);
+
+            const auto minArrTimeAtTransferPVeh =
+                    std::max(getVehDepTimeAtStopForRequest(pVehId, tp.pickupFromTransferStopIdx, context, routeState) +
+                    tp.distancePVehToTransfer, context.originalRequest.requestTime);
+            const auto minArrTimeAtTransferDVeh =
+                    std::max(getVehDepTimeAtStopForRequest(dVehId, tp.dropoffAtTransferStopIdx, context, routeState) +
+                    tp.distanceDVehToTransfer, context.originalRequest.requestTime);
+            const auto psgDepTimeAtTransfer =
+                    std::max(minArrTimeAtTransferPVeh,
+                             minArrTimeAtTransferDVeh + !transferAtExistingStopDVeh * InputConfig::getInstance().stopTime);
+            const auto minTripTime = psgDepTimeAtTransfer - context.originalRequest.requestTime;
+            KASSERT(minTripTime >= 0);
+            cost.tripCost += F::calcTripCost(minTripTime, context);
+
+            cost.total = cost.walkingCost + cost.waitTimeViolationCost + cost.vehCost + cost.tripCost +
+                         cost.changeInTripCostsOfOthers;
+            return cost;
+        }
+
+        template<typename RequestContext>
         RequestCost recomputePVeh(AssignmentWithTransfer &asgn, RequestContext &context) const {
             return calcPartialCostForPVeh<true>(asgn, context);
         }

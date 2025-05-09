@@ -155,7 +155,33 @@ namespace karri {
             constructPVehSet();
             constructDVehSet();
 
-
+//            // Construct set of pairs of stop pairs for which a transfer may be possible.
+//            // TODO: Use for parallelization in the future
+//            struct PairOfStopPairs {
+//                int firstStopIdPVeh = INVALID_ID;
+//                int firstStopIdDVeh = INVALID_ID;
+//            };
+//            std::vector<PairOfStopPairs> pairsOfStopPairs;
+//            for (const auto pVehId: pVehs) {
+//                const auto earliestRelevantStopIdxPVeh = getEarliestRelevantStopIdxForPVeh(pVehId);
+//                const auto stopIdsPVeh = routeState.stopIdsFor(pVehId);
+//                const auto numStopsPVeh = routeState.numStopsOf(pVehId);
+//                for (const auto dVehId : dVehs) {
+//                    if (pVehId == dVehId) {
+//                        continue;
+//                    }
+//                    const auto latestRelevantStopIdxDVeh = getLatestRelevantStopIdxForDVeh(dVehId);
+//                    const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
+//
+//                    for (int trIdxPVeh = earliestRelevantStopIdxPVeh; trIdxPVeh < numStopsPVeh - 1; ++trIdxPVeh) {
+//                        for (int trIdxDVeh = 0; trIdxDVeh < latestRelevantStopIdxDVeh + 1; ++trIdxDVeh) {
+//                            const auto stopIdPVeh = stopIdsPVeh[trIdxPVeh];
+//                            const auto stopIdDVeh = stopIdsDVeh[trIdxDVeh];
+//                            pairsOfStopPairs.emplace_back(stopIdPVeh, stopIdDVeh);
+//                        }
+//                    }
+//                }
+//            }
 
             // Calculate the necessary ellipses for every vehicle for pickup and dropoff
             std::vector<int> idxOfStop(routeState.getMaxStopId() + 1, INVALID_INDEX);
@@ -978,15 +1004,15 @@ namespace karri {
                         edgeDVeh.distToTail + inputGraphWithEllipseVertexIds.travelTime(locInPermutedGraph);
                 const int distDVehFromTransfer = edgeDVeh.distFromHead;
 
+
+                ++itEdgesPVeh;
+                ++itEdgesDVeh;
+
                 const int locInOriginalGraph = ellipseEdgeIdsToOriginalEdgeIds[locInPermutedGraph];
                 const auto tp = TransferPoint(locInOriginalGraph, &fleet[pVehId], &fleet[dVehId], stopIdxPVeh,
                                               stopIdxDVeh, distPVehToTransfer,
                                               distPVehFromTransfer,
                                               distDVehToTransfer, distDVehFromTransfer);
-
-
-                ++itEdgesPVeh;
-                ++itEdgesDVeh;
 
                 // Check whether known transfer points dominate tp
                 bool dominated = false;
@@ -1010,6 +1036,17 @@ namespace karri {
                     }
                     ++i;
                 }
+            }
+
+            // TODO: validate that this lower bound is correct
+            for (int i = 0; i < result.size();) {
+                const auto minTpCost = calc.calcMinCostForTransferPoint(result[i], requestState);
+                if (minTpCost.total > requestState.getBestCost()) {
+                    std::swap(result[i], result.back());
+                    result.pop_back();
+                    continue;
+                }
+                ++i;
             }
 
             return result;
