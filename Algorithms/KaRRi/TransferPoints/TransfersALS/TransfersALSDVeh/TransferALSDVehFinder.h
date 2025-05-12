@@ -162,8 +162,8 @@ class TransferALSDVehFinder {
                                 tp.distanceDVehToTransfer = distancesToTransfer[i - 1];
                                 tp.distanceDVehFromTransfer = 0;
 
-                                tp.pickupFromTransferStopIdx = i;
-                                tp.dropoffAtTransferStopIdx = numStopsDVeh - 1;
+                                tp.stopIdxPVeh = i;
+                                tp.stopIdxDVeh = numStopsDVeh - 1;
                             
                                 // Build the resulting assignment
                                 AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
@@ -244,8 +244,8 @@ class TransferALSDVehFinder {
                                 tp.distanceDVehToTransfer = distancesToTransfer[i - 1];
                                 tp.distanceDVehFromTransfer = 0;
 
-                                tp.pickupFromTransferStopIdx = i;
-                                tp.dropoffAtTransferStopIdx = numStopsDVeh - 1;
+                                tp.stopIdxPVeh = i;
+                                tp.stopIdxDVeh = numStopsDVeh - 1;
                             
                                 // Build the resulting assignment
                                 AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);

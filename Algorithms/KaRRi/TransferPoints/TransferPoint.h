@@ -21,8 +21,8 @@ namespace karri {
           : loc(loc),
             pVeh(pVeh),
             dVeh(dVeh),
-            dropoffAtTransferStopIdx(dVehIdx),
-            pickupFromTransferStopIdx(pVehIdx),
+            stopIdxDVeh(dVehIdx),
+            stopIdxPVeh(pVehIdx),
             distancePVehToTransfer(distanceToPveh),
             distancePVehFromTransfer(distanceFromPVeh),
             distanceDVehToTransfer(distanceToDVeh),
@@ -33,8 +33,8 @@ namespace karri {
         const Vehicle *pVeh = nullptr;
         const Vehicle *dVeh = nullptr;
 
-        int dropoffAtTransferStopIdx = INVALID_INDEX;
-        int pickupFromTransferStopIdx = INVALID_INDEX;
+        int stopIdxDVeh = INVALID_INDEX;
+        int stopIdxPVeh = INVALID_INDEX;
         
         int distancePVehToTransfer = -1;
         int distancePVehFromTransfer = -1;

@@ -24,7 +24,6 @@
 
 #pragma once
 
-#include "Algorithms/KaRRi/TransferPoints/TransferPointFinder.h"
 #include "Algorithms/KaRRi/TransferPoints/OrdinaryTransfers/OrdinaryTransferFinder.h"
 #include "Algorithms/KaRRi/TransferPoints/TransfersALS/TransfersALSPVeh/TransferALSPVehFinder.h"
 #include "Algorithms/KaRRi/TransferPoints/TransfersALS/TransfersALSDVeh/TransferALSDVehFinder.h"

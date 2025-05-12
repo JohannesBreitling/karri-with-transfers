@@ -33,7 +33,7 @@
 #include "DataStructures/Containers/TimestampedVector.h"
 #include "DataStructures/Containers/FastResetFlagArray.h"
 
-namespace karri {
+namespace karri::TransferPointStrategies {
 
     // Computes the set of vertices contained in the detour ellipse between a pair of consecutive stops in a vehicle
     // route using bucket entries and a CH topological downward search.
@@ -70,14 +70,14 @@ namespace karri {
             verticesInAnyEllipse.reserve(numVertices);
         }
 
-        std::vector<std::vector<VertexInEllipse>> run(const std::vector<int> &stopIds,
+        std::array<std::vector<VertexInEllipse>, K> run(const std::array<int, K> &stopIds,
+                                                      const int numEllipses, // number of stopIds actually used in batch
                                                       CHEllipseReconstructorStats& stats) {
-            KASSERT(stopIds.size() <= K);
+            KASSERT(numEllipses <= K);
 
             Timer timer;
             initializeDistanceArrays();
             DistanceLabel leeways = 0;
-            const auto numEllipses = stopIds.size();
             for (int i = 0; i < numEllipses; ++i) {
                 initializeDistancesForStopBasedOnBuckets(stopIds[i], i);
                 leeways[i] = routeState.leewayOfLegStartingAt(stopIds[i]);
@@ -96,7 +96,7 @@ namespace karri {
 
             // Accumulate result per ellipse
             timer.restart();
-            std::vector<std::vector<VertexInEllipse>> ellipses(numEllipses);
+            std::array<std::vector<VertexInEllipse>, K> ellipses;
             for (auto& ellipse : ellipses)
                 ellipse.reserve(verticesInAnyEllipse.size());
             for (const auto &r: verticesInAnyEllipse) {
@@ -112,8 +112,6 @@ namespace karri {
                     }
                 }
             }
-            for (auto& ellipse : ellipses)
-                ellipse.shrink_to_fit();
             stats.postprocessTime += timer.elapsed<std::chrono::nanoseconds>();
 
             return ellipses;

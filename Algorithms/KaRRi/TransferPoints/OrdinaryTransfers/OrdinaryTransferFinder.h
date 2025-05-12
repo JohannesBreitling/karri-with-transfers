@@ -42,12 +42,13 @@
 
 namespace karri {
 
-    template<typename TransfersDropoffALSStrategyT,
+    template<
             typename InputGraphT,
             typename VehCHEnvT,
             typename CurVehLocToPickupSearchesT,
+            typename TransferPointStrategyT,
+            typename TransfersDropoffALSStrategyT,
             typename InsertionAsserterT,
-            typename CHEllipseReconstructorT,
             typename DirectTransferDistancesFinderT>
     class OrdinaryTransferFinder {
 
@@ -61,11 +62,11 @@ namespace karri {
     public:
 
         OrdinaryTransferFinder(
-                TransfersDropoffALSStrategyT &dropoffALSStrategy,
-                CHEllipseReconstructorT &chEllipseReconstructor,
                 const InputGraphT &inputGraph,
                 const VehCHEnvT &vehChEnv,
                 CurVehLocToPickupSearchesT &searches,
+                TransferPointStrategyT &transferPointStrategy,
+                TransfersDropoffALSStrategyT &dropoffALSStrategy,
                 const RelevantPDLocs &relORDPickups,
                 const RelevantPDLocs &relBNSPickups,
                 const RelevantPDLocs &relORDDropoffs,
@@ -79,13 +80,12 @@ namespace karri {
                 CostCalculator &calc,
                 InsertionAsserterT &asserter
         ) :
-                dropoffALSStrategy(dropoffALSStrategy),
-                chEllipseReconstructor(chEllipseReconstructor),
                 inputGraph(inputGraph),
-                inputGraphWithEllipseVertexIds(inputGraph),
                 vehCh(vehChEnv.getCH()),
                 vehChQuery(vehChEnv.template getFullCHQuery<VehCHQueryLabelSet>()),
                 searches(searches),
+                transferPointStrategy(transferPointStrategy),
+                dropoffALSStrategy(dropoffALSStrategy),
                 relORDPickups(relORDPickups),
                 relBNSPickups(relBNSPickups),
                 relORDDropoffs(relORDDropoffs),
@@ -100,19 +100,13 @@ namespace karri {
                 asserter(asserter),
                 pVehs(fleet.size()),
                 dVehs(fleet.size()),
-                distanceFromVertexToNextStop(inputGraph.numVertices(), INFTY),
                 dVehIdsALS(Subset(0)),
                 edgesSubset(inputGraph.numEdges()),
+                stopSeen(fleet.size()),
                 ellipsesLogger(LogManager<std::ofstream>::getLogger("ellipses.csv",
                                                                     "size\n")),
                 ellipseIntersectionLogger(LogManager<std::ofstream>::getLogger("ellipse-intersection.csv",
-                                                                               "size\n")) {
-
-            // Construct input graph permuted by vertex IDs used by ellipse reconstructor and inverse mapping of edges.
-            inputGraphWithEllipseVertexIds.permuteVertices(chEllipseReconstructor.getVertexPermutation(),
-                                                           ellipseEdgeIdsToOriginalEdgeIds);
-            ellipseEdgeIdsToOriginalEdgeIds.invert();
-        }
+                                                                               "size\n")) {}
 
 
         void init() {
@@ -184,56 +178,38 @@ namespace karri {
 //            }
 
             // Calculate the necessary ellipses for every vehicle for pickup and dropoff
-            std::vector<int> idxOfStop(routeState.getMaxStopId() + 1, INVALID_INDEX);
-            std::vector<int> stopIdsForEllipses;
+            if (routeState.getMaxStopId() + 1 > stopSeen.size())
+                stopSeen.resize(routeState.getMaxStopId() + 1);
+            stopSeen.reset();
+            std::vector<int> pVehStopIds;
             for (const auto pVehId: pVehs) {
                 const int earliestRelevantStopIdx = getEarliestRelevantStopIdxForPVeh(pVehId);
                 const auto stopIds = routeState.stopIdsFor(pVehId);
                 for (int i = earliestRelevantStopIdx; i < routeState.numStopsOf(pVehId) - 1; i++) {
-                    if (idxOfStop[stopIds[i]] == INVALID_INDEX) {
-                        idxOfStop[stopIds[i]] = stopIdsForEllipses.size();
-                        stopIdsForEllipses.push_back(stopIds[i]);
+                    if (!stopSeen.isSet(stopIds[i])) {
+                        stopSeen.set(stopIds[i]);
+                        pVehStopIds.push_back(stopIds[i]);
                     }
                 }
             }
 
+            stopSeen.reset();
+            std::vector<int> dVehStopIds;
             for (const auto dVehId: dVehs) {
                 const int latestRelevantStopIdx = getLatestRelevantStopIdxForDVeh(dVehId);
                 KASSERT(latestRelevantStopIdx + 1 <= routeState.numStopsOf(dVehId) - 1);
                 const auto stopIds = routeState.stopIdsFor(dVehId);
                 for (int i = 0; i < latestRelevantStopIdx + 1; i++) {
-                    if (idxOfStop[stopIds[i]] == INVALID_INDEX) {
-                        idxOfStop[stopIds[i]] = stopIdsForEllipses.size();
-                        stopIdsForEllipses.push_back(stopIds[i]);
+                    if (!stopSeen.isSet(stopIds[i])) {
+                        stopSeen.set(stopIds[i]);
+                        dVehStopIds.push_back(stopIds[i]);
                     }
                 }
             }
 
-            // Calculate all necessary ellipses
+            // Calculate transfer points
             Timer searchTimer;
-            const auto vertexEllipses = chEllipseReconstructor.getVerticesInEllipsesOfLegsAfterStops(stopIdsForEllipses,
-                                                                                                     numVerticesScanned,
-                                                                                                     numEdgesRelaxed);
-
-            // Convert the ellipses of vertices to ellipses of edges
-            std::vector<std::vector<EdgeInEllipse>> edgeEllipses(stopIdsForEllipses.size());
-            for (int i = 0; i < stopIdsForEllipses.size(); ++i) {
-                const auto &stopId = stopIdsForEllipses[i];
-                KASSERT(i == idxOfStop[stopId]);
-                const auto &vertexEllipse = vertexEllipses[i];
-
-                const auto leeway = routeState.leewayOfLegStartingAt(stopId);
-
-                auto &edgeEllipse = edgeEllipses[i];
-                convertVertexEllipseIntoEdgeEllipse(vertexEllipse, leeway, edgeEllipse);
-                ellipsesLogger << edgeEllipse.size() << '\n';
-
-                KASSERT(std::is_sorted(edgeEllipse.begin(), edgeEllipse.end(),
-                                       [](const EdgeInEllipse &e1, const EdgeInEllipse &e2) {
-                                           return e1.edge < e2.edge;
-                                       }));
-            }
-
+            transferPointStrategy.computeTransferPoints(pVehStopIds, dVehStopIds);
             searchTime += searchTimer.elapsed<std::chrono::nanoseconds>();
 
             // Run selection phase for many-to-many searches used to find distances from pickups to transfers and from
@@ -260,7 +236,6 @@ namespace karri {
 
 
 
-
             // Loop over all the possible vehicle combinations
             for (const auto pVehId: pVehs) {
                 for (const auto dVehId: dVehs) {
@@ -270,7 +245,7 @@ namespace karri {
                         continue;
 
                     // Find the assignments with the transfer points
-                    findAssignmentsForVehiclePair(pVehId, dVehId, idxOfStop, edgeEllipses);
+                    findAssignmentsForVehiclePair(pVehId, dVehId);
 
                     if (promisingPartials.empty())
                         continue;
@@ -339,8 +314,7 @@ namespace karri {
             return -1;
         }
 
-        void findAssignmentsForVehiclePair(const int pVehId, const int dVehId, const std::vector<int> &idxOfStop,
-                                           const std::vector<std::vector<EdgeInEllipse>> &edgeEllipses) {
+        void findAssignmentsForVehiclePair(const int pVehId, const int dVehId) {
 
             const int numStopsPVeh = routeState.numStopsOf(pVehId);
 
@@ -358,28 +332,17 @@ namespace karri {
             const auto latestRelevantStopIdxDVeh = getLatestRelevantStopIdxForDVeh(dVehId);
             for (int trIdxPVeh = earliestRelevantStopIdxPVeh; trIdxPVeh < numStopsPVeh - 1; ++trIdxPVeh) {
                 const auto stopIdPVeh = stopIdsPVeh[trIdxPVeh];
-                KASSERT(idxOfStop[stopIdPVeh] != INVALID_INDEX);
-                const auto &ellipsePVeh = edgeEllipses[idxOfStop[stopIdPVeh]];
 
                 for (int trIdxDVeh = 0; trIdxDVeh < latestRelevantStopIdxDVeh + 1; ++trIdxDVeh) {
                     ++numStopPairs;
                     const auto stopIdDVeh = stopIdsDVeh[trIdxDVeh];
-                    KASSERT(idxOfStop[stopIdDVeh] != INVALID_INDEX);
-                    const auto &ellipseDVeh = edgeEllipses[idxOfStop[stopIdDVeh]];
 
-                    const auto intersection = getIntersectionOfEllipses(ellipsePVeh,
-                                                                        ellipseDVeh, pVehId,
-                                                                        dVehId, trIdxPVeh,
-                                                                        trIdxDVeh);
-
-                    numTransferPoints += intersection.size();
-                    ellipseIntersectionLogger << intersection.size() << '\n';
+                    const auto transferPoints = transferPointStrategy.getTransferPoints(stopIdPVeh, stopIdDVeh);
+                    numTransferPoints += transferPoints.size();
+                    ellipseIntersectionLogger << transferPoints.size() << '\n';
 
                     // For fixed transfer indices, try to find possible pickups
-                    for (const auto &tp: intersection) {
-
-                        // TODO: Test cost lower bound based only on transfer point
-
+                    for (const auto &tp: transferPoints) {
                         tryPickupBNS(pVehId, dVehId, trIdxPVeh, trIdxDVeh, tp);
                         tryPickupORD(pVehId, dVehId, trIdxPVeh, trIdxDVeh, tp);
                     }
@@ -397,8 +360,6 @@ namespace karri {
                 if (pickup.stopIndex > trIdxPVeh)
                     break; // pickups in relevant stops are ordered by stop index
 
-                // Try all possible transfer points between the stops of the two vehicles
-//                for (const auto &tp: transferPointsForStopPair) {
                 // Build the partial assignment with the transfer point
                 PDLoc *pickupPDLoc = &requestState.pickups[pickup.pdId];
 
@@ -418,17 +379,14 @@ namespace karri {
                 // Try the partial assignment
                 tryPartialAssignment(asgn);
             }
-//            }
         }
 
         void tryPickupBNS(const int pVehId, const int dVehId, const int trIdxPVeh, const int trIdxDVeh,
                           const TransferPoint &tp) {
             if (!relBNSPickups.hasRelevantSpotsFor(pVehId))
                 return;
-//            KASSERT(!transferPointsForStopPair.empty());
 
             for (const auto &pickup: relBNSPickups.relevantSpotsFor(pVehId)) {
-//                for (const auto &tp: transferPointsForStopPair) {
                 // Build the partial assignment with the transfer point
                 PDLoc *pickupPDLoc = &requestState.pickups[pickup.pdId];
 
@@ -446,7 +404,6 @@ namespace karri {
                 assert(asgn.pickup->id >= 0);
                 // Try the partial assignment
                 tryPartialAssignment(asgn);
-//                }
             }
         }
 
@@ -774,7 +731,6 @@ namespace karri {
 
             //* Transfer distances pVeh
             if (paired) {
-//                asgn.distToTransferPVeh = pairedLowerBoundPT;
                 asgn.distToTransferPVeh = 0;
                 asgn.pickupPairedLowerBoundUsed = true;
             }
@@ -838,7 +794,6 @@ namespace karri {
 
             //* Dropoff distances
             if (paired) {
-//                asgn.distToDropoff = pairedLowerBoundTD;
                 asgn.distToDropoff = 0;
                 asgn.dropoffPairedLowerBoundUsed = true;
             }
@@ -930,134 +885,12 @@ namespace karri {
             }
         }
 
-        // Takes set of vertices in an ellipse (with vertex IDs used by ellipse reconstructor) and returns edges in
-        // ellipse (with edge IDs of input graph permuted by ellipse vertex IDs).
-        void
-        convertVertexEllipseIntoEdgeEllipse(const std::vector<VertexInEllipse> &vertexEllipse, const int leeway,
-                                            std::vector<EdgeInEllipse> &edgeEllipse) {
-            edgeEllipse.reserve(vertexEllipse.size() * 2);
-
-            distanceFromVertexToNextStop.clear();
-            for (const auto &vertexInEllipse: vertexEllipse)
-                distanceFromVertexToNextStop[vertexInEllipse.vertex] = vertexInEllipse.distFromVertex;
-
-            for (const auto &vertexInEllipse: vertexEllipse) {
-
-                FORALL_INCIDENT_EDGES(inputGraphWithEllipseVertexIds, vertexInEllipse.vertex, e) {
-
-                    const int travelTime = inputGraphWithEllipseVertexIds.travelTime(e);
-                    const int edgeHead = inputGraphWithEllipseVertexIds.edgeHead(e);
-                    const int distToTail = vertexInEllipse.distToVertex;
-                    const int distFromHead = distanceFromVertexToNextStop[edgeHead];
-
-                    if (distToTail + travelTime + distFromHead <= leeway) {
-                        edgeEllipse.emplace_back(e, distToTail, distFromHead);
-                    }
-                }
-            }
-
-            edgeEllipse.shrink_to_fit();
-        }
-
-        bool transferPointDominates(const TransferPoint &tp1, const TransferPoint &tp2) {
-            const auto detourPVeh1 = tp1.distancePVehToTransfer + tp1.distancePVehFromTransfer;
-            const auto detourPVeh2 = tp2.distancePVehToTransfer + tp2.distancePVehFromTransfer;
-            const auto detourDVeh1 = tp1.distanceDVehToTransfer + tp1.distanceDVehFromTransfer;
-            const auto detourDVeh2 = tp2.distanceDVehToTransfer + tp2.distanceDVehFromTransfer;
-            return detourPVeh1 < detourPVeh2 && detourDVeh1 < detourDVeh2;
-        }
-
-        // Computes intersection of two ellipses. Ellipses are expected to be sorted by edge IDs in input graph
-        // permuted by vertex IDs of the ellipse reconstructor.
-        // The result is a vector of transfer points specified with edge IDs of the original input graph.
-        // The transfer points are checked for pareto-dominance and only non-dominated points are returned.
-        std::vector<TransferPoint> getIntersectionOfEllipses(const std::vector<EdgeInEllipse> &ellipsePVeh,
-                                                             const std::vector<EdgeInEllipse> &ellipseDVeh,
-                                                             const int pVehId, const int dVehId,
-                                                             const int stopIdxPVeh, const int stopIdxDVeh) {
-            std::vector<TransferPoint> result;
-            result.reserve(std::max(ellipsePVeh.size(), ellipseDVeh.size()));
-
-            auto itEdgesPVeh = ellipsePVeh.begin();
-            auto itEdgesDVeh = ellipseDVeh.begin();
-            const auto endEdgesPVeh = ellipsePVeh.end();
-            const auto endEdgesDVeh = ellipseDVeh.end();
-
-            while (itEdgesPVeh < endEdgesPVeh && itEdgesDVeh < endEdgesDVeh) {
-                const auto &edgePVeh = *itEdgesPVeh;
-                const auto &edgeDVeh = *itEdgesDVeh;
-                if (edgePVeh.edge < edgeDVeh.edge) {
-                    ++itEdgesPVeh;
-                    continue;
-                }
-
-                if (edgePVeh.edge > edgeDVeh.edge) {
-                    ++itEdgesDVeh;
-                    continue;
-                }
-
-                const int locInPermutedGraph = edgePVeh.edge;
-                const int distPVehToTransfer =
-                        edgePVeh.distToTail + inputGraphWithEllipseVertexIds.travelTime(locInPermutedGraph);
-                const int distPVehFromTransfer = edgePVeh.distFromHead;
-                const int distDVehToTransfer =
-                        edgeDVeh.distToTail + inputGraphWithEllipseVertexIds.travelTime(locInPermutedGraph);
-                const int distDVehFromTransfer = edgeDVeh.distFromHead;
-
-
-                ++itEdgesPVeh;
-                ++itEdgesDVeh;
-
-                const int locInOriginalGraph = ellipseEdgeIdsToOriginalEdgeIds[locInPermutedGraph];
-                const auto tp = TransferPoint(locInOriginalGraph, &fleet[pVehId], &fleet[dVehId], stopIdxPVeh,
-                                              stopIdxDVeh, distPVehToTransfer,
-                                              distPVehFromTransfer,
-                                              distDVehToTransfer, distDVehFromTransfer);
-
-                // Check whether known transfer points dominate tp
-                bool dominated = false;
-                for (const auto &knownTP: result) {
-                    if (transferPointDominates(knownTP, tp)) {
-                        dominated = true;
-                        break;
-                    }
-                }
-                if (dominated) {
-                    continue;
-                }
-
-                // If tp is not dominated, add it to result and remove any dominated by tp
-                result.push_back(tp);
-                for (int i = 0; i < result.size();) {
-                    if (transferPointDominates(tp, result[i])) {
-                        std::swap(result[i], result.back());
-                        result.pop_back();
-                        continue;
-                    }
-                    ++i;
-                }
-            }
-
-            // TODO: validate that this lower bound is correct
-            for (int i = 0; i < result.size();) {
-                const auto minTpCost = calc.calcMinCostForTransferPoint(result[i], requestState);
-                if (minTpCost.total > requestState.getBestCost()) {
-                    std::swap(result[i], result.back());
-                    result.pop_back();
-                    continue;
-                }
-                ++i;
-            }
-
-            return result;
-        }
-
         bool assertTransferPointCalculation(const TransferPoint tp) {
             const auto stopLocationsPVeh = routeState.stopLocationsFor(tp.pVeh->vehicleId);
             const auto stopLocationsDVeh = routeState.stopLocationsFor(tp.dVeh->vehicleId);
 
-            const auto stopIndexPVeh = tp.dropoffAtTransferStopIdx;
-            const auto stopIndexDVeh = tp.pickupFromTransferStopIdx;
+            const auto stopIndexPVeh = tp.stopIdxDVeh;
+            const auto stopIndexDVeh = tp.stopIdxPVeh;
 
             const auto stopLocPVeh = stopLocationsPVeh[stopIndexPVeh];
             const auto nextStopLocPVeh = stopLocationsPVeh[stopIndexPVeh + 1];
@@ -1126,23 +959,13 @@ namespace karri {
 
         std::vector<AssignmentWithTransfer> promisingPartials;
 
-//        TransferPointFinderT &tpFinder;
-        TransfersDropoffALSStrategyT &dropoffALSStrategy;
-        CHEllipseReconstructorT &chEllipseReconstructor;
-
         const InputGraphT &inputGraph;
-
-
-        // Identical to input graph but vertex IDs permuted by representation used in ellipse reconstructor.
-        InputGraphT inputGraphWithEllipseVertexIds;
-
-        // Permutation that maps edge IDs in permuted input graph to edge IDs in original input graph.
-        Permutation ellipseEdgeIdsToOriginalEdgeIds;
-
         const CH &vehCh;
         VehCHQuery vehChQuery;
 
         CurVehLocToPickupSearchesT &searches;
+        TransferPointStrategyT &transferPointStrategy;
+        TransfersDropoffALSStrategyT &dropoffALSStrategy;
 
         const RelevantPDLocs &relORDPickups;
         const RelevantPDLocs &relBNSPickups;
@@ -1164,13 +987,11 @@ namespace karri {
         Subset pVehs;
         Subset dVehs;
 
-
-        TimestampedVector<int> distanceFromVertexToNextStop;
-//        std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints;
-
         Subset dVehIdsALS;
 
         LightweightSubset edgesSubset; // Subset used to deduplicate locations in preparing any-to-any searches
+
+        FastResetFlagArray<uint32_t> stopSeen;
 
         //* Statistics for the ordinary transfer assignment finder
         int64_t totalTime;

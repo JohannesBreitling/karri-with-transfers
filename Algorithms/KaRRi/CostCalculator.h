@@ -284,46 +284,46 @@ namespace karri {
             const auto pVehId = tp.pVeh->vehicleId;
             const auto numStopsPVeh = routeState.numStopsOf(pVehId);
             const bool transferAtExistingStopPVeh =
-                    tp.loc == routeState.stopLocationsFor(pVehId)[tp.pickupFromTransferStopIdx];
+                    tp.loc == routeState.stopLocationsFor(pVehId)[tp.stopIdxPVeh];
             int initialDetourPVeh = 0;
             if (!transferAtExistingStopPVeh) {
 
-                const auto legLengthPVeh = calcLengthOfLegStartingAt(tp.pickupFromTransferStopIdx, pVehId,
+                const auto legLengthPVeh = calcLengthOfLegStartingAt(tp.stopIdxPVeh, pVehId,
                                                                      routeState);
                 initialDetourPVeh = tp.distancePVehToTransfer + InputConfig::getInstance().stopTime +
                                     tp.distancePVehFromTransfer - legLengthPVeh;
             }
-            const auto residualDetourPVeh = calcResidualPickupDetour(pVehId, tp.pickupFromTransferStopIdx, numStopsPVeh,
+            const auto residualDetourPVeh = calcResidualPickupDetour(pVehId, tp.stopIdxPVeh, numStopsPVeh,
                                                                      initialDetourPVeh, routeState);
             cost.vehCost += F::calcVehicleCost(residualDetourPVeh);
-            const auto addedTripTimePVeh = calcAddedTripTimeInInterval(pVehId, tp.pickupFromTransferStopIdx,
+            const auto addedTripTimePVeh = calcAddedTripTimeInInterval(pVehId, tp.stopIdxPVeh,
                                                                        numStopsPVeh - 1, initialDetourPVeh, routeState);
             cost.changeInTripCostsOfOthers += F::calcChangeInTripCostsOfExistingPassengers(addedTripTimePVeh);
 
             const auto dVehId = tp.dVeh->vehicleId;
             const auto numStopsDVeh = routeState.numStopsOf(dVehId);
             const bool transferAtExistingStopDVeh =
-                    tp.loc == routeState.stopLocationsFor(dVehId)[tp.dropoffAtTransferStopIdx];
+                    tp.loc == routeState.stopLocationsFor(dVehId)[tp.stopIdxDVeh];
             int initialDetourDVeh = 0;
             if (!transferAtExistingStopDVeh) {
-                const auto legLengthDVeh = calcLengthOfLegStartingAt(tp.dropoffAtTransferStopIdx, dVehId,
+                const auto legLengthDVeh = calcLengthOfLegStartingAt(tp.stopIdxDVeh, dVehId,
                                                                      routeState);
                 initialDetourDVeh = tp.distanceDVehToTransfer + InputConfig::getInstance().stopTime +
                                     tp.distanceDVehFromTransfer - legLengthDVeh;
             }
-            const auto residualDetourDVeh = calcResidualPickupDetour(dVehId, tp.dropoffAtTransferStopIdx,
+            const auto residualDetourDVeh = calcResidualPickupDetour(dVehId, tp.stopIdxDVeh,
                                                                      numStopsDVeh, initialDetourDVeh, routeState);
             cost.vehCost += F::calcVehicleCost(residualDetourDVeh);
-            const auto addedTripTimeDVeh = calcAddedTripTimeInInterval(dVehId, tp.dropoffAtTransferStopIdx,
+            const auto addedTripTimeDVeh = calcAddedTripTimeInInterval(dVehId, tp.stopIdxDVeh,
                                                                        numStopsDVeh - 1, initialDetourDVeh, routeState);
             cost.changeInTripCostsOfOthers += F::calcChangeInTripCostsOfExistingPassengers(addedTripTimeDVeh);
 
             const auto minArrTimeAtTransferPVeh =
-                    std::max(getVehDepTimeAtStopForRequest(pVehId, tp.pickupFromTransferStopIdx, context, routeState) +
-                    tp.distancePVehToTransfer, context.originalRequest.requestTime);
+                    std::max(getVehDepTimeAtStopForRequest(pVehId, tp.stopIdxPVeh, context, routeState) +
+                             tp.distancePVehToTransfer, context.originalRequest.requestTime);
             const auto minArrTimeAtTransferDVeh =
-                    std::max(getVehDepTimeAtStopForRequest(dVehId, tp.dropoffAtTransferStopIdx, context, routeState) +
-                    tp.distanceDVehToTransfer, context.originalRequest.requestTime);
+                    std::max(getVehDepTimeAtStopForRequest(dVehId, tp.stopIdxDVeh, context, routeState) +
+                             tp.distanceDVehToTransfer, context.originalRequest.requestTime);
             const auto psgDepTimeAtTransfer =
                     std::max(minArrTimeAtTransferPVeh,
                              minArrTimeAtTransferDVeh + !transferAtExistingStopDVeh * InputConfig::getInstance().stopTime);

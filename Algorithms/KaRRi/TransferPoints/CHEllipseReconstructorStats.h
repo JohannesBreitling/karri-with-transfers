@@ -32,7 +32,7 @@
 #include "DataStructures/Containers/TimestampedVector.h"
 #include "DataStructures/Containers/FastResetFlagArray.h"
 
-namespace karri {
+namespace karri::TransferPointStrategies {
 
         struct CHEllipseReconstructorStats {
             int numVerticesSettled = 0;

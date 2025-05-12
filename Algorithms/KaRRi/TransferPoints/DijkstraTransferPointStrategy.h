@@ -127,84 +127,117 @@ namespace karri::TransferPointStrategies {
                 const RouteState &routeState,
                 const InputGraphT &inputGraph,
                 const InputGraphT &reverseGraph,
-                std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints) : 
+                const Fleet& fleet) :
                 routeState(routeState),
                 inputGraph(inputGraph),
                 reverseGraph(reverseGraph),
+                fleet(fleet),
                 maxDetour(-1),
                 settledVertecies(0),
                 searchSpaceIntersection(SearchSpaceIntersection(4)),
                 currSearch(0),
                 dijSearchTransferPointsFw(inputGraph, {*this, maxDetour, settledVertecies}, {}),
                 dijSearchTransferPointsBw(reverseGraph, {*this, maxDetour, settledVertecies}, {}),
-                transferPoints(transferPoints),
                 dijkstraSearchLogger(LogManager<std::ofstream>::getLogger("dijkstra.csv",
                     "size\n")) {}
 
-        void findTransferPoints(
-            const Vehicle &pVeh, const Vehicle &dVeh,
-            const int numStopsPVeh, const int numStopsDVeh,
-            const ConstantVectorRange<int> &stopLocationsPVeh, const ConstantVectorRange<int> &stopLocationsDVeh,
-            const ConstantVectorRange<int> &stopIdsPVeh, const ConstantVectorRange<int> &stopIdsDVeh
-        ) {
-            if (numStopsPVeh <= 1 || numStopsDVeh <= 1)
-                return;
-
+        // Given a set of stop IDs for pickup vehicles and dropoff vehicles, this computes the transfer points between
+        // any pair of stops in the two sets. The given stop IDs should indicate the first stop in a pair of stops of
+        // the respective vehicle.
+       void  computeTransferPoints(const std::vector<int> &pVehStopIds, const std::vector<int> &dVehStopIds) {
             numSearchesRun = 0;
             numEdgesRelaxed = 0;
             numVerticesScanned = 0;
 
-            transferPoints = std::map<std::tuple<int, int>, std::vector<TransferPoint>>{};
+           if (pVehStopIds.empty() || dVehStopIds.empty())
+               return;
 
-            // Loop over all the possible stop pairs
-            for (int stopIdxPVeh = 0; stopIdxPVeh < numStopsPVeh - 1; stopIdxPVeh++) {
-                for (int stopIdxDVeh = 0; stopIdxDVeh < numStopsDVeh - 1; stopIdxDVeh++) {
-                    assert(numStopsPVeh > 1 && numStopsDVeh > 1);
-                    assert(stopLocationsPVeh.size() == stopIdsPVeh.size());
-                    assert(stopLocationsDVeh.size() == stopIdsDVeh.size());
+            std::fill(idxOfStopPVeh.begin(), idxOfStopPVeh.end(), INVALID_INDEX);
+            idxOfStopPVeh.resize(routeState.getMaxStopId() + 1, INVALID_INDEX);
+            std::fill(idxOfStopDVeh.begin(), idxOfStopDVeh.end(), INVALID_INDEX);
+            idxOfStopDVeh.resize(routeState.getMaxStopId() + 1, INVALID_INDEX);
 
-                    currSearch = 0;
-                    possibleTransferPoints = std::vector<TransferPoint>{};
-
-                    const int stopLocPStop = stopLocationsPVeh[stopIdxPVeh];
-                    const int stopLocPNStop = stopLocationsPVeh[stopIdxPVeh + 1];
-                    const int stopLocDStop = stopLocationsDVeh[stopIdxDVeh];
-                    const int stopLocDNStop = stopLocationsDVeh[stopIdxDVeh + 1];
-
-                    const int stopIdPStop = stopIdsPVeh[stopIdxPVeh];
-                    const int stopIdPNStop = stopIdsPVeh[stopIdxPVeh + 1];
-                    const int stopIdDStop = stopIdsDVeh[stopIdxDVeh];
-                    const int stopIdDNStop = stopIdsDVeh[stopIdxDVeh + 1];
-                    
-                    findTransferPointsBetweenStops(stopLocPStop, stopLocPNStop, stopLocDStop, stopLocDNStop, stopIdPStop, stopIdPNStop, stopIdDStop, stopIdDNStop);
-
-                    transferPoints[{stopIdxPVeh, stopIdxDVeh}] = std::vector<TransferPoint>{};
-                    for (auto &tp : possibleTransferPoints) {
-                        tp.pVeh = &pVeh;
-                        tp.dVeh = &dVeh;
-                        tp.dropoffAtTransferStopIdx = stopIdxPVeh;
-                        tp.pickupFromTransferStopIdx = stopIdxDVeh;
-                        // tpsForStopPair.push_back(tp);    
-                        transferPoints[{stopIdxPVeh, stopIdxDVeh}].push_back(tp);
-
-                        assert(tp.distancePVehToTransfer >= 0);
-                        assert(tp.distancePVehFromTransfer >= 0);
-                        assert(tp.distanceDVehToTransfer >= 0);
-                        assert(tp.distanceDVehFromTransfer >= 0);
-                    }
-                    possibleTransferPoints.clear();
+            numStopsPVeh = 0;
+            for (const auto &pVehStopId: pVehStopIds) {
+                if (idxOfStopPVeh[pVehStopId] == INVALID_INDEX) {
+                    idxOfStopPVeh[pVehStopId] = numStopsPVeh++;
                 }
             }
+
+            numStopsDVeh = 0;
+            for (const auto &dVehStopId: dVehStopIds) {
+                if (idxOfStopDVeh[dVehStopId] == INVALID_INDEX) {
+                    idxOfStopDVeh[dVehStopId] = numStopsDVeh++;
+                }
+            }
+
+            if (transferPoints.size() < numStopsPVeh * numStopsDVeh)
+                transferPoints.resize(numStopsPVeh * numStopsDVeh);
+
+           // Flatten for parallelization of work
+           std::vector<std::pair<int, int>> stopIdPairs;
+           stopIdPairs.reserve(numStopsPVeh * numStopsDVeh);
+           for (const auto &stopIdPStop: pVehStopIds) {
+               const auto vehIdPStop = routeState.vehicleIdOf(stopIdPStop);
+
+               for (const auto &stopIdDStop: dVehStopIds) {
+                   const auto vehIdDStop = routeState.vehicleIdOf(stopIdDStop);
+
+                   if (vehIdPStop == vehIdDStop)
+                       continue;
+
+                   stopIdPairs.emplace_back(stopIdPStop, stopIdDStop);
+               }
+           }
+
+           // TODO parallelize this loop
+           for (const auto &[stopIdPStop, stopIdDStop]: stopIdPairs) {
+               const auto vehIdPStop = routeState.vehicleIdOf(stopIdPStop);
+               const auto internalIdxPStop = idxOfStopPVeh[stopIdPStop];
+
+               const auto vehIdDStop = routeState.vehicleIdOf(stopIdDStop);
+               const auto internalIdxDStop = idxOfStopDVeh[stopIdDStop];
+
+               KASSERT(vehIdPStop != vehIdDStop);
+
+               auto &transferPointsForPair = transferPoints[internalIdxPStop * numStopsDVeh + internalIdxDStop];
+               transferPointsForPair.clear();
+               findTransferPointsBetweenStops(stopIdPStop, stopIdDStop, transferPointsForPair);
+           }
         }
 
-        void findTransferPointsBetweenStops(int pStopLoc, int pNStopLoc, int dStopLoc, int dNStopLoc, int pStopId, int /*pNStopId*/, int dStopId, int /*dNStopId*/) {
+        // Given the IDs of the respective first stops in a pair of stops in a pickup vehicle and a pair of stops in a
+        // dropoff vehicle, this returns the feasible transfer points for these stop pairs.
+        const std::vector<TransferPoint> &getTransferPoints(const int pVehStopId, const int dVehStopId) {
+            const auto internalIdxPStop = idxOfStopPVeh[pVehStopId];
+            const auto internalIdxDStop = idxOfStopDVeh[dVehStopId];
+            KASSERT(internalIdxPStop != INVALID_INDEX && internalIdxDStop != INVALID_INDEX);
+            return transferPoints[internalIdxPStop * numStopsDVeh + internalIdxDStop];
+        }
+
+    private:
+
+        void findTransferPointsBetweenStops(const int pStopId, const int dStopId, std::vector<TransferPoint>& result) {
+
+            const auto pVehId = routeState.vehicleIdOf(pStopId);
+            const auto dVehId = routeState.vehicleIdOf(dStopId);
+            const auto stopIdxPVeh = routeState.stopPositionOf(pStopId);
+            const auto stopIdxDVeh = routeState.stopPositionOf(dStopId);
+            const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
+            const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
+
+            const int stopLocPStop = stopLocationsPVeh[stopIdxPVeh];
+            const int stopLocPNStop = stopLocationsPVeh[stopIdxPVeh + 1];
+            const int stopLocDStop = stopLocationsDVeh[stopIdxDVeh];
+            const int stopLocDNStop = stopLocationsDVeh[stopIdxDVeh + 1];
+
             // Convert the stop locations, that are edges to the respective vertecies
-            int pStopVertex = inputGraph.edgeHead(pStopLoc);
+            int pStopVertex = inputGraph.edgeHead(stopLocPStop);
             // assert(inputGraph.edgeTail(pStopLoc) == reverseGraph.edgeHead(pStopLoc));
-            int pNextStopVertex = inputGraph.edgeTail(pNStopLoc);
+            int pNextStopVertex = inputGraph.edgeTail(stopLocPNStop);
             // assert(inputGraph.edgeTail(pNStopLoc) == reverseGraph.edgeHead(pNStopLoc));
-            int dStopVertex = inputGraph.edgeHead(dStopLoc);
-            int dNextStopVertex = inputGraph.edgeTail(dNStopLoc);
+            int dStopVertex = inputGraph.edgeHead(stopLocDStop);
+            int dNextStopVertex = inputGraph.edgeTail(stopLocDNStop);
 
             dijkstraSearchLogger << searchSpaceIntersection.getEdgesFoundInFirstSearch() << '\n';
 
@@ -212,21 +245,23 @@ namespace karri::TransferPointStrategies {
             const int maxLeewayPVeh = routeState.leewayOfLegStartingAt(pStopId);
             const int maxLeewayDVeh = routeState.leewayOfLegStartingAt(dStopId);
 
+
+            currSearch = 0;
             searchSpaceIntersection.init(maxLeewayPVeh, maxLeewayDVeh);
 
-            offsetPNStop = inputGraph.travelTime(pNStopLoc);
-            offsetDNStop = inputGraph.travelTime(dNStopLoc);
+            offsetPNStop = inputGraph.travelTime(stopLocPNStop);
+            offsetDNStop = inputGraph.travelTime(stopLocDNStop);
 
             maxDetour = maxLeewayPVeh;
             offsetReverseSearch = offsetPNStop;
 
             dijSearchTransferPointsFw.run(pStopVertex);
-            searchSpaceIntersection.edgeFound(pStopLoc, 0);
+            searchSpaceIntersection.edgeFound(stopLocPStop, 0);
             searchSpaceIntersection.nextSearch();
             currSearch++;
         
             dijSearchTransferPointsBw.run(pNextStopVertex);
-            searchSpaceIntersection.edgeFound(pNStopLoc, 0);
+            searchSpaceIntersection.edgeFound(stopLocPNStop, 0);
             searchSpaceIntersection.nextSearch();
             currSearch++;
 
@@ -234,15 +269,24 @@ namespace karri::TransferPointStrategies {
             offsetReverseSearch = offsetDNStop;
 
             dijSearchTransferPointsFw.run(dStopVertex);
-            searchSpaceIntersection.edgeFound(dStopLoc, 0);
+            searchSpaceIntersection.edgeFound(stopLocDStop, 0);
             searchSpaceIntersection.nextSearch();
             currSearch++;
             
             dijSearchTransferPointsBw.run(dNextStopVertex);
-            searchSpaceIntersection.edgeFound(dNStopLoc, 0);
+            searchSpaceIntersection.edgeFound(stopLocDNStop, 0);
 
-            possibleTransferPoints = std::vector<TransferPoint>{};
-            possibleTransferPoints = searchSpaceIntersection.getIntersection();
+            result = searchSpaceIntersection.getIntersection();
+            for (auto &tp : result) {
+                tp.pVeh = &fleet[pVehId];
+                tp.dVeh = &fleet[dVehId];
+                tp.stopIdxPVeh = stopIdxPVeh;
+                tp.stopIdxDVeh = stopIdxDVeh;
+                KASSERT(tp.distancePVehToTransfer >= 0);
+                KASSERT(tp.distancePVehFromTransfer >= 0);
+                KASSERT(tp.distanceDVehToTransfer >= 0);
+                KASSERT(tp.distanceDVehFromTransfer >= 0);
+            }
 
             numSearchesRun += 4;
         }
@@ -274,8 +318,8 @@ namespace karri::TransferPointStrategies {
                 if (distance > maxDetour)
                     return;
                 
-                int firstEdge = reverseGraph.firstEdge(v);
-                int degree = reverseGraph.degree(v);
+                firstEdge = reverseGraph.firstEdge(v);
+                degree = reverseGraph.degree(v);
 
                 for (int i = 0; i < degree; i++) {
                     int currentEdge = firstEdge + i;
@@ -342,6 +386,7 @@ namespace karri::TransferPointStrategies {
         const RouteState &routeState;
         const InputGraphT &inputGraph;
         const InputGraphT &reverseGraph;
+        const Fleet& fleet;
         int maxDetour;
         int maxDetourP;
         int maxDetourD;
@@ -352,8 +397,16 @@ namespace karri::TransferPointStrategies {
         Dijkstra<InputGraphT, TravelTimeAttribute, DijLabelSet, TransferPointSearch> dijSearchTransferPointsFw;
         Dijkstra<InputGraphT, TravelTimeAttribute, DijLabelSet, TransferPointSearch> dijSearchTransferPointsBw;
 
-        std::map<std::tuple<int, int>, std::vector<TransferPoint>> &transferPoints;
-        std::vector<TransferPoint> possibleTransferPoints;
+        int numStopsPVeh;
+        int numStopsDVeh;
+
+        // Maps a stop ID to an internal index in the vector of stop IDs.
+        std::vector<int> idxOfStopPVeh;
+        std::vector<int> idxOfStopDVeh;
+
+        // For two stop IDs i (pVeh) and j (dVeh), transferPoints[idxOfStopPVeh[i] * numStopsDVeh + idxOfStopDVeh[j]] contains the
+        // transfer points between the two stops.
+        std::vector<std::vector<TransferPoint>> transferPoints;
 
         int64_t numSearchesRun;
         int64_t numEdgesRelaxed;

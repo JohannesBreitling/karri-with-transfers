@@ -185,15 +185,22 @@ endif (KARRI_COL_PALS_ONLY_PROMISING_DROPOFFS)
 
 
 ## Compile time parameters for transfers
-set(KARRI_ELLIPSE_RECONSTRUCTOR_LOG_K 3 CACHE STRING "Given value i, KaRRi runs 2^i ellipse reconstruction searches simultaneously as bundled search.")
-target_compile_definitions(karri PRIVATE KARRI_ELLIPSE_RECONSTRUCTOR_LOG_K=${KARRI_ELLIPSE_RECONSTRUCTOR_LOG_K})
+option(KARRI_USE_DIJKSTRA_TRANSFER_POINT_STRATEGY "Use Dijkstra searches to find transfer points (slow)." OFF)
+if (KARRI_USE_DIJKSTRA_TRANSFER_POINT_STRATEGY)
+    target_compile_definitions(karri PRIVATE KARRI_USE_DIJKSTRA_TRANSFER_POINT_STRATEGY=true)
+else(KARRI_USE_DIJKSTRA_TRANSFER_POINT_STRATEGY)
+    target_compile_definitions(karri PRIVATE KARRI_USE_DIJKSTRA_TRANSFER_POINT_STRATEGY=false)
+endif (KARRI_USE_DIJKSTRA_TRANSFER_POINT_STRATEGY)
 
-option(KARRI_ELLIPSE_RECONSTRUCTOR_USE_SIMD "Use SIMD instructions for bundled ellipse reconstruction searches." ON)
-if (KARRI_ELLIPSE_RECONSTRUCTOR_USE_SIMD)
-    target_compile_definitions(karri PRIVATE KARRI_ELLIPSE_RECONSTRUCTOR_USE_SIMD=true)
-else(KARRI_ELLIPSE_RECONSTRUCTOR_USE_SIMD)
-    target_compile_definitions(karri PRIVATE KARRI_ELLIPSE_RECONSTRUCTOR_USE_SIMD=false)
-endif (KARRI_ELLIPSE_RECONSTRUCTOR_USE_SIMD)
+set(KARRI_CH_ELLIPSE_RECONSTRUCTOR_LOG_K 3 CACHE STRING "Given value i, KaRRi runs 2^i ellipse reconstruction searches simultaneously as bundled search.")
+target_compile_definitions(karri PRIVATE KARRI_CH_ELLIPSE_RECONSTRUCTOR_LOG_K=${KARRI_CH_ELLIPSE_RECONSTRUCTOR_LOG_K})
+
+option(KARRI_CH_ELLIPSE_RECONSTRUCTOR_USE_SIMD "Use SIMD instructions for bundled ellipse reconstruction searches." ON)
+if (KARRI_CH_ELLIPSE_RECONSTRUCTOR_USE_SIMD)
+    target_compile_definitions(karri PRIVATE KARRI_CH_ELLIPSE_RECONSTRUCTOR_USE_SIMD=true)
+else(KARRI_CH_ELLIPSE_RECONSTRUCTOR_USE_SIMD)
+    target_compile_definitions(karri PRIVATE KARRI_CH_ELLIPSE_RECONSTRUCTOR_USE_SIMD=false)
+endif (KARRI_CH_ELLIPSE_RECONSTRUCTOR_USE_SIMD)
 
 
 set(KARRI_DIRECT_TRANSFER_DISTANCES_LOG_K 0 CACHE STRING "Given value i, KaRRi runs 2^i direct transfer distance searches simultaneously as bundled search.")
