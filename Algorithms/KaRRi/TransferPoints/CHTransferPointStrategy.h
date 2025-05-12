@@ -94,8 +94,14 @@ namespace karri::TransferPointStrategies {
             downGraph.permuteVertices(topDownRankPermutation);
             upGraph.permuteVertices(topDownRankPermutation);
 
-            inputGraphWithTopDownRankVertexIds.permuteVertices(topDownRankPermutation,
+            Permutation inputGraphVertexIdsToTopDownRank(inputGraph.numVertices());
+            for (int i = 0; i < inputGraph.numVertices(); ++i) {
+                inputGraphVertexIdsToTopDownRank[i] = topDownRankPermutation[ch.rank(i)];
+            }
+            KASSERT(inputGraphVertexIdsToTopDownRank.validate());
+            inputGraphWithTopDownRankVertexIds.permuteVertices(inputGraphVertexIdsToTopDownRank,
                                                                ellipseEdgeIdsToOriginalEdgeIds);
+            ellipseEdgeIdsToOriginalEdgeIds.invert();
         }
 
         // Given a set of stop IDs for pickup vehicles and dropoff vehicles, this computes the transfer points between
@@ -247,9 +253,9 @@ namespace karri::TransferPointStrategies {
                 // Reconstruct shortest path between stops by running point-to-point CH query.
                 // TODO: what if there is more than one shortest path?
                 const int stopId = stopIds[indicesWithoutLeeway[i]];
-                KASSERT(routeState.leewayOfLegStartingAt(stopId) ==
-                        time_utils::calcLengthOfLegStartingAt(stopId, routeState.vehicleIdOf(stopId), routeState));
                 const auto stopIdx = routeState.stopPositionOf(stopId);
+                KASSERT(routeState.leewayOfLegStartingAt(stopId) ==
+                        time_utils::calcLengthOfLegStartingAt(stopIdx, routeState.vehicleIdOf(stopId), routeState));
                 const auto &stopLocs = routeState.stopLocationsFor(routeState.vehicleIdOf(stopId));
                 const auto source = ch.rank(inputGraph.edgeHead(stopLocs[stopIdx]));
                 const auto target = ch.rank(inputGraph.edgeTail(stopLocs[stopIdx + 1]));
@@ -350,6 +356,7 @@ namespace karri::TransferPointStrategies {
 
         bool sanityCheckEdgeEllipses(const std::vector<int> &stopIds,
                                      const std::vector<std::vector<EdgeInEllipse>> &ellipses) {
+            std::vector<int> edgePathInInputGraph;
             for (int i = 0; i < stopIds.size(); ++i) {
                 const auto &ellipse = ellipses[i];
 
@@ -363,14 +370,22 @@ namespace karri::TransferPointStrategies {
                 const auto stopIdx = routeState.stopPositionOf(stopId);
                 const auto vehId = routeState.vehicleIdOf(stopId);
                 const auto stopLocs = routeState.stopLocationsFor(vehId);
-                const auto secondStopEdgeInOriginalGraph = stopLocs[stopIdx + 1];
 
-                // Make sure ellipse at least contains the second stop
-                if (std::find_if(ellipse.begin(), ellipse.end(), [&](const EdgeInEllipse &e) {
-                    return ellipseEdgeIdsToOriginalEdgeIds[e.edge] == secondStopEdgeInOriginalGraph;
-                }) == ellipse.end()) {
-                    KASSERT(false);
-                    return false;
+                // Make sure ellipse at least contains edges on shortest path
+                const auto source = ch.rank(inputGraph.edgeHead(stopLocs[stopIdx]));
+                const auto target = ch.rank(inputGraph.edgeTail(stopLocs[stopIdx + 1]));
+                p2pQuery.run(source, target);
+                edgePathInInputGraph.clear();
+                pathUnpacker.unpackUpDownPath(p2pQuery.getUpEdgePath(), p2pQuery.getDownEdgePath(),
+                                              edgePathInInputGraph);
+
+                for (const auto& eInInputGraph : edgePathInInputGraph) {
+                    if (std::find_if(ellipse.begin(), ellipse.end(), [&](const EdgeInEllipse &e) {
+                        return ellipseEdgeIdsToOriginalEdgeIds[e.edge] == eInInputGraph;
+                    }) == ellipse.end()) {
+                        KASSERT(false);
+                        return false;
+                    }
                 }
             }
             return true;
