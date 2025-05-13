@@ -615,8 +615,8 @@ int main(int argc, char *argv[]) {
         TransferPointFinderImpl transferPointFinder = TransferPointFinder(transferPointStrategy, routeState, transferPoints);
 
 
-        // using TransferStrategyALSImpl = CHStrategyALS<VehicleInputGraph, VehCHEnv>;
-        // TransferStrategyALSImpl transferALSStrategy = CHStrategyALS(routeState, fleet, vehicleInputGraph, *vehChEnv);
+        // using SlowTransferStrategyALSImpl = CHStrategyALS<VehicleInputGraph, VehCHEnv>;
+        // SlowTransferStrategyALSImpl transferALSStrategy = CHStrategyALS(routeState, fleet, vehicleInputGraph, *vehChEnv);
 
         using DALSLabelSet = std::conditional_t<KARRI_DALS_USE_SIMD,
                 SimdLabelSet<KARRI_DALS_LOG_K, ParentInfo::NO_PARENT_INFO>,
@@ -641,7 +641,7 @@ int main(int argc, char *argv[]) {
         TransferALSPVehFinderImpl transferALSPVehInsertions = TransferALSPVehFinderImpl(phastTransferALSStrategy, transferPickupALSStrategy, transferDropoffALSStrategy, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, relOrdinaryDropoffs, postponedAssignments, fleet, routeState, reqState, calc, asserter);
 
         using TransferALSDVehFinderImpl = TransferALSDVehFinder<TransferStrategyALSImpl, TransfersDropoffALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
-        TransferALSDVehFinderImpl transferALSDVehInsertions = TransferALSDVehFinderImpl(phastTransferALSStrategy, transferDropoffALSStrategy, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, postponedAssignments, fleet, routeState, reqState, calc, asserter);
+        TransferALSDVehFinderImpl transferALSDVehInsertions = TransferALSDVehFinderImpl(phastTransferALSStrategy, transferDropoffALSStrategy, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, postponedAssignments, fleet, routeState, reqState, asserter);
         
         using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<OrdinaryTransferInsertionsImpl, TransferALSPVehFinderImpl, TransferALSDVehFinderImpl, TransferAsserterImpl>;
         AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(ordinaryTransferInsertions, transferALSPVehInsertions, transferALSDVehInsertions, reqState, asserter);

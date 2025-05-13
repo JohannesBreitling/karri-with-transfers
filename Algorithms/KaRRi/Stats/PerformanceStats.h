@@ -441,7 +441,6 @@ namespace karri::stats {
     };
 
     struct AssignmentsWithTransferALSPVehPerformanceStats {
-
         // Overall stats
         int64_t totalTime;
         
@@ -452,6 +451,9 @@ namespace karri::stats {
 
         int64_t numCandidateVehiclesDropoffORD;
         int64_t numCandidateVehiclesDropoffALS;
+
+        int64_t numPickups;
+        int64_t numDropoffs;
         
         // Stats for the tried assignments 
         int64_t numAssignmentsTriedPickupBNS;
@@ -466,17 +468,10 @@ namespace karri::stats {
         // Stats for the transfer search itself
         int64_t numTransferPoints;
         
-        // Search from last stop to all stops
-        int64_t numSearchesRunLastStopToDVeh;
-        int64_t numEdgesRelaxedLastStopToDVeh;
-        int64_t numVerticesScannedLastStopToDVeh;
-        int64_t searchTimeLastStopToDVeh;
-        
-        // Search from pickup to all stops
-        int64_t numSearchesRunPickupToDVeh;
-        int64_t numEdgesRelaxedPickupToDVeh;
-        int64_t numVerticesScannedPickupToDVeh;
-        int64_t searchTimePickupToDVeh;
+        int64_t searchTimePickupALS;
+        int64_t searchTimeDropoffALS;
+        int64_t searchTimeLastStopToTransfer;
+        int64_t searchTimePickupToTransfer;
         
         static constexpr auto LOGGER_NAME = "perf_transf_als_pveh.csv";
         static constexpr auto LOGGER_COLS =
@@ -486,6 +481,8 @@ namespace karri::stats {
                 "num_vehs_pickup_als,"
                 "num_vehs_dropoff_ord,"
                 "num_vehs_dropoff_als,"
+                "num_pickups,"
+                "num_dropoffs,"
                 "num_assignments_pickup_bns,"
                 "num_assignments_pickup_ord,"
                 "num_assignments_pickup_als,"
@@ -493,14 +490,10 @@ namespace karri::stats {
                 "num_assignments_dropoff_als,"
                 "try_assignments_time,"
                 "num_transfer_points,"
-                "num_searches_last_stop_to_dveh,"
-                "num_edges_relaxed_last_stop_to_dveh,"
-                "num_vertices_settled_last_stop_to_dveh,"
-                "search_time_last_stop_to_dveh"
-                "num_searches_pickup_to_dveh,"
-                "num_edges_relaxed_pickup_to_dveh,"
-                "num_vertices_settled_pickup_to_dveh,"
-                "search_time_pickup_to_dveh\n";
+                "search_time_pickup_als,"
+                "search_time_dropoff_als,"
+                "search_time_last_stop_to_transfer,"
+                "search_time_pickup_to_transfer\n";
 
         std::string getLoggerRow() const {
             std::stringstream ss;
@@ -510,6 +503,8 @@ namespace karri::stats {
                << numCandidateVehiclesPickupALS << ", "
                << numCandidateVehiclesDropoffORD << ", "
                << numCandidateVehiclesDropoffALS << ", "
+               << numPickups << ", "
+               << numDropoffs << ", "
                << numAssignmentsTriedPickupBNS << ", "
                << numAssignmentsTriedPickupORD << ", "
                << numAssignmentsTriedPickupALS << ", "
@@ -517,14 +512,10 @@ namespace karri::stats {
                << numAssignmentsTriedDropoffALS << ", "
                << tryAssignmentsTime << ", "
                << numTransferPoints << ", "
-               << numSearchesRunLastStopToDVeh << ", "
-               << numEdgesRelaxedLastStopToDVeh << ", "
-               << numVerticesScannedLastStopToDVeh << ", "
-               << searchTimeLastStopToDVeh << ", "
-               << numSearchesRunLastStopToDVeh << ", "
-               << numEdgesRelaxedPickupToDVeh << ", "
-               << numVerticesScannedPickupToDVeh << ", "
-               << searchTimePickupToDVeh;
+               << searchTimePickupALS << ", "
+               << searchTimeDropoffALS << ", "
+               << searchTimeLastStopToTransfer << ", "
+               << searchTimePickupToTransfer;
             return ss.str();
         }
 
@@ -539,6 +530,8 @@ namespace karri::stats {
             numCandidateVehiclesPickupALS = 0;
             numCandidateVehiclesDropoffORD = 0;
             numCandidateVehiclesDropoffALS = 0;
+            numPickups = 0;
+            numDropoffs = 0;
             numAssignmentsTriedPickupBNS = 0;
             numAssignmentsTriedPickupORD = 0;
             numAssignmentsTriedPickupALS = 0;
@@ -546,14 +539,10 @@ namespace karri::stats {
             numAssignmentsTriedDropoffALS = 0;
             tryAssignmentsTime = 0;
             numTransferPoints = 0;
-            numSearchesRunLastStopToDVeh = 0;
-            numEdgesRelaxedLastStopToDVeh = 0;
-            numVerticesScannedLastStopToDVeh = 0;
-            searchTimeLastStopToDVeh = 0;
-            numSearchesRunPickupToDVeh = 0;
-            numEdgesRelaxedPickupToDVeh = 0;
-            numVerticesScannedPickupToDVeh = 0;
-            searchTimePickupToDVeh = 0;
+            searchTimePickupALS = 0;
+            searchTimeDropoffALS = 0;
+            searchTimeLastStopToTransfer = 0;
+            searchTimePickupToTransfer = 0;
         }
     };
 
@@ -565,25 +554,25 @@ namespace karri::stats {
         // Stats for the PD Locs
         int64_t numCandidateVehiclesPickupBNS;
         int64_t numCandidateVehiclesPickupORD;
-
         int64_t numCandidateVehiclesDropoffALS;
         
+        int64_t numPickups;
+        int64_t numDropoffs;
+
         // Stats for the tried assignments 
         int64_t numAssignmentsTriedPickupBNS;
         int64_t numAssignmentsTriedPickupORD;
-        
         int64_t numAssignmentsTriedDropoffALS;
 
         int64_t tryAssignmentsTime;
         
         // Stats for the transfer search itself
         int64_t numTransferPoints;
-        
+
         // Search from last stop to all stops
-        int64_t numSearchesRunLastStopToPVeh;
-        int64_t numEdgesRelaxedLastStopToPVeh;
-        int64_t numVerticesScannedLastStopToPVeh;
-        int64_t searchTimeLastStopToPVeh;
+        int64_t searchTimeDropoffALS;
+        int64_t searchTimeLastStopToTransfer;
+        int64_t searchTimeTransferToDropoff;
 
         static constexpr auto LOGGER_NAME = "perf_transf_als_dveh.csv";
         static constexpr auto LOGGER_COLS =
@@ -591,15 +580,16 @@ namespace karri::stats {
                 "num_vehs_pickup_bns,"
                 "num_vehs_pickup_ord,"
                 "num_vehs_dropoff_als,"
+                "num_pickups,"
+                "num_dropoffs,"
                 "num_assignments_pickup_bns,"
                 "num_assignments_pickup_ord,"
                 "num_assignments_dropoff_als,"
                 "try_assignments_time,"
                 "num_transfer_points,"
-                "num_searches_last_stop_to_pveh,"
-                "num_edges_relaxed_last_stop_to_pveh,"
-                "num_vertices_settled_last_stop_to_pveh,"
-                "search_time_last_stop_to_pveh\n";
+                "search_time_dropoff_als,"
+                "search_time_last_stop_to_transfer,"
+                "search_time_transfer_to_dropoff\n";
 
         std::string getLoggerRow() const {
             std::stringstream ss;
@@ -607,15 +597,19 @@ namespace karri::stats {
                << numCandidateVehiclesPickupBNS << ", "
                << numCandidateVehiclesPickupORD << ", "
                << numCandidateVehiclesDropoffALS << ", "
+               << numPickups << ", "
+               << numDropoffs << ", "
+               
                << numAssignmentsTriedPickupBNS << ", "
                << numAssignmentsTriedPickupORD << ", "
                << numAssignmentsTriedDropoffALS << ", "
                << tryAssignmentsTime << ", "
+               
                << numTransferPoints << ", "
-               << numSearchesRunLastStopToPVeh << ", "
-               << numEdgesRelaxedLastStopToPVeh << ", "
-               << numVerticesScannedLastStopToPVeh << ", "
-               << searchTimeLastStopToPVeh;
+               
+               << searchTimeDropoffALS << ", "
+               << searchTimeLastStopToTransfer << ", "
+               << searchTimeTransferToDropoff;
             return ss.str();
         }
 
@@ -628,15 +622,17 @@ namespace karri::stats {
             numCandidateVehiclesPickupBNS = 0;
             numCandidateVehiclesPickupORD = 0;
             numCandidateVehiclesDropoffALS = 0;
+            numPickups = 0;
+            numDropoffs = 0;
             numAssignmentsTriedPickupBNS = 0;
             numAssignmentsTriedPickupORD = 0;
             numAssignmentsTriedDropoffALS = 0;
             tryAssignmentsTime = 0;
             numTransferPoints = 0;
-            numSearchesRunLastStopToPVeh = 0;
-            numEdgesRelaxedLastStopToPVeh = 0;
-            numVerticesScannedLastStopToPVeh = 0;
-            searchTimeLastStopToPVeh = 0;
+            
+            searchTimeDropoffALS = 0;
+            searchTimeLastStopToTransfer = 0;
+            searchTimeTransferToDropoff = 0;
         }
 
     };

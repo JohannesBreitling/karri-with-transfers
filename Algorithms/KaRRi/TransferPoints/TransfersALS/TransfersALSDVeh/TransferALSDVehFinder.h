@@ -44,7 +44,6 @@ class TransferALSDVehFinder {
             const Fleet &fleet,
             const RouteState &routeState,
             RequestState &requestState,
-            CostCalculator &calc,
             InsertionAsserterT &asserter
         ) : strategy(strategy),
             dropoffALSStrategy(dropoffALSStrategy),
@@ -55,13 +54,14 @@ class TransferALSDVehFinder {
             fleet(fleet),
             routeState(routeState),
             requestState(requestState),
-            calc(calc),
+            distancesToTransfer(),
+            distancesToDropoff(),
             asserter(asserter) {}
 
     void findAssignments() {
         Timer total;
         assert(postponedAssignments.size() == 0);
-        
+
         findAssignmentsWithDropoffALS();
 
         // Write the stats
@@ -70,38 +70,43 @@ class TransferALSDVehFinder {
         stats.numCandidateVehiclesPickupBNS += numCandidateVehiclesPickupBNS;
         stats.numCandidateVehiclesPickupORD += numCandidateVehiclesPickupORD;
         stats.numCandidateVehiclesDropoffALS += numCandidateVehiclesDropoffALS;
+        stats.numPickups += requestState.numPickups();
+        stats.numDropoffs += requestState.numDropoffs();
         stats.numAssignmentsTriedPickupBNS += numAssignmentsTriedPickupBNS;
         stats.numAssignmentsTriedPickupORD += numAssignmentsTriedPickupORD;
         stats.numAssignmentsTriedDropoffALS += numAssignmentsTriedDropoffALS;
         stats.tryAssignmentsTime += tryAssignmentsTime;
         stats.numTransferPoints += numTransferPoints;
-        stats.numSearchesRunLastStopToPVeh += numSearchesRunLastStopToPVeh;
-        stats.numEdgesRelaxedLastStopToPVeh += numEdgesRelaxedLastStopToPVeh;
-        stats.numVerticesScannedLastStopToPVeh += numVerticesScannedLastStopToPVeh;
-        stats.searchTimeLastStopToPVeh += searchTimeLastStopToPVeh;
+
+        stats.searchTimeDropoffALS += searchTimeDropoffALS;
+        stats.searchTimeLastStopToTransfer += searchTimeLastStopToTransfer;
+        stats.searchTimeTransferToDropoff += searchTimeTransferToDropoff;
     }
 
     void init() {
         totalTime = 0;
+        
         numCandidateVehiclesPickupBNS = 0;
         numCandidateVehiclesPickupORD = 0;
         numCandidateVehiclesDropoffALS = 0;
+
+        numPickups = 0;
+        numDropoffs = 0;
+        
         numAssignmentsTriedPickupBNS = 0;
         numAssignmentsTriedPickupORD = 0;
         numAssignmentsTriedDropoffALS = 0;
         tryAssignmentsTime = 0;
+        
         numTransferPoints = 0;
-        numSearchesRunLastStopToPVeh = 0;
-        // numEdgesRelaxedLastStopToPVeh = 0;
-        // numVerticesScannedLastStopToPVeh = 0;
-        searchTimeLastStopToPVeh = 0;
+        
+        searchTimeDropoffALS = 0;
+        searchTimeLastStopToTransfer = 0;
+        searchTimeTransferToDropoff = 0;
     }
 
     private:
         void findAssignmentsWithDropoffALS() {
-
-            return;
-
             // The pickup has to be BNS or ORD
             // The set of pickup vehicles are the vehicles with BNS or ORD pickups
             if (relORDPickups.getVehiclesWithRelevantPDLocs().size() == 0 && relBNSPickups.getVehiclesWithRelevantPDLocs().size() == 0)
@@ -112,17 +117,43 @@ class TransferALSDVehFinder {
             
             // The vehicle set for the dropoff is the set of vehicles for the ALS dropoff
             // The distance from the last stop to the dropoff is a lower bound for the distance from the last stop to the dropoff via the transfer point
+            Timer searchDropoffALSTimer;
             const auto dVehIds = dropoffALSStrategy.findDropoffsAfterLastStop();
+            searchTimeDropoffALS = searchDropoffALSTimer.elapsed<std::chrono::nanoseconds>();
             numCandidateVehiclesDropoffALS += dVehIds.size();
             
             if (dVehIds.size() == 0)
                 return;
 
-            
-            
-            
-            // TODO Hier ansetzten um die nötigen Distanzen zu bestimmen...
-            
+            //* Calculate the relevant distances from all stops of the 
+            std::vector<int> pVehIds;
+            std::vector<bool> pVehIdFlags(fleet.size(), false);
+
+            for (const auto pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
+                pVehIds.push_back(pVehId);
+                pVehIdFlags[pVehId] = true;
+            }
+
+            for (const auto pVehId : relORDPickups.getVehiclesWithRelevantPDLocs()) {
+                if (pVehIdFlags[pVehId]) {
+                    continue;
+                }
+                 
+                pVehIds.push_back(pVehId);
+                pVehIdFlags[pVehId] = true;
+            }
+
+            Timer searchToDropoffsTimer;
+            distancesToDropoff = strategy.calculateDistancesFromAllStopsToAllDropoffs(pVehIds, requestState.dropoffs);
+            searchTimeTransferToDropoff = searchToDropoffsTimer.elapsed<std::chrono::nanoseconds>();
+
+            std::vector<int> dVehIdsVec;
+            for (const auto dVehId : dVehIds)
+                dVehIdsVec.push_back(dVehId);
+
+            Timer searchToTransfersTimer;
+            distancesToTransfer = strategy.calculateDistancesFromLastStopsToAllStops(dVehIdsVec, pVehIds);
+            searchTimeLastStopToTransfer = searchToTransfersTimer.elapsed<std::chrono::nanoseconds>();
             
             for (const auto dVehId : dVehIds) {
                 const auto *dVeh = &fleet[dVehId];
@@ -139,17 +170,9 @@ class TransferALSDVehFinder {
                     const auto numStopsPVeh = routeState.numStopsOf(pVehId);
                     const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
 
-                    //* Calculate the distances from the last stop of the dVeh to all stops of the pVeh
-                    const auto distancesToTransfer =  strategy.calculateDistancesFromLastStopToAllStops(*dVeh, *pVeh);
-                    numTransferPoints += distancesToTransfer.size();
-                    numSearchesRunLastStopToPVeh += strategy.getNumSearchesRun();
-                    searchTimeLastStopToPVeh += strategy.getSearchTime();
-
                     for (const auto &dropoff : requestState.dropoffs) {
-                        const auto distancesToDropoff = strategy.calculateDistancesFromAllStopsToLocation(*pVeh, dropoff.loc);
-                        
-                        assert(numStopsPVeh - 1 == distancesToTransfer.size());
-                        assert(numStopsPVeh - 1 == distancesToDropoff.size());
+                        assert(numStopsPVeh - 1 == distancesToTransfer[dVehId][pVehId].size());
+                        assert(numStopsPVeh - 1 == distancesToDropoff[pVehId][dropoff.id].size());
 
                         for (const auto &pickup : relBNSPickups.relevantSpotsFor(pVehId)) {
                             assert(pickup.stopIndex == 0);
@@ -160,9 +183,10 @@ class TransferALSDVehFinder {
                                 
                                 // Construct the transfer point
                                 TransferPoint tp = TransferPoint(stopLocationsPVeh[i], pVeh, dVeh);
+                                numTransferPoints++;
                                 tp.distancePVehToTransfer = 0;
                                 tp.distancePVehFromTransfer = 0;
-                                tp.distanceDVehToTransfer = distancesToTransfer[i - 1];
+                                tp.distanceDVehToTransfer = distancesToTransfer[dVehId][pVehId][i - 1];
                                 tp.distanceDVehFromTransfer = 0;
 
                                 tp.pickupFromTransferStopIdx = i;
@@ -180,7 +204,7 @@ class TransferALSDVehFinder {
 
                                 asgn.distToPickup = pickup.distToPDLoc;
                                 asgn.distFromPickup = pickup.distFromPDLocToNextStop;
-                                asgn.distToDropoff = distancesToDropoff[i - 1];
+                                asgn.distToDropoff = distancesToDropoff[pVehId][dropoff.id][i - 1];
                                 asgn.distFromDropoff = 0;
 
                                 asgn.distToTransferPVeh = 0;
@@ -188,7 +212,7 @@ class TransferALSDVehFinder {
                                 const int lengthOfLeg = i < numStopsPVeh - 1 ? routeState.schedArrTimesFor(pVehId)[i + 1] - routeState.schedDepTimesFor(pVehId)[i] : 0;
                                 asgn.distFromTransferPVeh = lengthOfLeg;
                                 
-                                asgn.distToTransferDVeh = transferAtLastStop ? 0 : distancesToTransfer[i - 1];
+                                asgn.distToTransferDVeh = transferAtLastStop ? 0 : distancesToTransfer[dVehId][pVehId][i - 1];
                                 asgn.distFromTransferDVeh = 0;
     
                                 asgn.pickupType = BEFORE_NEXT_STOP;
@@ -221,19 +245,13 @@ class TransferALSDVehFinder {
                     if (dVehId == pVehId)
                         continue;
 
-                    //* Calculate the distances from the vehicles last stop to all stops of possible pickup vehicles
-                    const auto distancesToTransfer = strategy.calculateDistancesFromLastStopToAllStops(*dVeh, *pVeh);
-                    numTransferPoints += distancesToTransfer.size();
-                
                     for (const auto &dropoff : requestState.dropoffs) {
                         //* Calculate the distances from the stops of the pVeh to the possible dropoffs
-                        const auto distancesToDropoff = strategy.calculateDistancesFromAllStopsToLocation(*pVeh, dropoff.loc);
-
                         for (const auto &pickup : relORDPickups.relevantSpotsFor(pVehId)) {
                             const auto *pickupPDLoc = &requestState.pickups[pickup.pdId];
 
-                            assert(numStopsPVeh - 1 == distancesToTransfer.size());
-                            assert(numStopsPVeh - 1 == distancesToDropoff.size());
+                            assert(numStopsPVeh - 1 == distancesToTransfer[dVehId][pVehId].size());
+                            assert(numStopsPVeh - 1 == distancesToDropoff[pVehId][dropoff.id].size());
 
                             for (int i = pickup.stopIndex + 1; i < numStopsPVeh; i++) {
                                 assert(pickup.stopIndex > 0);
@@ -241,10 +259,11 @@ class TransferALSDVehFinder {
                                 assert(pickup.stopIndex != i);
                                 
                                 // Construct the transfer point
-                                TransferPoint tp = TransferPoint(stopLocationsPVeh[i], pVeh, dVeh);                                
+                                TransferPoint tp = TransferPoint(stopLocationsPVeh[i], pVeh, dVeh);
+                                numTransferPoints++;                          
                                 tp.distancePVehToTransfer = 0;
                                 tp.distancePVehFromTransfer = 0;                                
-                                tp.distanceDVehToTransfer = distancesToTransfer[i - 1];
+                                tp.distanceDVehToTransfer = distancesToTransfer[dVehId][pVehId][i - 1];
                                 tp.distanceDVehFromTransfer = 0;
 
                                 tp.pickupFromTransferStopIdx = i;
@@ -262,13 +281,13 @@ class TransferALSDVehFinder {
 
                                 asgn.distToPickup = pickup.distToPDLoc;
                                 asgn.distFromPickup = pickup.distFromPDLocToNextStop;
-                                asgn.distToDropoff = distancesToDropoff[i - 1];
+                                asgn.distToDropoff = distancesToDropoff[pVehId][dropoff.id][i - 1];
                                 asgn.distFromDropoff = 0;
 
                                 asgn.distToTransferPVeh = 0;
                                 const int lengthOfLeg = i < numStopsPVeh - 1 ? routeState.schedArrTimesFor(pVehId)[i + 1] - routeState.schedDepTimesFor(pVehId)[i] : 0;
                                 asgn.distFromTransferPVeh = lengthOfLeg;
-                                asgn.distToTransferDVeh = transferAtLastStop ? 0 : distancesToTransfer[i - 1];
+                                asgn.distToTransferDVeh = transferAtLastStop ? 0 : distancesToTransfer[dVehId][pVehId][i - 1];
                                 asgn.distFromTransferDVeh = 0;
 
                                 asgn.pickupType = ORDINARY;
@@ -344,7 +363,7 @@ class TransferALSDVehFinder {
                 asgn.pickupBNSLowerBoundUsed = false;
 
                 assert(asgn.isFinished());
- 
+                
                 tryAssignment(asgn);
             }
 
@@ -365,7 +384,8 @@ class TransferALSDVehFinder {
         const RouteState &routeState;
         RequestState &requestState;
 
-        CostCalculator &calc;
+        std::map<int, std::map<int, std::vector<int>>> distancesToTransfer;
+        std::map<int, std::map<int, std::vector<int>>> distancesToDropoff;
 
         InsertionAsserterT &asserter;
 
@@ -375,6 +395,9 @@ class TransferALSDVehFinder {
         // Stats for the PD Locs
         int64_t numCandidateVehiclesPickupBNS;
         int64_t numCandidateVehiclesPickupORD;
+
+        int64_t numPickups;
+        int64_t numDropoffs;
 
         int64_t numCandidateVehiclesDropoffALS;
         
@@ -389,10 +412,9 @@ class TransferALSDVehFinder {
         // Stats for the transfer search itself
         int64_t numTransferPoints;
         
-        // Search from last stop to all stops
-        int64_t numSearchesRunLastStopToPVeh;
-        int64_t numEdgesRelaxedLastStopToPVeh;
-        int64_t numVerticesScannedLastStopToPVeh;
-        int64_t searchTimeLastStopToPVeh;
+        int64_t searchTimeDropoffALS;
+        int64_t searchTimeLastStopToTransfer;
+        int64_t searchTimeTransferToDropoff;
+        
     };
 }

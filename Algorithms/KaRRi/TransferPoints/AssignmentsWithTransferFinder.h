@@ -68,11 +68,11 @@ namespace karri {
             // * ORDINARY TRANSFER
             // ordinaryTransfers.findAssignments();
             
-            // * TRANSFER AFTER LAST STOP (PVeh)
-            // transfersALSDVeh.findAssignments();
+            // * TRANSFER AFTER LAST STOP (DVeh)
+            transfersALSDVeh.findAssignments();
 
             //* Test the best assignment found
-            // assert(asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
+            assert(asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
         }
 
 

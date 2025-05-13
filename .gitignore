@@ -8,10 +8,13 @@
 
 # Output files
 /Outputs/
-/Publications/karri-with-transfers/outputs/
-/Publications/karri-with-transfers/results/
-/Publications/karri-with-transfers/sizes/
-/Publications/karri-with-transfers/inputs/
+/Publications/single-transfer-journeys/outputs/
+/Publications/single-transfer-journeys/inputs/
+
+/Publications/ba-karri-with-transfers/outputs/
+/Publications/ba-karri-with-transfers/results/
+/Publications/ba-karri-with-transfers/sizes/
+/Publications/ba-karri-with-transfers/inputs/
 
 # Various config files.
 /.settings/
