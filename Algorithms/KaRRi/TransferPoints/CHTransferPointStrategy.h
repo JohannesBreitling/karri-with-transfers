@@ -74,8 +74,9 @@ namespace karri::TransferPointStrategies {
                   downGraph(chEnv.getCH().downwardGraph()),
                   upGraph(chEnv.getCH().upwardGraph()),
                   topDownRankPermutation(chEnv.getCH().downwardGraph().numVertices()),
+                  firstIdxOfLevel(),
                   inputGraphWithTopDownRankVertexIds(inputGraph),
-                  queryPerThread([&](){return Query(ch, downGraph, upGraph, topDownRankPermutation,
+                  queryPerThread([&](){return Query(ch, downGraph, upGraph, topDownRankPermutation, firstIdxOfLevel,
                                            ellipticBucketsEnv, routeState);}),
                   distanceFromVertexToNextStopPerThread([&](){return std::vector<int>(inputGraph.numVertices(), INFTY);}),
                   p2pQuery(chEnv.template getFullCHQuery<P2PLabelSet>()),
@@ -94,8 +95,37 @@ namespace karri::TransferPointStrategies {
                                                         "with_leeway_postprocess_time\n")) {
             KASSERT(downGraph.numVertices() == upGraph.numVertices());
             const int numVertices = downGraph.numVertices();
-            for (int r = 0; r < numVertices; ++r)
-                topDownRankPermutation[r] = numVertices - r - 1;
+
+            auto levels = computeSharedLevelsInUpAndDownGraph(upGraph, downGraph);
+            std::vector<int> inversePerm(numVertices);
+            std::iota(inversePerm.begin(), inversePerm.end(), 0);
+            std::sort(inversePerm.begin(), inversePerm.end(), [&](const auto a, const auto b) {
+                return levels[a] > levels[b] || (levels[a] == levels[b] && a < b);
+            });
+            topDownRankPermutation.assign(inversePerm.begin(), inversePerm.end());
+            KASSERT(topDownRankPermutation.validate());
+            topDownRankPermutation.invert();
+
+
+            int curLevel = INFTY;
+            for (int i = 0; i < numVertices; ++i) {
+                if (levels[inversePerm[i]] == curLevel)
+                    continue;
+                curLevel = levels[inversePerm[i]];
+                firstIdxOfLevel.push_back(i);
+            }
+            firstIdxOfLevel.push_back(numVertices);
+            static constexpr int NUM_INTS_PER_CACHE_LINE = CACHE_LINE_SIZE / sizeof(int);
+            static constexpr int LARGE_LEVEL_THRESHOLD = NUM_INTS_PER_CACHE_LINE * (1 << 10);
+            int firstLargeLevelIdx = 0;
+            while (firstLargeLevelIdx < firstIdxOfLevel.size() - 1 &&
+                   firstIdxOfLevel[firstLargeLevelIdx + 1] - firstIdxOfLevel[firstLargeLevelIdx] < LARGE_LEVEL_THRESHOLD) {
+                ++firstLargeLevelIdx;
+            }
+            firstIdxOfLevel.erase(firstIdxOfLevel.begin(), firstIdxOfLevel.begin() + firstLargeLevelIdx);
+
+//            for (int r = 0; r < numVertices; ++r)
+//                topDownRankPermutation[r] = numVertices - r - 1;
 
             downGraph.permuteVertices(topDownRankPermutation);
             upGraph.permuteVertices(topDownRankPermutation);
@@ -332,7 +362,8 @@ namespace karri::TransferPointStrategies {
             // Construct ellipses with leeway by running topological downward sweep in CH.
             const size_t numEllipsesWithLeeway = indicesWithLeeway.size();
             const size_t numBatchesWithLeeway = numEllipsesWithLeeway / K + (numEllipsesWithLeeway % K != 0);
-            tbb::parallel_for(0ul, numBatchesWithLeeway, [&](const auto i) {
+            for (int i = 0; i < numBatchesWithLeeway; ++i) {
+//            tbb::parallel_for(0ul, numBatchesWithLeeway, [&](const auto i) {
 
 
                 auto& query = queryPerThread.local();
@@ -354,7 +385,8 @@ namespace karri::TransferPointStrategies {
                                                         edgeEllipses[indicesWithLeeway[i * K + j]],
                                                         distanceFromVertexToNextStop);
                 }
-            });
+            }
+//            );
 
             globalQueryStats.reset();
             for (auto& localStats : queryStatsPerThread) {
@@ -525,28 +557,28 @@ namespace karri::TransferPointStrategies {
             }
         }
 
-//        // Takes CH search graphs ordered by increasing rank (as in CH) and assigns a level to each vertex, s.t.
-//        // level[v] > level[u] for all upward and reverse downward edges (u, v).
-//        std::vector<int> computeSharedLevelsInUpAndDownGraph(const CH::SearchGraph &forwardUpGraph,
-//                                                             const CH::SearchGraph &reverseDownGraph) const {
-//            const auto numVertices = forwardUpGraph.numVertices();
-//            KASSERT(reverseDownGraph.numVertices() == numVertices);
-//            std::vector<int> level(numVertices, 0);
-//
-//            // Traverse vertices in increasing order, updating levels of upper neighbors for each vertex
-//            for (int u = 0; u < numVertices; ++u) {
-//                FORALL_INCIDENT_EDGES(forwardUpGraph, u, e) {
-//                    const auto v = forwardUpGraph.edgeHead(e);
-//                    level[v] = std::max(level[v], level[u] + 1);
-//                }
-//                FORALL_INCIDENT_EDGES(reverseDownGraph, u, e) {
-//                    const auto v = reverseDownGraph.edgeHead(e);
-//                    level[v] = std::max(level[v], level[u] + 1);
-//                }
-//            }
-//
-//            return level;
-//        }
+        // Takes CH search graphs ordered by increasing rank (as in CH) and assigns a level to each vertex, s.t.
+        // level[v] > level[u] for all upward and reverse downward edges (u, v).
+        std::vector<int> computeSharedLevelsInUpAndDownGraph(const CH::SearchGraph &forwardUpGraph,
+                                                             const CH::SearchGraph &reverseDownGraph) const {
+            const auto numVertices = forwardUpGraph.numVertices();
+            KASSERT(reverseDownGraph.numVertices() == numVertices);
+            std::vector<int> level(numVertices, 0);
+
+            // Traverse vertices in increasing order, updating levels of upper neighbors for each vertex
+            for (int u = 0; u < numVertices; ++u) {
+                FORALL_INCIDENT_EDGES(forwardUpGraph, u, e) {
+                    const auto v = forwardUpGraph.edgeHead(e);
+                    level[v] = std::max(level[v], level[u] + 1);
+                }
+                FORALL_INCIDENT_EDGES(reverseDownGraph, u, e) {
+                    const auto v = reverseDownGraph.edgeHead(e);
+                    level[v] = std::max(level[v], level[u] + 1);
+                }
+            }
+
+            return level;
+        }
 
         const InputGraphT &inputGraph;
         const CH &ch;
@@ -558,6 +590,8 @@ namespace karri::TransferPointStrategies {
         CH::SearchGraph upGraph; // Upward edges in CH. Vertices ordered by decreasing rank.
 
         Permutation topDownRankPermutation; // Permutes vertex ranks in order to linearize top-down passes.
+
+        std::vector<int> firstIdxOfLevel;
 
         // Identical to input graph but vertex IDs permuted by topDownRankPermutation.
         InputGraphT inputGraphWithTopDownRankVertexIds;

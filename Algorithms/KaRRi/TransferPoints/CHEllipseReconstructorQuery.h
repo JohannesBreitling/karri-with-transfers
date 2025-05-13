@@ -33,6 +33,9 @@
 #include "DataStructures/Containers/TimestampedVector.h"
 #include "DataStructures/Containers/FastResetFlagArray.h"
 
+#include <tbb/parallel_for.h>
+#include <tbb/enumerable_thread_specific.h>
+
 namespace karri::TransferPointStrategies {
 
     // Computes the set of vertices contained in the detour ellipse between a pair of consecutive stops in a vehicle
@@ -50,6 +53,7 @@ namespace karri::TransferPointStrategies {
                                     const typename CH::SearchGraph &downGraph,
                                     const typename CH::SearchGraph &upGraph,
                                     const Permutation &topDownRankPermutation,
+                                    const std::vector<int>& firstIdxOfLargeLevels,
                                     const EllipticBucketsEnvironmentT &ellipticBucketsEnv,
                                     const RouteState &routeState)
                 : ch(ch),
@@ -57,6 +61,7 @@ namespace karri::TransferPointStrategies {
                   downGraph(downGraph),
                   upGraph(upGraph),
                   topDownRankPermutation(topDownRankPermutation),
+                  firstIdxOfLargeLevels(firstIdxOfLargeLevels),
                   ellipticBucketsEnv(ellipticBucketsEnv),
                   routeState(routeState),
                   enumerateBucketEntriesSearchSpace(numVertices),
@@ -67,7 +72,11 @@ namespace karri::TransferPointStrategies {
                   relevantInFromSearch(numVertices) {
             KASSERT(downGraph.numVertices() == numVertices);
             KASSERT(upGraph.numVertices() == numVertices);
+            KASSERT(!firstIdxOfLargeLevels.empty() && firstIdxOfLargeLevels.back() == numVertices);
             verticesInAnyEllipse.reserve(numVertices);
+
+            // TODO: padding to align beginning of each large level in distTo, distFrom, relevantInToSearch,
+            //  relevantInFromSearch with cache lines and avoid false sharing
         }
 
         std::array<std::vector<VertexInEllipse>, K> run(const std::array<int, K> &stopIds,
@@ -88,11 +97,40 @@ namespace karri::TransferPointStrategies {
             // The number of vertices that need to be settled can be expected to be quite large. Thus, we avoid
             // using a PQ with many costly deleteMin() operations and instead settle every vertex in the graph.
             timer.restart();
-            for (int r = 0; r < numVertices; ++r) {
-                ++stats.numVerticesSettled;
-                settleVertexInTopodownSearch(r, leeways, stats.numEdgesRelaxed);
+
+            // Process vertices in all small levels sequentially
+            for (int r = 0; r < firstIdxOfLargeLevels.front(); ++r) {
+                settleVertexInTopodownSearch(r, leeways, verticesInAnyEllipse);
             }
+
+            // Process vertices in each large level in parallel
+            for (int l = 0; l < firstIdxOfLargeLevels.size() - 1; ++l) {
+                const int firstIdx = firstIdxOfLargeLevels[l];
+                const int lastIdx = firstIdxOfLargeLevels[l + 1];
+                static constexpr int CHUNK_SIZE = 1 << 10;
+                tbb::parallel_for(tbb::blocked_range<int>(firstIdx, lastIdx, CHUNK_SIZE), [&](const tbb::blocked_range<int>& range) {
+                    auto& localVerticesInEllipse = threadLocalVerticesInEllipse.local();
+                    for (int r = range.begin(); r != range.end(); ++r) {
+                        settleVertexInTopodownSearch(r, leeways, localVerticesInEllipse);
+                    }
+                }, tbb::simple_partitioner());
+            }
+
+            for (auto& localVerticesInEllipse : threadLocalVerticesInEllipse) {
+                verticesInAnyEllipse.insert(verticesInAnyEllipse.end(), localVerticesInEllipse.begin(),
+                                             localVerticesInEllipse.end());
+                localVerticesInEllipse.clear();
+            }
+            std::sort(verticesInAnyEllipse.begin(), verticesInAnyEllipse.end(), [](const int v1, const int v2) {
+                return v1 < v2;
+            });
+
+//            for (int r = 0; r < numVertices; ++r) {
+//                settleVertexInTopodownSearch(r, leeways);
+//            }
             stats.topoSearchTime += timer.elapsed<std::chrono::nanoseconds>();
+            stats.numVerticesSettled += numVertices;
+            stats.numEdgesRelaxed += upGraph.numEdges() + downGraph.numEdges();
 
             // Accumulate result per ellipse
             timer.restart();
@@ -177,8 +215,7 @@ namespace karri::TransferPointStrategies {
             }
         }
 
-        void settleVertexInTopodownSearch(const int v, const DistanceLabel &leeway,
-                                          int &numEdgesRelaxed) {
+        void settleVertexInTopodownSearch(const int v, const DistanceLabel &leeway, std::vector<int>& verticesInEllipse) {
 
 
             auto &distToV = distTo[v];
@@ -189,7 +226,6 @@ namespace karri::TransferPointStrategies {
             FORALL_INCIDENT_EDGES(downGraph, v, e) {
                 const auto head = downGraph.edgeHead(e);
 
-                ++numEdgesRelaxed;
                 const auto &distToHead = distTo[head];
                 const auto distViaHead = distToHead + downGraph.template get<WeightT>(e);
                 distToV.min(distViaHead);
@@ -203,7 +239,6 @@ namespace karri::TransferPointStrategies {
             FORALL_INCIDENT_EDGES(upGraph, v, e) {
                 const auto head = upGraph.edgeHead(e);
 
-                ++numEdgesRelaxed;
                 const auto &distFromHead = distFrom[head];
                 const auto distViaHead = distFromHead + upGraph.template get<WeightT>(e);
                 distFromV.min(distViaHead);
@@ -213,7 +248,7 @@ namespace karri::TransferPointStrategies {
             const auto sum = distToV + distFromV;
             const bool allSumGreaterLeeway = allSet(sum > leeway);
             if (!allSumGreaterLeeway) {
-                verticesInAnyEllipse.push_back(v);
+                verticesInEllipse.push_back(v);
             }
         }
 
@@ -223,6 +258,7 @@ namespace karri::TransferPointStrategies {
         const CH::SearchGraph &downGraph; // Reverse downward edges in CH. Vertices ordered by decreasing rank.
         const CH::SearchGraph &upGraph; // Upward edges in CH. Vertices ordered by decreasing rank.
         const Permutation &topDownRankPermutation; // Maps vertex rank to n - rank in order to linearize top-down passes.
+        const std::vector<int>& firstIdxOfLargeLevels; // First index of large levels in top-down rank ordering.
         const EllipticBucketsEnvironmentT &ellipticBucketsEnv;
         const RouteState &routeState;
 
@@ -231,6 +267,7 @@ namespace karri::TransferPointStrategies {
         AlignedVector<DistanceLabel> distTo;
         AlignedVector<DistanceLabel> distFrom;
         std::vector<int> verticesInAnyEllipse;
+        tbb::enumerable_thread_specific<std::vector<int>> threadLocalVerticesInEllipse;
 
         FastResetFlagArray<> relevantInToSearch; // Flags that mark whether vertex is relevant in to search.
         FastResetFlagArray<> relevantInFromSearch; // Flags that mark whether vertex is relevant in from search.
