@@ -119,6 +119,8 @@
 
 #include "Algorithms/KaRRi/DalsAssignments/CollectiveBCHStrategy.h"
 #include "Algorithms/KaRRi/TransferPoints/OrdinaryTransfers/DirectTransferDistances/BCHDirectTransferDistancesFinder.h"
+#include "Parallel/hardware_topology.h"
+#include "Parallel/tbb_initializer.h"
 
 #elif KARRI_DALS_STRATEGY == KARRI_IND
 
@@ -154,6 +156,7 @@ inline void printUsage() {
               "  -veh-d <file>          separator decomposition for the vehicle network in binary format (needed for CCHs).\n"
               "  -psg-d <file>          separator decomposition for the passenger network in binary format (needed for CCHs).\n"
               "  -csv-in-LOUD-format    if set, assumes that input files are in the format used by LOUD.\n"
+              "  -max-num-threads <int> set the maximum number of threads to use (dflt: 1).\n"
               "  -o <file>              generate output files at name <file> (specify name without file suffix).\n"
               "  -help                  show usage help text.\n";
 }
@@ -166,6 +169,16 @@ int main(int argc, char *argv[]) {
             printUsage();
             return EXIT_SUCCESS;
         }
+
+        // Initialize TBB
+        auto maxNumThreads = clp.getValue<size_t>("max-num-threads", 1);
+        size_t numAvailableCpus = parallel::HardwareTopology<>::instance().num_cpus();
+        if (numAvailableCpus < maxNumThreads) {
+            std::cout << "There are currently only " << numAvailableCpus << " cpus available. "
+                      << "Setting number of threads from " << maxNumThreads << " to " << numAvailableCpus << std::endl;
+            maxNumThreads = numAvailableCpus;
+        }
+        parallel::TBBInitializer<parallel::HardwareTopology<>>::instance(maxNumThreads);
 
 
         // Parse the command-line options.

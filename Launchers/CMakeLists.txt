@@ -35,7 +35,7 @@ endif()
 # Executable for KaRRi Dynamic Taxi Sharing Simulation
 add_executable(karri KaRRi.cpp)
 target_compile_definitions(karri PRIVATE CSV_IO_NO_THREAD)
-target_link_libraries(karri ${RoutingKit_LIBRARY} kassert ${BOOST_LIBRARIES})
+target_link_libraries(karri ${RoutingKit_LIBRARY} kassert ${BOOST_LIBRARIES} hwloc TBB::tbb TBB::tbbmalloc)
 if(OpenMP_FOUND)
     target_link_libraries(karri OpenMP::OpenMP_CXX)
 endif()
