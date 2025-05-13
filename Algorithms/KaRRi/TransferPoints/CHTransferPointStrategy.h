@@ -76,16 +76,17 @@ namespace karri::TransferPointStrategies {
                   p2pQuery(chEnv.template getFullCHQuery<P2PLabelSet>()),
                   pathUnpacker(chEnv.getCH()),
                   distanceFromVertexToNextStop(inputGraph.numVertices(), INFTY),
-                  logger(LogManager<LoggerT>::getLogger("ch_ellipse_reconstruction.csv",
+                  logger(LogManager<LoggerT>::getLogger("ch_transfer_point_computation.csv",
                                                         "num_ellipses_without_leeway,"
                                                         "num_ellipses_with_leeway,"
-                                                        "p2p_search_time,"
-                                                        "topo_init_time,"
-                                                        "topo_search_time,"
-                                                        "topo_postprocess_time,"
+                                                        "init_time,"
+                                                        "without_leeway_search_time,"
+                                                        "with_leeway_search_time,"
+                                                        "compute_intersections_time,"
                                                         "total_time,"
-                                                        "topo_search_num_vertices_settled,"
-                                                        "topo_search_num_edges_relaxed\n")) {
+                                                        "with_leeway_init_time,"
+                                                        "with_leeway_topo_sweep_time,"
+                                                        "with_leeway_postprocess_time\n")) {
             KASSERT(downGraph.numVertices() == upGraph.numVertices());
             const int numVertices = downGraph.numVertices();
             for (int r = 0; r < numVertices; ++r)
@@ -99,15 +100,15 @@ namespace karri::TransferPointStrategies {
                 inputGraphVertexIdsToTopDownRank[i] = topDownRankPermutation[ch.rank(i)];
             }
             KASSERT(inputGraphVertexIdsToTopDownRank.validate());
-            inputGraphWithTopDownRankVertexIds.permuteVertices(inputGraphVertexIdsToTopDownRank,
-                                                               ellipseEdgeIdsToOriginalEdgeIds);
-            ellipseEdgeIdsToOriginalEdgeIds.invert();
+            inputGraphWithTopDownRankVertexIds.permuteVertices(inputGraphVertexIdsToTopDownRank);
         }
 
         // Given a set of stop IDs for pickup vehicles and dropoff vehicles, this computes the transfer points between
         // any pair of stops in the two sets. The given stop IDs should indicate the first stop in a pair of stops of
         // the respective vehicle.
         void computeTransferPoints(const std::vector<int> &pVehStopIds, const std::vector<int> &dVehStopIds) {
+
+            Timer timer;
 
             numVerticesSettled = 0;
             numEdgesRelaxed = 0;
@@ -138,10 +139,34 @@ namespace karri::TransferPointStrategies {
             std::vector<int> allStopIds;
             allStopIds.insert(allStopIds.end(), pVehStopIds.begin(), pVehStopIds.end());
             allStopIds.insert(allStopIds.end(), dVehStopIds.begin(), dVehStopIds.end());
-            const auto edgeEllipses = getEdgesInEllipsesOfLegsAfterStops(allStopIds, numVerticesSettled,
-                                                                         numEdgesRelaxed);
+
+            const size_t numEllipses = allStopIds.size();
+
+            // Differentiate between stops with and without leeway since the ellipse of stops without leeway is just
+            // the shortest path between the stops (i.e. no detour allowed).
+            std::vector<int> indicesWithoutLeeway;
+            std::vector<int> indicesWithLeeway;
+            for (int i = 0; i < numEllipses; ++i) {
+                const int stopPos = routeState.stopPositionOf(allStopIds[i]);
+                const int vehId = routeState.vehicleIdOf(allStopIds[i]);
+                const int legLength = time_utils::calcLengthOfLegStartingAt(stopPos, vehId, routeState);
+                const int leeway = routeState.leewayOfLegStartingAt(allStopIds[i]);
+                if (leeway == legLength) {
+                    indicesWithoutLeeway.push_back(i);
+                } else {
+                    indicesWithLeeway.push_back(i);
+                }
+            }
+            const auto initTime = timer.elapsed<std::chrono::nanoseconds>();
+
+            int64_t withoutLeewayTime = 0, withLeewayTime = 0;
+            const auto edgeEllipses = getEdgesInEllipsesOfLegsAfterStops(allStopIds,
+                                                                         indicesWithoutLeeway, indicesWithLeeway,
+                                                                         withoutLeewayTime, withLeewayTime);
+            const auto computeEllipsesTime = withoutLeewayTime + withLeewayTime;
 
             // Compute pairwise intersections of ellipses
+            timer.restart();
             if (transferPoints.size() < numStopsPVeh * numStopsDVeh)
                 transferPoints.resize(numStopsPVeh * numStopsDVeh);
 
@@ -179,6 +204,16 @@ namespace karri::TransferPointStrategies {
                                   routeState.stopPositionOf(stopIdPStop),
                                   routeState.stopPositionOf(stopIdDStop), transferPointsForPair);
             }
+
+            const auto computeIntersectionsTime = timer.elapsed<std::chrono::nanoseconds>();
+
+            const auto totalTime = initTime + computeEllipsesTime + computeIntersectionsTime;
+
+            logger << indicesWithoutLeeway.size() << "," << indicesWithLeeway.size() << "," << initTime << ","
+                   << withoutLeewayTime << "," << withLeewayTime << "," << computeIntersectionsTime << ","
+                   << totalTime << "," << queryStats.initTime << "," << queryStats.topoSearchTime << ","
+                   << queryStats.postprocessTime << "\n";
+
         }
 
         // Given the IDs of the respective first stops in a pair of stops in a pickup vehicle and a pair of stops in a
@@ -193,51 +228,30 @@ namespace karri::TransferPointStrategies {
     private:
 
         std::vector<std::vector<EdgeInEllipse>>
-        getEdgesInEllipsesOfLegsAfterStops(const std::vector<int> &stopIds, int64_t &totalNumVerticesSettled,
-                                           int64_t &totalNumEdgesRelaxed) {
+        getEdgesInEllipsesOfLegsAfterStops(const std::vector<int> &stopIds,
+                                           const std::vector<int> &indicesWithoutLeeway,
+                                           const std::vector<int> &indicesWithLeeway,
+                                           int64_t &withoutLeewayTime,
+                                           int64_t &withLeewayTime) {
             if (stopIds.empty())
                 return {};
 
+            std::vector<std::vector<EdgeInEllipse>> edgeEllipses(stopIds.size());
+            queryStats.reset();
             Timer timer;
 
-            const size_t numEllipses = stopIds.size();
-
-            // Differentiate between stops with and without leeway since the ellipse of stops without leeway is just
-            // the shortest path between the stops (i.e. no detour allowed).
-            std::vector<int> indicesWithoutLeeway;
-            std::vector<int> indicesWithLeeway;
-            for (int i = 0; i < numEllipses; ++i) {
-                const int stopPos = routeState.stopPositionOf(stopIds[i]);
-                const int vehId = routeState.vehicleIdOf(stopIds[i]);
-                const int legLength = time_utils::calcLengthOfLegStartingAt(stopPos, vehId, routeState);
-                const int leeway = routeState.leewayOfLegStartingAt(stopIds[i]);
-                if (leeway == legLength) {
-                    indicesWithoutLeeway.push_back(i);
-                } else {
-                    indicesWithLeeway.push_back(i);
-                }
-            }
-
-            std::vector<std::vector<EdgeInEllipse>> edgeEllipses(numEllipses);
-
             // Construct ellipses without leeway by running point-to-point CH queries.
-            Timer p2pTimer;
             computeEdgeEllipsesWithoutLeeway(stopIds, indicesWithoutLeeway, edgeEllipses);
-            const auto p2pTime = p2pTimer.elapsed<std::chrono::nanoseconds>();
+            withoutLeewayTime += timer.elapsed<std::chrono::nanoseconds>();
 
+            timer.restart();
             computeEdgeEllipsesWithLeeway(stopIds, indicesWithLeeway, edgeEllipses);
+            withLeewayTime += timer.elapsed<std::chrono::nanoseconds>();
 
-            const auto totalTime = timer.elapsed<std::chrono::nanoseconds>();
             KASSERT(sanityCheckEdgeEllipses(stopIds, edgeEllipses));
 
-            logger << indicesWithoutLeeway.size() << "," << indicesWithLeeway.size() << "," << p2pTime << ","
-                   << queryStats.initTime << "," << queryStats.topoSearchTime << ","
-                   << queryStats.postprocessTime << "," << totalTime << "," << queryStats.numVerticesSettled << ","
-                   << queryStats.numEdgesRelaxed << "\n";
-
-            totalNumVerticesSettled += queryStats.numVerticesSettled;
-            totalNumEdgesRelaxed += queryStats.numEdgesRelaxed;
-            queryStats.reset();
+            numVerticesSettled += queryStats.numVerticesSettled;
+            numEdgesRelaxed += queryStats.numEdgesRelaxed;
 
             return edgeEllipses;
         }
@@ -379,9 +393,9 @@ namespace karri::TransferPointStrategies {
                 pathUnpacker.unpackUpDownPath(p2pQuery.getUpEdgePath(), p2pQuery.getDownEdgePath(),
                                               edgePathInInputGraph);
 
-                for (const auto& eInInputGraph : edgePathInInputGraph) {
+                for (const auto &eInInputGraph: edgePathInInputGraph) {
                     if (std::find_if(ellipse.begin(), ellipse.end(), [&](const EdgeInEllipse &e) {
-                        return ellipseEdgeIdsToOriginalEdgeIds[e.edge] == eInInputGraph;
+                        return inputGraphWithTopDownRankVertexIds.edgeId(e.edge) == eInInputGraph;
                     }) == ellipse.end()) {
                         KASSERT(false);
                         return false;
@@ -441,7 +455,7 @@ namespace karri::TransferPointStrategies {
                 ++itEdgesPVeh;
                 ++itEdgesDVeh;
 
-                const int locInOriginalGraph = ellipseEdgeIdsToOriginalEdgeIds[locInPermutedGraph];
+                const int locInOriginalGraph = inputGraphWithTopDownRankVertexIds.edgeId(locInPermutedGraph);
                 const auto tp = TransferPoint(locInOriginalGraph, &fleet[pVehId], &fleet[dVehId], stopIdxPVeh,
                                               stopIdxDVeh, distPVehToTransfer,
                                               distPVehFromTransfer,
@@ -496,9 +510,6 @@ namespace karri::TransferPointStrategies {
 
         // Identical to input graph but vertex IDs permuted by topDownRankPermutation.
         InputGraphT inputGraphWithTopDownRankVertexIds;
-
-        // Permutation that maps edge IDs in permuted input graph to edge IDs in original input graph.
-        Permutation ellipseEdgeIdsToOriginalEdgeIds;
 
         Query query;
         CHEllipseReconstructorStats queryStats;
