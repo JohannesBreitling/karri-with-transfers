@@ -86,6 +86,7 @@ namespace karri::TransferPointStrategies {
                                                         "init_time,"
                                                         "without_leeway_search_time,"
                                                         "with_leeway_search_time,"
+                                                        "num_intersections_computed,"
                                                         "compute_intersections_time,"
                                                         "total_time,"
                                                         "with_leeway_init_time,"
@@ -112,6 +113,7 @@ namespace karri::TransferPointStrategies {
         // the respective vehicle.
         void computeTransferPoints(const std::vector<int> &pVehStopIds, const std::vector<int> &dVehStopIds) {
 
+            Timer totalTimer;
             Timer timer;
 
             numVerticesSettled = 0;
@@ -167,7 +169,6 @@ namespace karri::TransferPointStrategies {
             const auto edgeEllipses = getEdgesInEllipsesOfLegsAfterStops(allStopIds,
                                                                          indicesWithoutLeeway, indicesWithLeeway,
                                                                          withoutLeewayTime, withLeewayTime);
-            const auto computeEllipsesTime = withoutLeewayTime + withLeewayTime;
 
             // Compute pairwise intersections of ellipses
             timer.restart();
@@ -190,8 +191,8 @@ namespace karri::TransferPointStrategies {
                 }
             }
 
-            // TODO parallelize this loop
-            for (const auto &[stopIdPStop, stopIdDStop]: stopIdPairs) {
+            tbb::parallel_for(0ul, stopIdPairs.size(), [&](const auto i) {
+                const auto &[stopIdPStop, stopIdDStop] = stopIdPairs[i];
                 const auto vehIdPStop = routeState.vehicleIdOf(stopIdPStop);
                 const auto internalIdxPStop = idxOfStopPVeh[stopIdPStop];
                 auto &ellipsePStop = edgeEllipses[internalIdxPStop];
@@ -207,14 +208,14 @@ namespace karri::TransferPointStrategies {
                 intersectEllipses(ellipsePStop, ellipseDStop, vehIdPStop, vehIdDStop,
                                   routeState.stopPositionOf(stopIdPStop),
                                   routeState.stopPositionOf(stopIdDStop), transferPointsForPair);
-            }
+            });
 
             const auto computeIntersectionsTime = timer.elapsed<std::chrono::nanoseconds>();
 
-            const auto totalTime = initTime + computeEllipsesTime + computeIntersectionsTime;
+            const auto totalTime = totalTimer.elapsed<std::chrono::nanoseconds>();
 
             logger << indicesWithoutLeeway.size() << "," << indicesWithLeeway.size() << "," << initTime << ","
-                   << withoutLeewayTime << "," << withLeewayTime << "," << computeIntersectionsTime << ","
+                   << withoutLeewayTime << "," << withLeewayTime << "," << stopIdPairs.size() << "," << computeIntersectionsTime << ","
                    << totalTime << "," << globalQueryStats.initTime << "," << globalQueryStats.topoSearchTime << ","
                    << globalQueryStats.postprocessTime << "\n";
 
@@ -227,6 +228,14 @@ namespace karri::TransferPointStrategies {
             const auto internalIdxDStop = idxOfStopDVeh[dVehStopId];
             KASSERT(internalIdxPStop != INVALID_INDEX && internalIdxDStop != INVALID_INDEX);
             return transferPoints[internalIdxPStop * numStopsDVeh + internalIdxDStop];
+        }
+
+        size_t getTotalNumTransferPoints() const {
+            size_t numTransferPoints = 0;
+            for (const auto &transferPointsForPair: transferPoints) {
+                numTransferPoints += transferPointsForPair.size();
+            }
+            return numTransferPoints;
         }
 
     private:

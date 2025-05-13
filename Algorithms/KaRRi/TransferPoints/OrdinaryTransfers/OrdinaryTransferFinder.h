@@ -149,34 +149,6 @@ namespace karri {
             constructPVehSet();
             constructDVehSet();
 
-//            // Construct set of pairs of stop pairs for which a transfer may be possible.
-//            // TODO: Use for parallelization in the future
-//            struct PairOfStopPairs {
-//                int firstStopIdPVeh = INVALID_ID;
-//                int firstStopIdDVeh = INVALID_ID;
-//            };
-//            std::vector<PairOfStopPairs> pairsOfStopPairs;
-//            for (const auto pVehId: pVehs) {
-//                const auto earliestRelevantStopIdxPVeh = getEarliestRelevantStopIdxForPVeh(pVehId);
-//                const auto stopIdsPVeh = routeState.stopIdsFor(pVehId);
-//                const auto numStopsPVeh = routeState.numStopsOf(pVehId);
-//                for (const auto dVehId : dVehs) {
-//                    if (pVehId == dVehId) {
-//                        continue;
-//                    }
-//                    const auto latestRelevantStopIdxDVeh = getLatestRelevantStopIdxForDVeh(dVehId);
-//                    const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
-//
-//                    for (int trIdxPVeh = earliestRelevantStopIdxPVeh; trIdxPVeh < numStopsPVeh - 1; ++trIdxPVeh) {
-//                        for (int trIdxDVeh = 0; trIdxDVeh < latestRelevantStopIdxDVeh + 1; ++trIdxDVeh) {
-//                            const auto stopIdPVeh = stopIdsPVeh[trIdxPVeh];
-//                            const auto stopIdDVeh = stopIdsDVeh[trIdxDVeh];
-//                            pairsOfStopPairs.emplace_back(stopIdPVeh, stopIdDVeh);
-//                        }
-//                    }
-//                }
-//            }
-
             // Calculate the necessary ellipses for every vehicle for pickup and dropoff
             if (routeState.getMaxStopId() + 1 > stopSeen.size())
                 stopSeen.resize(routeState.getMaxStopId() + 1);
