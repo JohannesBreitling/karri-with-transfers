@@ -637,7 +637,7 @@ namespace karri {
             if (pairedPVeh)
                 asgn.distToTransferPVeh = pairedDistancePVeh;
 
-            if ((!pickupAfterLastStop && transferAfterLastStopPVeh) || (pickupAfterLastStop && pickupAtStop))
+            if (!pickupAfterLastStop && transferAfterLastStopPVeh)
                 asgn.distToTransferPVeh = alsDistancePVeh;
 
             // Distance from transfer pVeh
