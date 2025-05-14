@@ -20,12 +20,16 @@ namespace karri {
                 vehCh(vehChEnv.getCH()),
                 vehChQuery(vehChEnv.template getFullCHQuery<>()) {}
 
-        // NEW METHODS FOR ALS TO COMPUTE WITH FASTER ALGORITHMS
+        //* NEW METHODS FOR ALS TO COMPUTE WITH FASTER ALGORITHMS
         
         // Calculate distances from last stop of every pickup vehicle to all stops of dropoff vehicles
         // Result is of form: vehLastStop - vehAllStops - stop
-        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromLastStopsToAllStops(std::vector<int> vehIdsLastStop, std::vector<int> vehIdsAllStops) {
+        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromLastStopsToAllStops(std::vector<int> &vehIdsLastStop, std::vector<int> &vehIdsAllStops) {
             std::map<int, std::map<int, std::vector<int>>> result;
+            
+            if (vehIdsLastStop.size() == 0 || vehIdsAllStops.size() == 0)
+                return result;
+            
             numSearchesRun = 0;
 
             for (const auto vehIdLastStop : vehIdsLastStop) {
@@ -36,6 +40,7 @@ namespace karri {
                 for (const auto vehIdAllStops : vehIdsAllStops) {
                     const auto &vehAllStops = fleet[vehIdAllStops];
                     result[vehIdLastStop][vehIdAllStops] = runFromSourceToAllStops(sourceRank, vehAllStops);
+                    numSearchesRun++;
                 }
             }
 
@@ -67,7 +72,7 @@ namespace karri {
             std::map<int, std::map<int, std::vector<int>>> result;
         
             for (const auto pVehId : pVehIds) {
-                const auto &pVeh = &fleet[pVehId];
+                // const auto &pVeh = &fleet[pVehId];
                 const int numStopsPVeh = routeState.numStopsOf(pVehId);
                 const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
 
@@ -92,7 +97,7 @@ namespace karri {
         }
         
 
-        // OLD METHODS FOR ALS
+        //* OLD METHODS FOR ALS
         std::vector<int> calculateDistancesFromLastStopToAllStops(const Vehicle &pVeh, const Vehicle &dVeh) {
             numSearchesRun = 0;
             const auto numStopsPVeh = routeState.numStopsOf(pVeh.vehicleId);
@@ -154,7 +159,7 @@ namespace karri {
                 offsets.push_back(inputGraph.travelTime(stopLocationsDVeh[i]));
             }
 
-            numSearchesRun = ranks.size();
+            // numSearchesRun = ranks.size();
             
             
             Timer searchTimer;

@@ -66,11 +66,6 @@ public:
         timestamps[i] = clock;
     }
 
-    void setIf(const int i, const bool condition) {
-        assert(i < timestamps.size());
-        timestamps[i] = condition * clock;
-    }
-
     bool isSet(const int i) const {
         assert(i < timestamps.size());
         return timestamps[i] == clock;

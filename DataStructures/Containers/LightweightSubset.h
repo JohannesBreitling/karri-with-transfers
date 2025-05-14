@@ -53,6 +53,21 @@ class LightweightSubset {
   std::vector<int32_t>::const_iterator end() const noexcept {
     return elements.end();
   }
+  
+  // Returns an iterator referring to the first element in the subset.
+  // User is responsible for ensuring consistency of subset when working with this iterator.
+  // Changing the order of elements does not destroy consistency but changing any values does.
+  std::vector<int32_t>::iterator begin() noexcept {
+    return elements.begin();
+  }
+
+  // Returns the past-the-end iterator for the subset.
+  // User is responsible for ensuring consistency of subset when working with this iterator.
+  // Changing the order of elements does not destroy consistency but changing any values does.
+  std::vector<int32_t>::iterator end() noexcept {
+      return elements.end();
+  }
+
 
   // Returns the number of elements in the subset.
   int size() const noexcept {
