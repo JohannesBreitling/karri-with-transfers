@@ -55,6 +55,8 @@
 
 #include "Algorithms/KaRRi/TransferPoints/InsertionAsserter.h"
 
+#include "Algorithms/KaRRi/PHAST/RPHASTEnvironment.h"
+
 #include "Algorithms/KaRRi/RequestState/RequestState.h"
 #include "Algorithms/KaRRi/RequestState/RelevantPDLocs.h"
 #include "Algorithms/KaRRi/PDDistanceQueries/PDDistances.h"
@@ -119,6 +121,7 @@
 
 #include "Algorithms/KaRRi/DalsAssignments/CollectiveBCHStrategy.h"
 #include "Algorithms/KaRRi/TransferPoints/OrdinaryTransfers/DirectTransferDistances/BCHDirectTransferDistancesFinder.h"
+#include "Algorithms/KaRRi/TransferPoints/OrdinaryTransfers/DirectTransferDistances/PHASTDirectTransferDistancesFinder.h"
 
 #elif KARRI_DALS_STRATEGY == KARRI_IND
 
@@ -584,13 +587,7 @@ int main(int argc, char *argv[]) {
 #endif
 
         // Create RPHAST Environment
-        // RPHASTEnvironment rphastEnv(vehChEnv->getCH());
-        // using EllipticSearchSpacesImpl = EllipticSearchSpaces<VehicleInputGraph, VehCHEnv>;
-        // EllipticSearchSpacesImpl ellipticSearchSpaces(vehicleInputGraph, *vehChEnv, routeState);
-        // using OrdinaryStopsRPHASTSelectionImpl = OrdinaryStopsRPHASTSelection<VehicleInputGraph, EllipticSearchSpacesImpl, std::ofstream>;
-        // OrdinaryStopsRPHASTSelectionImpl ordinaryStopsRphastSelection(vehicleInputGraph, vehChEnv->getCH(), fleet,
-        //                                                               routeState, ellipticSearchSpaces, rphastEnv);
-
+        RPHASTEnvironment rphastEnv(vehChEnv->getCH());
 
         using DALSInsertionsFinderImpl = DALSAssignmentsFinder<DALSStrategy>;
         DALSInsertionsFinderImpl dalsInsertionsFinder(dalsStrategy);
@@ -647,8 +644,12 @@ int main(int argc, char *argv[]) {
                                                                       PDLocType::PICKUP);
         DirectTransferDistancesFinder transferToDropoffDistancesFinder(vehicleInputGraph.numVertices(), *vehChEnv,
                                                                        PDLocType::DROPOFF);
+        
+        using FastDirectTransferDistanceFinder = PHASTDirectTransferDistanceFinder<VehCHEnv, RPHASTEnvironment, DirectTransferDistancesLabelSet>;
+        FastDirectTransferDistancesFinder fastPickupToTransferDistancesFinder(vehicleInputGraph.numVertices(), *vehChEnv, *rphastEnv, PDLocType::PICKUP);
+        FastDirectTransferDistancesFinder fastTransferToDropoffDistancesFinder(vehicleInputGraph.numVertices(), *vehChEnv, *rphastEnv, PDLocType::DROPOFF);
 
-        using OrdinaryTransferInsertionsImpl = OrdinaryTransferFinder<VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, TransferPointStrategyImpl, TransfersDropoffALSStrategy, TransferAsserterImpl, DirectTransferDistancesFinder>;
+        using OrdinaryTransferInsertionsImpl = OrdinaryTransferFinder<VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, TransferPointStrategyImpl, TransfersDropoffALSStrategy, TransferAsserterImpl, DirectTransferDistancesFinder, FastDirectTransferDistanceFinder>;
         OrdinaryTransferInsertionsImpl ordinaryTransferInsertions = OrdinaryTransferInsertionsImpl(
                                                                                                    vehicleInputGraph,
                                                                                                    *vehChEnv,
@@ -661,6 +662,8 @@ int main(int argc, char *argv[]) {
                                                                                                    relDropoffsBeforeNextStop,
                                                                                                    pickupToTransferDistancesFinder,
                                                                                                    transferToDropoffDistancesFinder,
+                                                                                                   fastPickupToTransferDistancesFinder,
+                                                                                                   fastTransferToDropoffDistancesFinder,
                                                                                                    postponedAssignments,
                                                                                                    fleet, routeState,
                                                                                                    reqState, calc,

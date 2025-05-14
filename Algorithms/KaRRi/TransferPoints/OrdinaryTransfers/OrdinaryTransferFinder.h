@@ -49,7 +49,8 @@ namespace karri {
             typename TransferPointStrategyT,
             typename TransfersDropoffALSStrategyT,
             typename InsertionAsserterT,
-            typename DirectTransferDistancesFinderT>
+            typename DirectTransferDistancesFinderT,
+            typename FastDirectTransferDistancesFinderT>
     class OrdinaryTransferFinder {
 
         using VehCHQueryLabelSet = BasicLabelSet<0, ParentInfo::NO_PARENT_INFO>;
@@ -73,6 +74,8 @@ namespace karri {
                 const RelevantPDLocs &relBNSDropoffs,
                 DirectTransferDistancesFinderT &pickupToTransferDistancesFinder,
                 DirectTransferDistancesFinderT &transferToDropoffDistancesFinder,
+                FastDirectTransferDistancesFinderT &fastPickupToTransferDistancesFinder,
+                FastDirectTransferDistancesFinderT &fasttransferToDropoffDistancesFinder,
                 std::vector<AssignmentWithTransfer> &postponedAssignments,
                 const Fleet &fleet,
                 const RouteState &routeState,
@@ -92,6 +95,8 @@ namespace karri {
                 relBNSDropoffs(relBNSDropoffs),
                 pickupToTransferDistancesFinder(pickupToTransferDistancesFinder),
                 transferToDropoffDistancesFinder(transferToDropoffDistancesFinder),
+                fastPickupToTransferDistancesFinder(fastPickupToTransferDistancesFinder),
+                fastTransferToDropoffDistancesFinder(fastTransferToDropoffDistancesFinder),
                 postponedAssignments(postponedAssignments),
                 fleet(fleet),
                 routeState(routeState),
@@ -974,6 +979,9 @@ namespace karri {
 
         DirectTransferDistancesFinderT &pickupToTransferDistancesFinder;
         DirectTransferDistancesFinderT &transferToDropoffDistancesFinder;
+
+        FastDirectTransferDistancesFinderT &pickupToTransferDistancesFinder;
+        FastDirectTransferDistancesFinderT &transferToDropoffDistancesFinder;
 
         std::vector<AssignmentWithTransfer> &postponedAssignments;
 
