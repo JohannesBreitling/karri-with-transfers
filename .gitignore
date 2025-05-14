@@ -22,3 +22,5 @@
 /.project
 /.pydevproject
 /.idea/
+
+__pycache__/
