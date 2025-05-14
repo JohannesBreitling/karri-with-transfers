@@ -52,6 +52,7 @@ namespace karri {
                   selectionPhase(type == PDLocType::PICKUP ? rphastEnv.getSourcesSelectionPhase() : rphastEnv.getTargetsSelectionPhase()),
                   query(type == PDLocType::PICKUP ? rphastEnv.getReverseRPHASTQuery() : rphastEnv.getForwardRPHASTQuery()),
                   currentPdLocRanks(),
+                  currentPdOffsets(),
                   distances(numVertices) {}
 
 
@@ -60,9 +61,9 @@ namespace karri {
             KASSERT(pdLocRanks.size() == pdLocOffsets.size());
             const auto numPdLocs = pdLocRanks.size();
             currentPdLocRanks = pdLocRanks;
+            currentPdOffsets = pdLocOffsets;
             distances.init(numPdLocs);
-            
-            currentSelection = selectionPhase.run(pdLocRanks, pdLocOffsets);
+            currentSelection = selectionPhase.run(pdLocRanks);
         }
 
         // Runs query for given CH rank
@@ -72,10 +73,11 @@ namespace karri {
             
             query.run(currentSelection, transferRank);
 
+            distances.allocateEntriesFor(transferRank);
             for (int i = 0; i < currentPdLocRanks.size(); i++) {
                 const auto pdLocRank = currentPdLocRanks[i];
-                int distance = query.getDistance(currentSelection.fullToSubMapping[transferRank]);
-                distances.updateDistanceIfSmaller(i, transferRank, distance);
+                int distance = query.getDistance(currentSelection.fullToSubMapping[pdLocRank]);
+                distances.updateDistanceIfSmaller(i, transferRank, distance + currentPdOffsets[i]);
             }
         }
 
@@ -96,6 +98,7 @@ namespace karri {
         Query query;
 
         std::vector<int> currentPdLocRanks;
+        std::vector<int> currentPdOffsets;
 
         DirectTransferDistances<LabelSetT> distances;
 

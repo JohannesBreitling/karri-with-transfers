@@ -135,6 +135,11 @@ namespace karri {
             numEdgesRelaxed = 0;
             numVerticesScanned = 0;
             searchTime = 0;
+
+            directPDSearchSelectionTime = 0;
+            directPDSearchQueryTime = 0;
+            fastDirectPDSearchSelectionTime = 0;
+            fastDirectPDSearchQueryTime = 0;
         }
 
         void findAssignments() {
@@ -227,7 +232,14 @@ namespace karri {
                 pdLocRanks.push_back(vehCh.rank(inputGraph.edgeHead(p.loc)));
                 pdLocOffsets.push_back(0);
             }
+            
+            Timer runSelectionTimer;
             pickupToTransferDistancesFinder.runSelectionForPdLocs(pdLocRanks, pdLocOffsets);
+            directPDSearchSelectionTime += runSelectionTimer.elapsed<std::chrono::nanoseconds>();
+
+            Timer runFastSelectionTimer;
+            fastPickupToTransferDistancesFinder.runSelectionForPdLocs(pdLocRanks, pdLocOffsets);
+            fastDirectPDSearchSelectionTime += runFastSelectionTimer.elapsed<std::chrono::nanoseconds>();
 
             pdLocRanks.clear();
             pdLocOffsets.clear();
@@ -237,7 +249,9 @@ namespace karri {
                 pdLocRanks.push_back(vehCh.rank(inputGraph.edgeTail(d.loc)));
                 pdLocOffsets.push_back(inputGraph.travelTime(d.loc));
             }
+            
             transferToDropoffDistancesFinder.runSelectionForPdLocs(pdLocRanks, pdLocOffsets);
+            fastTransferToDropoffDistancesFinder.runSelectionForPdLocs(pdLocRanks, pdLocOffsets);
 
 
 
@@ -272,6 +286,19 @@ namespace karri {
                     postponedAssignments.clear();
                 }
             }
+
+            // Output the different times for the PHAST directPD and the BCH directPD
+            std::cout << "- - - - - - - - - - - - - - - - - - - -\n";
+            std::cout << "BCH Selection Time:      " << (directPDSearchSelectionTime / 1000) << "mics\n"; 
+            std::cout << "PHAST Selection Time:    " << (fastDirectPDSearchSelectionTime / 1000) << "mics\n";
+            std::cout << "BCH Query Time:          " << (directPDSearchQueryTime / 1000) << "mics\n";
+            std::cout << "PHAST Query Time:        " << (fastDirectPDSearchQueryTime / 1000) << "mics\n"; 
+
+            if (directPDSearchQueryTime > 0) {
+                std::cout << "PHAST slower by Factor:  " << fastDirectPDSearchQueryTime / directPDSearchQueryTime << "\n";
+            }
+            
+
 
             // Write the statss
             auto &stats = requestState.stats().ordinaryTransferStats;
@@ -595,11 +622,24 @@ namespace karri {
                 if (asgn.pickupPairedLowerBoundUsed) {
                     const int transferRank = vehCh.rank(inputGraph.edgeTail(asgn.transfer.loc));
                     const int transferOffset = inputGraph.travelTime(asgn.transfer.loc);
-
+                    
+                    Timer runQueryTimer;
                     pickupToTransferDistancesFinder.runQueryForTransferRank(transferRank);
+                    directPDSearchQueryTime += runQueryTimer.elapsed<std::chrono::nanoseconds>();
+
+                    Timer runFastQueryTimer;
+                    fastPickupToTransferDistancesFinder.runQueryForTransferRank(transferRank);
+                    fastDirectPDSearchQueryTime += runFastQueryTimer.elapsed<std::chrono::nanoseconds>();
+
                     const int distance =
                             pickupToTransferDistancesFinder.getDistances().getDistance(asgn.pickup->id, transferRank) +
                             transferOffset;
+
+                    const int fastDistance =
+                            fastPickupToTransferDistancesFinder.getDistances().getDistance(asgn.pickup->id, transferRank) +
+                            transferOffset;
+
+                    KASSERT(distance == fastDistance);
 
                     asgn.distToTransferPVeh = distance;
                     asgn.pickupPairedLowerBoundUsed = false;
@@ -673,9 +713,19 @@ namespace karri {
                 assert(asgn.dropoffPairedLowerBoundUsed);
 
                 const int transferRank = vehCh.rank(inputGraph.edgeHead(asgn.transfer.loc));
+
+                Timer runQueryTimer;
                 transferToDropoffDistancesFinder.runQueryForTransferRank(transferRank);
-                const int distance = transferToDropoffDistancesFinder.getDistances().getDistance(asgn.dropoff->id,
-                                                                                                 transferRank);
+                directPDSearchQueryTime += runQueryTimer.elapsed<std::chrono::nanoseconds>();
+
+                Timer runFastQueryTimer;
+                fastTransferToDropoffDistancesFinder.runQueryForTransferRank(transferRank);
+                fastDirectPDSearchQueryTime += runFastQueryTimer.elapsed<std::chrono::nanoseconds>();
+                
+                const int distance = transferToDropoffDistancesFinder.getDistances().getDistance(asgn.dropoff->id, transferRank);
+                const int fastDistance = fastTransferToDropoffDistancesFinder.getDistances().getDistance(asgn.dropoff->id, transferRank);
+
+                KASSERT(distance == fastDistance);
 
                 asgn.distToDropoff = distance;
                 asgn.dropoffPairedLowerBoundUsed = false;
@@ -1024,6 +1074,13 @@ namespace karri {
         int64_t numAssignmentsTriedDropoffALS;
 
         int64_t tryAssignmentsTime;
+
+        // Stats for the direct PD searches
+        int64_t directPDSearchSelectionTime;
+        int64_t directPDSearchQueryTime;
+
+        int64_t fastDirectPDSearchSelectionTime;
+        int64_t fastDirectPDSearchQueryTime;
 
         // Stats for the transfer search itself
         int64_t numStopPairs;
