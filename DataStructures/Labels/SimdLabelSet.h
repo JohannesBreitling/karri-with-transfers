@@ -129,6 +129,14 @@ public:
             return isMarked[i / VECTOR_SIZE][i % VECTOR_SIZE];
         }
 
+        std::array<int, K> toIntArray() const {
+            std::array<int, K> arr;
+            for (int i = 0; i < NUM_VECTORS; ++i) {
+                isMarked[i].store(arr.data() + i * VECTOR_SIZE);
+            }
+            return arr;
+        }
+
 //        // Returns true if this mask marks at least one component.
 //        operator bool() const {
 //            BooleanVector tmp = isMarked[0];
@@ -204,6 +212,14 @@ public:
             assert(i >= 0);
             assert(i < K);
             return values[i / VECTOR_SIZE].extract(i % VECTOR_SIZE);
+        }
+
+        std::array<int, K> toIntArray() const {
+            std::array<int, K> arr;
+            for (int i = 0; i < NUM_VECTORS; ++i) {
+                values[i].store(arr.data() + i * VECTOR_SIZE);
+            }
+            return arr;
         }
 
         // Returns the packed sum of lhs and rhs.

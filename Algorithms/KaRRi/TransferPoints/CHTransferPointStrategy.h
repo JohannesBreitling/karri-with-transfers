@@ -76,9 +76,12 @@ namespace karri::TransferPointStrategies {
                   topDownRankPermutation(chEnv.getCH().downwardGraph().numVertices()),
                   firstIdxOfLevel(),
                   inputGraphWithTopDownRankVertexIds(inputGraph),
-                  queryPerThread([&](){return Query(ch, downGraph, upGraph, topDownRankPermutation, firstIdxOfLevel,
-                                           ellipticBucketsEnv, routeState);}),
-                  distanceFromVertexToNextStopPerThread([&](){return std::vector<int>(inputGraph.numVertices(), INFTY);}),
+                  queryPerThread([&]() {
+                      return Query(ch, downGraph, upGraph, topDownRankPermutation, firstIdxOfLevel,
+                                   ellipticBucketsEnv, routeState);
+                  }),
+                  distanceFromVertexToNextStopPerThread(
+                          [&]() { return std::vector<int>(inputGraph.numVertices(), INFTY); }),
                   p2pQuery(chEnv.template getFullCHQuery<P2PLabelSet>()),
                   pathUnpacker(chEnv.getCH()),
                   logger(LogManager<LoggerT>::getLogger("ch_transfer_point_computation.csv",
@@ -115,17 +118,14 @@ namespace karri::TransferPointStrategies {
                 firstIdxOfLevel.push_back(i);
             }
             firstIdxOfLevel.push_back(numVertices);
-            static constexpr int NUM_INTS_PER_CACHE_LINE = CACHE_LINE_SIZE / sizeof(int);
-            static constexpr int LARGE_LEVEL_THRESHOLD = NUM_INTS_PER_CACHE_LINE * (1 << 10);
+            static constexpr int LARGE_LEVEL_THRESHOLD = (1 << 7) * CACHE_LINE_SIZE / sizeof(int);
             int firstLargeLevelIdx = 0;
             while (firstLargeLevelIdx < firstIdxOfLevel.size() - 1 &&
-                   firstIdxOfLevel[firstLargeLevelIdx + 1] - firstIdxOfLevel[firstLargeLevelIdx] < LARGE_LEVEL_THRESHOLD) {
+                   firstIdxOfLevel[firstLargeLevelIdx + 1] - firstIdxOfLevel[firstLargeLevelIdx] <
+                   LARGE_LEVEL_THRESHOLD) {
                 ++firstLargeLevelIdx;
             }
             firstIdxOfLevel.erase(firstIdxOfLevel.begin(), firstIdxOfLevel.begin() + firstLargeLevelIdx);
-
-//            for (int r = 0; r < numVertices; ++r)
-//                topDownRankPermutation[r] = numVertices - r - 1;
 
             downGraph.permuteVertices(topDownRankPermutation);
             upGraph.permuteVertices(topDownRankPermutation);
@@ -245,7 +245,8 @@ namespace karri::TransferPointStrategies {
             const auto totalTime = totalTimer.elapsed<std::chrono::nanoseconds>();
 
             logger << indicesWithoutLeeway.size() << "," << indicesWithLeeway.size() << "," << initTime << ","
-                   << withoutLeewayTime << "," << withLeewayTime << "," << stopIdPairs.size() << "," << computeIntersectionsTime << ","
+                   << withoutLeewayTime << "," << withLeewayTime << "," << stopIdPairs.size() << ","
+                   << computeIntersectionsTime << ","
                    << totalTime << "," << globalQueryStats.initTime << "," << globalQueryStats.topoSearchTime << ","
                    << globalQueryStats.postprocessTime << "\n";
 
@@ -350,9 +351,8 @@ namespace karri::TransferPointStrategies {
 
                 // Convert ellipse of vertices to ellipse of edges.
                 auto &edgeEllipse = edgeEllipses[indicesWithoutLeeway[i]];
-                auto& distanceFromVertexToNextStop = distanceFromVertexToNextStopPerThread.local();
                 convertVertexEllipseIntoEdgeEllipse(vertexEllipse, routeState.leewayOfLegStartingAt(stopId),
-                                                    edgeEllipse, distanceFromVertexToNextStop);
+                                                    edgeEllipse, distanceFromVertexToNextStopPerThread.local());
             }
         }
 
@@ -366,22 +366,22 @@ namespace karri::TransferPointStrategies {
 //            tbb::parallel_for(0ul, numBatchesWithLeeway, [&](const auto i) {
 
 
-                auto& query = queryPerThread.local();
-                auto& queryStats = queryStatsPerThread.local();
-                auto& distanceFromVertexToNextStop = distanceFromVertexToNextStopPerThread.local();
+                auto &query = queryPerThread.local();
+                auto &queryStats = queryStatsPerThread.local();
+                auto &distanceFromVertexToNextStop = distanceFromVertexToNextStopPerThread.local();
 
                 std::array<int, K> batchStopIds;
+                DistanceLabel leeways;
                 int numEllipsesInBatch = 0;
                 for (int j = 0; j < K && i * K + j < numEllipsesWithLeeway; ++j) {
                     batchStopIds[j] = stopIds[indicesWithLeeway[i * K + j]];
+                    leeways[j] = routeState.leewayOfLegStartingAt(batchStopIds[j]);
                     ++numEllipsesInBatch;
                 }
-                const std::array<std::vector<VertexInEllipse>, K> batchResult = query.run(batchStopIds,
-                                                                                          numEllipsesInBatch,
-                                                                                          queryStats);
+                const auto batchResult = query.run(batchStopIds, leeways, numEllipsesInBatch, queryStats);
+
                 for (int j = 0; j < numEllipsesInBatch; ++j) {
-                    const auto leeway = routeState.leewayOfLegStartingAt(batchStopIds[j]);
-                    convertVertexEllipseIntoEdgeEllipse(batchResult[j], leeway,
+                    convertVertexEllipseIntoEdgeEllipse(batchResult[j], leeways[j],
                                                         edgeEllipses[indicesWithLeeway[i * K + j]],
                                                         distanceFromVertexToNextStop);
                 }
@@ -389,16 +389,17 @@ namespace karri::TransferPointStrategies {
 //            );
 
             globalQueryStats.reset();
-            for (auto& localStats : queryStatsPerThread) {
+            for (auto &localStats: queryStatsPerThread) {
                 globalQueryStats += localStats;
                 localStats.reset();
             }
         }
 
         void
-        convertVertexEllipseIntoEdgeEllipse(const std::vector<VertexInEllipse> &vertexEllipse, const int leeway,
+        convertVertexEllipseIntoEdgeEllipse(const std::vector<VertexInEllipse> &vertexEllipse,
+                                            const int leeway,
                                             std::vector<EdgeInEllipse> &edgeEllipse,
-                                            std::vector<int>& localDistanceFromVertexToNextStop) const {
+                                            std::vector<int> &localDistanceFromVertexToNextStop) const {
             edgeEllipse.reserve(vertexEllipse.size() * 2);
 
             KASSERT(std::all_of(localDistanceFromVertexToNextStop.begin(), localDistanceFromVertexToNextStop.end(),
@@ -425,6 +426,11 @@ namespace karri::TransferPointStrategies {
             // Reset distances
             for (const auto &vertexInEllipse: vertexEllipse)
                 localDistanceFromVertexToNextStop[vertexInEllipse.vertex] = INFTY;
+
+            KASSERT(std::is_sorted(edgeEllipse.begin(), edgeEllipse.end(),
+                                   [](const EdgeInEllipse &e1, const EdgeInEllipse &e2) {
+                                       return e1.edge < e2.edge;
+                                   }));
         }
 
         bool sanityCheckEdgeEllipses(const std::vector<int> &stopIds,
