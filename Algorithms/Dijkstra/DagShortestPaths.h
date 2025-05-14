@@ -58,6 +58,7 @@ class DagShortestPaths {
 
     template<typename, typename, bool>
     friend class karri::EllipticBucketsEnvironment;
+    static constexpr int K = LabelSetT::K; // The number of simultaneous shortest-path computations.
 
 
  public:
@@ -83,6 +84,20 @@ class DagShortestPaths {
       settleNextVertex();
     }
   }
+
+  // Used to update the pruning criterion for different runs of this search, e.g. to configure callbacks
+  PruningCriterionT &getPruningCriterion() {
+    return pruneSearch;
+  }
+
+  const int &getNumVerticesSettled() const {
+    return numVerticesSettled;
+  }
+
+  const int &getNumEdgeRelaxations() const {
+      return numEdgeRelaxations;
+  }
+
 
   // Runs a shortest-path search from s, with the distance of s initialized to the given offset.
   void runWithOffset(const int s, const int offset) {
@@ -166,4 +181,7 @@ class DagShortestPaths {
   ParentLabelCont parent;           // The parent information for each vertex.
   QueueT queue;                     // The priority queue of unsettled vertices.
   PruningCriterionT pruneSearch;    // The criterion used to prune the search.
+
+  int numVerticesSettled = 0;
+  int numEdgeRelaxations = 0;
 };

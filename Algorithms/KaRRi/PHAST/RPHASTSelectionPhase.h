@@ -192,7 +192,10 @@ private:
         findVerticesUsingBfs(targets);
 
         // Order vertices in subgraph by decreasing rank.
-        std::sort(verticesInSubgraph.begin(), verticesInSubgraph.end(), std::greater<>());
+        auto itBegin = verticesInSubgraph.begin();
+        auto itEnd = verticesInSubgraph.end();
+
+        std::sort(itBegin, itEnd, std::greater<>());
     }
 
     void findVerticesInSubgraphOrderedByLevels(const std::vector<int> &targets, const std::vector<int> &offsets) {

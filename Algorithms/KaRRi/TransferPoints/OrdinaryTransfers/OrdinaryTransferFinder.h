@@ -75,7 +75,7 @@ namespace karri {
                 DirectTransferDistancesFinderT &pickupToTransferDistancesFinder,
                 DirectTransferDistancesFinderT &transferToDropoffDistancesFinder,
                 FastDirectTransferDistancesFinderT &fastPickupToTransferDistancesFinder,
-                FastDirectTransferDistancesFinderT &fasttransferToDropoffDistancesFinder,
+                FastDirectTransferDistancesFinderT &fastTransferToDropoffDistancesFinder,
                 std::vector<AssignmentWithTransfer> &postponedAssignments,
                 const Fleet &fleet,
                 const RouteState &routeState,
@@ -980,8 +980,8 @@ namespace karri {
         DirectTransferDistancesFinderT &pickupToTransferDistancesFinder;
         DirectTransferDistancesFinderT &transferToDropoffDistancesFinder;
 
-        FastDirectTransferDistancesFinderT &pickupToTransferDistancesFinder;
-        FastDirectTransferDistancesFinderT &transferToDropoffDistancesFinder;
+        FastDirectTransferDistancesFinderT &fastPickupToTransferDistancesFinder;
+        FastDirectTransferDistancesFinderT &fastTransferToDropoffDistancesFinder;
 
         std::vector<AssignmentWithTransfer> &postponedAssignments;
 

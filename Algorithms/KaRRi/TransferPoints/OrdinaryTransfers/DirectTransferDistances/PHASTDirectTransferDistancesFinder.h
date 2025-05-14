@@ -36,7 +36,6 @@
 namespace karri {
 
     template<typename CHEnvT, typename RPHASTEnvT, typename LabelSetT>
-    
     class PHASTDirectTransferDistancesFinder {
 
     public:
@@ -46,12 +45,13 @@ namespace karri {
     public:
         PHASTDirectTransferDistancesFinder(const int numVertices,
                                          const CHEnvT &chEnv,
-                                         const RPHASTEnvT &rphastEnv,
+                                         RPHASTEnvT &rphastEnv,
                                          const PDLocType& type)
                 : ch(chEnv.getCH()),
                   rphastEnv(rphastEnv),
-                  selection(type == PDLocType::PICKUP ? rphastEnv.getSourcesSelectionPhase() : rphastEnv.getTargetsSelectionPhase()),
+                  selectionPhase(type == PDLocType::PICKUP ? rphastEnv.getSourcesSelectionPhase() : rphastEnv.getTargetsSelectionPhase()),
                   query(type == PDLocType::PICKUP ? rphastEnv.getReverseRPHASTQuery() : rphastEnv.getForwardRPHASTQuery()),
+                  currentPdLocRanks(),
                   distances(numVertices) {}
 
 
@@ -62,7 +62,7 @@ namespace karri {
             currentPdLocRanks = pdLocRanks;
             distances.init(numPdLocs);
             
-            selection.run(pdLocRanks, pdLocOffsets);
+            currentSelection = selectionPhase.run(pdLocRanks, pdLocOffsets);
         }
 
         // Runs query for given CH rank
@@ -70,11 +70,11 @@ namespace karri {
             if (distances.knowsDistancesForTransferRank(transferRank))
                 return;
             
-            query.run(selection, transferRank);
+            query.run(currentSelection, transferRank);
 
             for (int i = 0; i < currentPdLocRanks.size(); i++) {
                 const auto pdLocRank = currentPdLocRanks[i];
-                int distance = query.getDistance(selection.fullToSubMapping[transferRank]);
+                int distance = query.getDistance(currentSelection.fullToSubMapping[transferRank]);
                 distances.updateDistanceIfSmaller(i, transferRank, distance);
             }
         }
@@ -87,13 +87,15 @@ namespace karri {
 
         const CH &ch;
 
-        using SelctionPhase = RPHASTSelectionPhase<dij::NoCriterion>;
+        using SelectionPhase = RPHASTSelectionPhase<dij::NoCriterion>;
+        using Query = PHASTQuery<CH::SearchGraph, CH::Weight, LabelSetT, dij::NoCriterion>;
+
         RPHASTEnvT &rphastEnv;
-        
-        SelectionPhase selection;
+        SelectionPhase selectionPhase;
+        RPHASTSelection currentSelection;
         Query query;
 
-        const std::vector<int> &currentPdLocRanks;
+        std::vector<int> currentPdLocRanks;
 
         DirectTransferDistances<LabelSetT> distances;
 
