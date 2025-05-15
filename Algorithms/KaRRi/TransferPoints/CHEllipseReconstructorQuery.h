@@ -169,6 +169,7 @@ namespace karri::TransferPointStrategies {
 
             tbb::parallel_for(0, numEllipses, [&](const int j) {
                 const auto leeway = leeways[j];
+                auto& ellipse = firstEllipseInBatch[j];
                 for (const auto &r: verticesInAnyEllipse) {
                     const int shifted = shiftedIndexForAlignment[r];
 
@@ -177,27 +178,11 @@ namespace karri::TransferPointStrategies {
                     const bool breaksLeeway = distToVertex + distFromVertex > leeway;
                     if (!breaksLeeway) {
                         KASSERT(distToVertex < INFTY && distFromVertex < INFTY);
-                        firstEllipseInBatch[j].emplace_back(r, distToVertex, distFromVertex);
+                        ellipse.emplace_back(r, distToVertex, distFromVertex);
                     }
                 }
             });
 
-//            for (const auto &r: verticesInAnyEllipse) {
-//                const int shifted = shiftedIndexForAlignment[r];
-//
-//                const auto &distToVertex = distTo[shifted];
-//                const auto &distFromVertex = distFrom[shifted];
-//                const std::array<int, K> breaksLeeway = (distToVertex + distFromVertex > leeways).toIntArray();
-//                const std::array<int, K> distToVertexArr = distToVertex.toIntArray();
-//                const std::array<int, K> distFromVertexArr = distFromVertex.toIntArray();
-//                KASSERT(!std::all_of(breaksLeeway.begin(), breaksLeeway.end(), [](const int b) { return b == 0; }));
-//                for (int j = 0; j < numEllipses; ++j) {
-//                    if (!breaksLeeway[j]) {
-//                        KASSERT(distToVertexArr[j] < INFTY && distFromVertexArr[j] < INFTY);
-//                        firstEllipseInBatch[j].emplace_back(r, distToVertexArr[j], distFromVertexArr[j]);
-//                    }
-//                }
-//            }
             stats.postprocessTime += timer.elapsed<std::chrono::nanoseconds>();
         }
 
