@@ -69,13 +69,11 @@ namespace karri::TransferPointStrategies {
                   enumerateBucketEntriesSearchSpace(numVertices),
                   distTo(numVertices, INFTY),
                   distFrom(numVertices, INFTY),
-                  verticesInAnyEllipse(),
                   relevantInToSearch(numVertices),
                   relevantInFromSearch(numVertices) {
             KASSERT(downGraph.numVertices() == numVertices);
             KASSERT(upGraph.numVertices() == numVertices);
             KASSERT(!firstIdxOfLargeLevels.empty() && firstIdxOfLargeLevels.back() == numVertices);
-            verticesInAnyEllipse.reserve(numVertices);
 
             int offsetForCurLevelInEntries = 0;
             KASSERT(reinterpret_cast<std::uintptr_t>(&distTo[0]) % CACHE_LINE_SIZE == 0);
@@ -131,8 +129,9 @@ namespace karri::TransferPointStrategies {
             timer.restart();
 
             // Process vertices in all small levels sequentially
+            auto& verticesInAnyEllipseForSeq = threadLocalVerticesInEllipse.local();
             for (int r = 0; r < firstIdxOfLargeLevels.front(); ++r) {
-                settleVertexInTopodownSearch(r, leeways, verticesInAnyEllipse);
+                settleVertexInTopodownSearch(r, leeways, verticesInAnyEllipseForSeq);
             }
 
             // Process vertices in each large level in parallel
@@ -156,13 +155,11 @@ namespace karri::TransferPointStrategies {
 
             // Accumulate result per ellipse
             timer.restart();
-            auto localMerged = threadLocalVerticesInEllipse.combine([](const auto &v1, const auto &v2) {
+            auto verticesInAnyEllipse = threadLocalVerticesInEllipse.combine([](const auto &v1, const auto &v2) {
                 KASSERT(std::is_sorted(v1.begin(), v1.end()));
                 KASSERT(std::is_sorted(v2.begin(), v2.end()));
                 return mergeSortedVectors(v1, v2);
             });
-            KASSERT(std::is_sorted(localMerged.begin(), localMerged.end()));
-            verticesInAnyEllipse = mergeSortedVectors(verticesInAnyEllipse, localMerged);
             threadLocalVerticesInEllipse.combine_each([](std::vector<int> &v) { v.clear(); });
             KASSERT(std::is_sorted(verticesInAnyEllipse.begin(), verticesInAnyEllipse.end()));
 
@@ -189,15 +186,6 @@ namespace karri::TransferPointStrategies {
             stats.postprocessTime += timer.elapsed<std::chrono::nanoseconds>();
         }
 
-        inline const DistanceLabel &getDistanceLabelTo(const int v) const {
-            return distTo[shiftedIndexForAlignment[v]];
-        }
-
-        inline const DistanceLabel &getDistanceLabelFrom(const int v) const {
-            return distFrom[shiftedIndexForAlignment[v]];
-        }
-
-
     private:
 
         static std::vector<int> mergeSortedVectors(const std::vector<int> &v1, const std::vector<int> &v2) {
@@ -210,8 +198,6 @@ namespace karri::TransferPointStrategies {
         void initializeDistanceArrays() {
             relevantInToSearch.reset();
             relevantInFromSearch.reset();
-
-            verticesInAnyEllipse.clear();
         }
 
         void initializeDistancesForStopBasedOnBuckets(const int stopId, const int ellipseIdx) {
@@ -311,12 +297,10 @@ namespace karri::TransferPointStrategies {
         // avoid false sharing.
         std::vector<int> shiftedIndexForAlignment;
 
-
         Subset enumerateBucketEntriesSearchSpace;
 
         AlignedVector<DistanceLabel> distTo;
         AlignedVector<DistanceLabel> distFrom;
-        std::vector<int> verticesInAnyEllipse;
         tbb::combinable<std::vector<int>> threadLocalVerticesInEllipse;
 
         FastResetFlagArray<> relevantInToSearch; // Flags that mark whether vertex is relevant in to search.
