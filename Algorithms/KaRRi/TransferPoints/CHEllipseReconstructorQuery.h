@@ -111,10 +111,11 @@ namespace karri::TransferPointStrategies {
         // Runs a topological downward search in the CH graph to find all vertices in the detour ellipse between
         // each pair of stops in the given batch of numEllipses <= K stop pairs.
         // Returns a set of vertices s.t. every vertex v appears in at least one of the ellipses.
-        std::array<std::vector<VertexInEllipse>, K> run(const std::array<int, K> &stopIds,
-                             const DistanceLabel& leeways,
-                             const int numEllipses, // number of stopIds actually used in batch
-                             CHEllipseReconstructorStats &stats) {
+        void run(const std::array<int, K> &stopIds,
+                 const DistanceLabel &leeways,
+                 const int numEllipses, // number of stopIds actually used in batch
+                 std::vector<std::vector<VertexInEllipse>>::iterator firstEllipseInBatch,
+                 CHEllipseReconstructorStats &stats) {
             KASSERT(numEllipses <= K);
 
             Timer timer;
@@ -139,13 +140,15 @@ namespace karri::TransferPointStrategies {
                 const int firstIdx = firstIdxOfLargeLevels[l];
                 const int lastIdx = firstIdxOfLargeLevels[l + 1];
                 static constexpr int CHUNK_SIZE = (1 << 2) * CACHE_LINE_SIZE / sizeof(int);
+                // Need to use static_partitioner to ensure that the vertices in localVerticesInEllipse are in
+                // increasing order.
                 tbb::parallel_for(tbb::blocked_range<int>(firstIdx, lastIdx, CHUNK_SIZE),
                                   [&](const tbb::blocked_range<int> &range) {
                                       auto &localVerticesInEllipse = threadLocalVerticesInEllipse.local();
                                       for (int r = range.begin(); r != range.end(); ++r) {
                                           settleVertexInTopodownSearch(r, leeways, localVerticesInEllipse);
                                       }
-                                  }, tbb::simple_partitioner());
+                                  }, tbb::static_partitioner());
             }
             stats.topoSearchTime += timer.elapsed<std::chrono::nanoseconds>();
             stats.numVerticesSettled += numVertices;
@@ -153,19 +156,20 @@ namespace karri::TransferPointStrategies {
 
             // Accumulate result per ellipse
             timer.restart();
-            verticesInAnyEllipse = mergeSortedVectors(verticesInAnyEllipse, threadLocalVerticesInEllipse.combine(
-                    [](const std::vector<int> &v1, const std::vector<int> &v2) {
-                        return mergeSortedVectors(v1, v2);
-                    }));
-            threadLocalVerticesInEllipse.combine_each([](std::vector<int> &v) {
-                v.clear();
+            auto localMerged = threadLocalVerticesInEllipse.combine([](const auto &v1, const auto &v2) {
+                KASSERT(std::is_sorted(v1.begin(), v1.end()));
+                KASSERT(std::is_sorted(v2.begin(), v2.end()));
+                return mergeSortedVectors(v1, v2);
             });
+            KASSERT(std::is_sorted(localMerged.begin(), localMerged.end()));
+            verticesInAnyEllipse = mergeSortedVectors(verticesInAnyEllipse, localMerged);
+            threadLocalVerticesInEllipse.combine_each([](std::vector<int> &v) { v.clear(); });
             KASSERT(std::is_sorted(verticesInAnyEllipse.begin(), verticesInAnyEllipse.end()));
 
+            for (auto it = firstEllipseInBatch; it != firstEllipseInBatch + numEllipses; ++it) {
+                it->reserve(verticesInAnyEllipse.size());
+            }
 
-            std::array<std::vector<VertexInEllipse>, K> ellipses;
-            for (auto &ellipse: ellipses)
-                ellipse.reserve(verticesInAnyEllipse.size());
             for (const auto &r: verticesInAnyEllipse) {
                 const int shifted = shiftedIndexForAlignment[r];
 
@@ -174,18 +178,15 @@ namespace karri::TransferPointStrategies {
                 const std::array<int, K> breaksLeeway = (distToVertex + distFromVertex > leeways).toIntArray();
                 const std::array<int, K> distToVertexArr = distToVertex.toIntArray();
                 const std::array<int, K> distFromVertexArr = distFromVertex.toIntArray();
-//                KASSERT(!allSet(breaksLeeway));
                 KASSERT(!std::all_of(breaksLeeway.begin(), breaksLeeway.end(), [](const int b) { return b == 0; }));
                 for (int j = 0; j < numEllipses; ++j) {
                     if (!breaksLeeway[j]) {
                         KASSERT(distToVertexArr[j] < INFTY && distFromVertexArr[j] < INFTY);
-                        ellipses[j].emplace_back(r, distToVertexArr[j], distFromVertexArr[j]);
+                        firstEllipseInBatch[j].emplace_back(r, distToVertexArr[j], distFromVertexArr[j]);
                     }
                 }
             }
             stats.postprocessTime += timer.elapsed<std::chrono::nanoseconds>();
-
-            return ellipses;
         }
 
         inline const DistanceLabel &getDistanceLabelTo(const int v) const {

@@ -362,13 +362,13 @@ namespace karri::TransferPointStrategies {
             // Construct ellipses with leeway by running topological downward sweep in CH.
             const size_t numEllipsesWithLeeway = indicesWithLeeway.size();
             const size_t numBatchesWithLeeway = numEllipsesWithLeeway / K + (numEllipsesWithLeeway % K != 0);
+            std::vector<std::vector<VertexInEllipse>> vertexEllipses(numEllipsesWithLeeway);
             for (int i = 0; i < numBatchesWithLeeway; ++i) {
 //            tbb::parallel_for(0ul, numBatchesWithLeeway, [&](const auto i) {
 
 
                 auto &query = queryPerThread.local();
                 auto &queryStats = queryStatsPerThread.local();
-                auto &distanceFromVertexToNextStop = distanceFromVertexToNextStopPerThread.local();
 
                 std::array<int, K> batchStopIds;
                 DistanceLabel leeways;
@@ -378,15 +378,20 @@ namespace karri::TransferPointStrategies {
                     leeways[j] = routeState.leewayOfLegStartingAt(batchStopIds[j]);
                     ++numEllipsesInBatch;
                 }
-                const auto batchResult = query.run(batchStopIds, leeways, numEllipsesInBatch, queryStats);
 
-                for (int j = 0; j < numEllipsesInBatch; ++j) {
-                    convertVertexEllipseIntoEdgeEllipse(batchResult[j], leeways[j],
-                                                        edgeEllipses[indicesWithLeeway[i * K + j]],
-                                                        distanceFromVertexToNextStop);
-                }
+                auto firstEllipseInBatch = vertexEllipses.begin() + i * K;
+                query.run(batchStopIds, leeways, numEllipsesInBatch, firstEllipseInBatch, queryStats);
             }
 //            );
+
+            // Convert vertex ellipses to edge ellipses
+            tbb::parallel_for(0ul, numEllipsesWithLeeway, [&](const auto i) {
+                const auto &vertexEllipse = vertexEllipses[i];
+                const auto leeway = routeState.leewayOfLegStartingAt(stopIds[indicesWithLeeway[i]]);
+                auto &edgeEllipse = edgeEllipses[indicesWithLeeway[i]];
+                convertVertexEllipseIntoEdgeEllipse(vertexEllipse, leeway, edgeEllipse,
+                                                    distanceFromVertexToNextStopPerThread.local());
+            });
 
             globalQueryStats.reset();
             for (auto &localStats: queryStatsPerThread) {
