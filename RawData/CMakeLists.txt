@@ -23,6 +23,8 @@
 # SOFTWARE.
 # ******************************************************************************
 
+add_executable(ComputeEdgeBetweenness ComputeEdgeBetweenness.cc)
+target_link_libraries(ComputeEdgeBetweenness kassert)
 
 add_executable(ConvertGraph ConvertGraph.cc)
 target_compile_definitions(ConvertGraph PRIVATE CSV_IO_NO_THREAD)
@@ -45,6 +47,9 @@ target_compile_definitions(DrawRandomDepartureTimes PRIVATE CSV_IO_NO_THREAD)
 add_executable(OsmToCarAndPassengerGraph OsmToCarAndPassengerGraph.cc)
 target_compile_definitions(OsmToCarAndPassengerGraph PRIVATE CSV_IO_NO_THREAD)
 target_link_libraries(OsmToCarAndPassengerGraph ${PROJ_LIBRARY} ${RoutingKit_LIBRARY} kassert ${BOOST_LIBRARIES})
+
+add_executable(SampleHeuristicTransferPointsUsingBetweenness SampleHeuristicTransferPointsUsingBetweenness.cc)
+target_link_libraries(SampleHeuristicTransferPointsUsingBetweenness kassert)
 
 add_executable(TransformLocations TransformLocations.cc)
 target_compile_definitions(TransformLocations PRIVATE CSV_IO_NO_THREAD)

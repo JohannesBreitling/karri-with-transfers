@@ -79,6 +79,9 @@ namespace karri {
 
     template<typename, typename, typename, typename, typename>
     class ClosestPDLocToLastStopBCHQuery;
+
+    template<typename, typename>
+    class HeuristicTransferPointPicker;
 }
 
 
@@ -123,6 +126,11 @@ class Dijkstra {
     template<typename, typename, typename, typename, typename>
     friend
     class karri::ClosestPDLocToLastStopBCHQuery;
+
+
+    template<typename, typename>
+    friend
+    class karri::HeuristicTransferPointPicker;
 
 private:
     using Graph = GraphT;                                    // The graph we work on.

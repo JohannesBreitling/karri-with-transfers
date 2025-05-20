@@ -119,6 +119,7 @@
 #if KARRI_DALS_STRATEGY == KARRI_COL
 
 #include "Algorithms/KaRRi/DalsAssignments/CollectiveBCHStrategy.h"
+#include "Algorithms/KaRRi/TransferPoints/Heuristic/HeuristicTransferPointPicker.h"
 
 #elif KARRI_DALS_STRATEGY == KARRI_IND
 
@@ -153,6 +154,7 @@ inline void printUsage() {
               "  -psg-h <file>          contraction hierarchy for the passenger network in binary format.\n"
               "  -veh-d <file>          separator decomposition for the vehicle network in binary format (needed for CCHs).\n"
               "  -psg-d <file>          separator decomposition for the passenger network in binary format (needed for CCHs).\n"
+              "  -tp-sample <file>      file containing heuristic sample of edges that are eligible transfer locations in binary format (see SampleHeuristicTransferPointsUsingBetweenness).\n"
               "  -csv-in-LOUD-format    if set, assumes that input files are in the format used by LOUD.\n"
               "  -o <file>              generate output files at name <file> (specify name without file suffix).\n"
               "  -help                  show usage help text.\n";
@@ -190,6 +192,7 @@ int main(int argc, char *argv[]) {
         const auto psgHierarchyFileName = clp.getValue<std::string>("psg-h");
         const auto vehSepDecompFileName = clp.getValue<std::string>("veh-d");
         const auto psgSepDecompFileName = clp.getValue<std::string>("psg-d");
+        const auto heuristicTpSampleFileName = clp.getValue<std::string>("tp-sample");
         const bool csvFilesInLoudFormat = clp.isSet("csv-in-LOUD-format");
         auto outputFileName = clp.getValue<std::string>("o");
         if (endsWith(outputFileName, ".csv"))
@@ -643,7 +646,27 @@ int main(int argc, char *argv[]) {
 
         using TransferALSDVehFinderImpl = TransferALSDVehFinder<TransferStrategyALSImpl, TransfersDropoffALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
         TransferALSDVehFinderImpl transferALSDVehInsertions = TransferALSDVehFinderImpl(transferALSStrategy, transferDropoffALSStrategy, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, postponedAssignments, fleet, routeState, reqState, calc, asserter);
-        
+
+
+
+        std::vector<int> heuristicTpSample;
+        if (!heuristicTpSampleFileName.empty()) {
+            std::cout << "Reading heuristic transfer point sample from file and generating buckets for sample... " << std::flush;
+            std::ifstream heuristicTpSampleFile(heuristicTpSampleFileName, std::ios::binary);
+            if (!heuristicTpSampleFile.good())
+                throw std::invalid_argument("file not found -- '" + heuristicTpSampleFileName + "'");
+            bio::read(heuristicTpSampleFile, heuristicTpSample);
+            heuristicTpSampleFile.close();
+        }
+        using HeuristicTransferPointPickerImpl = HeuristicTransferPointPicker<VehicleInputGraph, VehCHEnv>;
+        HeuristicTransferPointPickerImpl heuristicTransferPointPicker(vehicleInputGraph, *vehChEnv, heuristicTpSample);
+        if (!heuristicTpSampleFileName.empty()) {
+            std::cout << "done.\n";
+        }
+
+        // TODO: Use heuristic transfer point picker for additional transfer point strategy
+        unused(heuristicTransferPointPicker);
+
         using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<OrdinaryTransferInsertionsImpl, TransferALSPVehFinderImpl, TransferALSDVehFinderImpl, TransferAsserterImpl>;
         AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(ordinaryTransferInsertions, transferALSPVehInsertions, transferALSDVehInsertions, reqState, asserter);
 
