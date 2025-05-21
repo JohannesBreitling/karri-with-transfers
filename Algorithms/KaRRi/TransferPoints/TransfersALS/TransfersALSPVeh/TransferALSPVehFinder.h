@@ -103,104 +103,49 @@ namespace karri {
             dVehIds = dropoffALSStrategy.findDropoffsAfterLastStop();
             numCandidateVehiclesDropoffALS += dVehIds.size();
 
-
             //* More versatile calculation of the last stop distances
             std::vector<int> relevantPVehIds;
             std::vector<int> relevantDVehIds;
 
+
+            std::vector<bool> pVehIdFlags(fleet.size(), false);
+            std::vector<bool> dVehIdFlags(fleet.size(), false);
+
             for (const auto pVehId : relORDPickups.getVehiclesWithRelevantPDLocs()) {
                 relevantPVehIds.push_back(pVehId);
+                pVehIdFlags[pVehId] = true;
             }
 
             for (const auto pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
-                relevantPVehIds.push_back(pVehId);
+                if (!pVehIdFlags[pVehId]) {
+                    relevantPVehIds.push_back(pVehId);
+                    pVehIdFlags[pVehId] = true;
+                }
             }
 
-            for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
-                relevantDVehIds.push_back(dVehId);
+            if (relevantPVehIds.size() > 0) {
+                for (const auto dVehId : dVehIds) {
+                    relevantDVehIds.push_back(dVehId);
+                    dVehIdFlags[dVehId] = true;
+                }
+                
+                for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
+                    if (!dVehIdFlags[dVehId]) {
+                        relevantDVehIds.push_back(dVehId);
+                        dVehIdFlags[dVehId] = true;
+                    }
+                }
             }
-
-            for (const auto dVehId : dVehIds) {
-                relevantDVehIds.push_back(dVehId);
-            }
-
-            auto newLastStopDistances = strategy.calculateDistancesFromLastStopsToAllStops(relevantPVehIds, relevantDVehIds);
-
             
-            for (const auto pVehId : relORDPickups.getVehiclesWithRelevantPDLocs()) {
-                const auto &pVeh = &fleet[pVehId];
-                
-                for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
-                    const auto &dVeh = &fleet[dVehId];
-                    Timer searchTime;
-                    const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
-                    searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
-                    numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
-
-                    // Save the distances for building the assignments later
-                    lastStopDistances[pVehId][dVehId] = distances;
-
-                    // Assert calculations
-                    for (int i = 0; i < distances.size(); i++) {
-                        const auto newDistances = newLastStopDistances[pVehId][dVehId];
-                        assert(newDistances[i] == distances[i]);
-                    }
-                }
-
-                for (const auto dVehId : dVehIds) {
-                    const auto &dVeh = &fleet[dVehId];
-                    Timer searchTime;
-                    const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
-                    searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
-                    numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
-
-                    // Save the distances for building the assignments later
-                    lastStopDistances[pVehId][dVehId] = distances;
-
-                    // Assert calculations
-                    for (int i = 0; i < distances.size(); i++) {
-                        assert(newLastStopDistances[pVehId][dVehId][i] == distances[i]);
-                    }
-                }
+            int lastStopSearchTime;
+            if (relevantPVehIds.size() > 0 && relevantDVehIds.size() > 0) {
+                Timer lastStopSearchesTimer;
+                lastStopDistances = strategy.calculateDistancesFromLastStopsToAllStops(relevantPVehIds, relevantDVehIds);
+                lastStopSearchTime = lastStopSearchesTimer.elapsed<std::chrono::nanoseconds>();
             }
 
-            for (const auto pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
-                const auto *pVeh = &fleet[pVehId];
-                
-                for (const auto dVehId : relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
-                    const auto *dVeh = &fleet[dVehId];
-                    Timer searchTime;
-                    const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
-                    searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
-                    numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
-
-                    // Save the distances for building the assignments later
-                    lastStopDistances[pVehId][dVehId] = distances;
-                    numTransferPoints += distances.size();
-
-                    // Assert calculations
-                    for (int i = 0; i < distances.size(); i++) {
-                        assert(newLastStopDistances[pVehId][dVehId][i] == distances[i]);
-                    }
-                }
-
-                for (const auto dVehId : dVehIds) {
-                    const auto *dVeh = &fleet[dVehId];
-                    Timer searchTime;
-                    const auto distances = strategy.calculateDistancesFromLastStopToAllStops(*pVeh, *dVeh);
-                    searchTimeLastStopToDVeh += searchTime.elapsed<std::chrono::nanoseconds>();
-                    numSearchesRunLastStopToDVeh += strategy.getNumSearchesRun();
-
-                    // Save the distances for building the assignments later
-                    lastStopDistances[pVehId][dVehId] = distances;
-                    numTransferPoints += distances.size();
-
-                    // Assert calculations
-                    for (int i = 0; i < distances.size(); i++) {
-                        assert(newLastStopDistances[pVehId][dVehId][i] == distances[i]);
-                    }
-                }
-            }
+            (void) lastStopSearchTime;
+            //* End of the more versatile distance calculation
 
             numCandidateVehiclesPickupBNS += relBNSPickups.getVehiclesWithRelevantPDLocs().size();
             numCandidateVehiclesPickupORD += relORDPickups.getVehiclesWithRelevantPDLocs().size();
@@ -239,6 +184,18 @@ namespace karri {
         }
 
     private:
+
+        void printDistances(std::vector<int> distances) {
+            std::string sep = "";
+            std::cout << "Distances : ";
+            for (auto distance : distances) {
+                std::cout << sep;
+                std::cout << distance;
+                sep = ", ";
+            }
+
+            std::cout << "\n";
+        }
 
         void findAssignmentsWithPickupORD() {
             //* In this case we consider all vehicles that are able to perform the pickup ORD
@@ -299,8 +256,14 @@ namespace karri {
                 relevantDVehIds.push_back(dVehId);
             }
 
+            if (relevantDVehIds.size() == 0)
+                return;
+        
             // Calculate the distances from all pickups to all stops of relevant dropoff vehicles
-            fastTransferDistances = strategy.calculateDistancesFromAllPickupsToAllStops(requestState.pickups, relevantDVehIds);
+            Timer pickupToTransferSearchTimer;            
+            transferDistances = strategy.calculateDistancesFromAllPickupsToAllStops(requestState.pickups, relevantDVehIds);
+            const auto pickupToTransferSearchTime = pickupToTransferSearchTimer.elapsed<std::chrono::nanoseconds>(); 
+            (void) pickupToTransferSearchTime;
 
             for (const auto pVehId : pVehIds) {
                 const auto *pVeh = &fleet[pVehId];
@@ -333,7 +296,8 @@ namespace karri {
                 
                 // Calculate the distances from the pickup to the stops of the dropoff vehicle
                 Timer searchTimer;
-                const auto distancesToTransfer = strategy.calculateDistancesFromPickupToAllStops(pickup->loc, *dVeh);
+                const auto &distancesToTransfer = transferDistances[dVehId][pickup->id]; // strategy.calculateDistancesFromPickupToAllStops(pickup->loc, *dVeh);
+
                 numTransferPoints += distancesToTransfer.size();
                 searchTimePickupToDVeh += searchTimer.elapsed<std::chrono::nanoseconds>();
                 numSearchesRunPickupToDVeh += strategy.getNumSearchesRun();
@@ -349,8 +313,6 @@ namespace karri {
                         // Build the transfer point
                         const int transferLoc = stopLocationsDVeh[i];
                         const int distancePVehToTransfer = distancesToTransfer[i - 1];
-
-                        assert(distancePVehToTransfer == fastTransferDistances[dVehId][pickup->id][i - 1]);
                         
                         TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh - 1, i, distancePVehToTransfer, 0, 0, 0);
 
@@ -411,7 +373,8 @@ namespace karri {
                 
                 // Calculate the distances from the pickup to the stops of the dropoff vehicle
                 Timer searchTimer;
-                const auto distancesToTransfer = strategy.calculateDistancesFromPickupToAllStops(pickup->loc, *dVeh);
+                const auto &distancesToTransfer = transferDistances[dVehId][pickup->id]; // strategy.calculateDistancesFromPickupToAllStops(pickup->loc, *dVeh);
+
                 searchTimePickupToDVeh += searchTimer.elapsed<std::chrono::nanoseconds>();
                 numTransferPoints += distancesToTransfer.size();
                 numSearchesRunPickupToDVeh += strategy.getNumSearchesRun();
@@ -424,8 +387,6 @@ namespace karri {
                         // Build the transfer point
                         const int transferLoc = stopLocationsDVeh[i];
                         const int distancePVehToTransfer = distancesToTransfer[i - 1];
-
-                        assert(distancePVehToTransfer == fastTransferDistances[dVehId][pickup->id][i - 1]);
 
                         TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh, i, distancePVehToTransfer, 0, 0, 0);
 
@@ -823,10 +784,8 @@ namespace karri {
         
         // Stores for each pickup vehicle, the distances to all possible stops of dropoff vehicles
         std::map<int, std::map<int, std::vector<int>>> lastStopDistances;
-
-        std::map<int, std::map<int, std::vector<int>>> fastLastStopDistances;
-        std::map<int, std::map<int, std::vector<int>>> fastTransferDistances;
-
+        std::map<int, std::map<int, std::vector<int>>> transferDistances;
+        
         Subset dVehIds;
 
 

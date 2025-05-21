@@ -99,6 +99,9 @@ class TransferALSDVehFinder {
 
     private:
         void findAssignmentsWithDropoffALS() {
+
+            return;
+
             // The pickup has to be BNS or ORD
             // The set of pickup vehicles are the vehicles with BNS or ORD pickups
             if (relORDPickups.getVehiclesWithRelevantPDLocs().size() == 0 && relBNSPickups.getVehiclesWithRelevantPDLocs().size() == 0)
@@ -137,7 +140,7 @@ class TransferALSDVehFinder {
                     const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
 
                     //* Calculate the distances from the last stop of the dVeh to all stops of the pVeh
-                    const auto distancesToTransfer = strategy.calculateDistancesFromLastStopToAllStops(*dVeh, *pVeh);
+                    const auto distancesToTransfer =  strategy.calculateDistancesFromLastStopToAllStops(*dVeh, *pVeh);
                     numTransferPoints += distancesToTransfer.size();
                     numSearchesRunLastStopToPVeh += strategy.getNumSearchesRun();
                     searchTimeLastStopToPVeh += strategy.getSearchTime();

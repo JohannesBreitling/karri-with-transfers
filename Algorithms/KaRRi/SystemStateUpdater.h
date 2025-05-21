@@ -201,7 +201,7 @@ namespace karri {
                 ++dIdxPVeh;
             }
 
-            // assert(routeState.assertRoutePVeh(asgn));
+            assert(routeState.assertRoutePVeh(asgn));
 
             auto [pIdxDVeh, dIdxDVeh] = routeState.insertDVeh(asgn, requestState);
             updateBucketStateDVeh(asgn, pIdxDVeh, dIdxDVeh, depTimeAtLastStopBeforeDVeh);
@@ -214,7 +214,7 @@ namespace karri {
                 ++dIdxDVeh;
             }
 
-            // assert(routeState.assertRouteDVeh(asgn));
+            assert(routeState.assertRouteDVeh(asgn));
 
             const auto routeUpdateTime = timer.elapsed<std::chrono::nanoseconds>();
             requestState.stats().updateStats.updateRoutesTime += routeUpdateTime;
