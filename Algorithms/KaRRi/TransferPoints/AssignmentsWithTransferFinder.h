@@ -35,21 +35,21 @@
 
 namespace karri {
 
-    template <typename OrdinaryTransferFinderT, typename TransferALSPVehFinderT, typename TransferALSDVehFinderT, typename InsertionAsserterT>
+    template<typename OrdinaryTransferFinderT, typename TransferALSPVehFinderT, typename TransferALSDVehFinderT, typename InsertionAsserterT>
     class AssignmentsWithTransferFinder {
 
     public:
         AssignmentsWithTransferFinder(
-            OrdinaryTransferFinderT &ordinaryTransfers,
-            TransferALSPVehFinderT &transfersALSPVeh,
-            TransferALSDVehFinderT &transfersALSDVeh,
-            RequestState &requestState,
-            InsertionAsserterT &asserter)
-                            : ordinaryTransfers(ordinaryTransfers),
-                              transfersALSPVeh(transfersALSPVeh),
-                              transfersALSDVeh(transfersALSDVeh),
-                              requestState(requestState),
-                              asserter(asserter) {}
+                OrdinaryTransferFinderT &ordinaryTransfers,
+                TransferALSPVehFinderT &transfersALSPVeh,
+                TransferALSDVehFinderT &transfersALSDVeh,
+                RequestState &requestState,
+                InsertionAsserterT &asserter)
+                : ordinaryTransfers(ordinaryTransfers),
+                  transfersALSPVeh(transfersALSPVeh),
+                  transfersALSDVeh(transfersALSDVeh),
+                  requestState(requestState),
+                  asserter(asserter) {}
 
         void init() {
             ordinaryTransfers.init();
@@ -60,18 +60,18 @@ namespace karri {
         void findBestAssignment() {
             // Method to find the best assignment with exactly one transfer, i. e. the best possible
             // single transfer journey for the given request
-            
+
             // * TRANSFER AFTER LAST STOP (PVeh)
             transfersALSPVeh.findAssignments();
 
             // * ORDINARY TRANSFER
-             ordinaryTransfers.findAssignments();
-            
-            // * TRANSFER AFTER LAST STOP (PVeh)
-            // transfersALSDVeh.findAssignments();
+            ordinaryTransfers.findAssignments();
+
+            // * TRANSFER AFTER LAST STOP (DVeh)
+            transfersALSDVeh.findAssignments();
 
             //* Test the best assignment found
-             KASSERT(asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
+            KASSERT(asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
         }
 
 

@@ -28,7 +28,7 @@ namespace karri {
         
         // Calculate distances from last stop of every pickup vehicle to all stops of dropoff vehicles
         // Result is of form: vehLastStop - vehAllStops - stop
-        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromLastStopsToAllStops(std::vector<int> vehIdsLastStop, std::vector<int> vehIdsAllStops) {
+        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromLastStopsToAllStops(std::vector<int> &vehIdsLastStop, std::vector<int> &vehIdsAllStops) {
             std::map<int, std::map<int, std::vector<int>>> result;
 
             if (vehIdsLastStop.size() == 0 || vehIdsAllStops.size() == 0)
@@ -87,7 +87,7 @@ namespace karri {
 
         // Calculate distances from pickup to all stops of dropoff vehicles
         // Result is of form: veh - pickup - stop
-        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromAllPickupsToAllStops(std::vector<PDLoc> &pickups, std::vector<int> dVehIds) {
+        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromAllPickupsToAllStops(std::vector<PDLoc> &pickups, std::vector<int> &dVehIds) {
             std::map<int, std::map<int, std::vector<int>>> result;
 
             if (pickups.size() == 0 || dVehIds.size() == 0)
@@ -140,8 +140,50 @@ namespace karri {
         
         // Calculate distances from all stops of pickup vehicles to all dropoffs
         // Result is of form: veh - stop - dropoff
-        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromAllStopsToAllDropoffs(std::vector<int> pVehIds, std::vector<PDLoc> &dropoffs) {
+        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromAllStopsToAllDropoffs(std::vector<int> &pVehIds, std::vector<PDLoc> &dropoffs) {
             std::map<int, std::map<int, std::vector<int>>> result;
+
+            if (pVehIds.size() == 0 || dropoffs.size() == 0)
+                return result;
+
+            // Collect all sources (all stops) and run selection for those stops
+            std::vector<int> sources;
+            for (const auto pVehId : pVehIds) {
+                const auto stopLocations = routeState.stopLocationsFor(pVehId);
+                
+                for (int i = 1; i < stopLocations.size(); i++) {
+                    sources.push_back(vehCh.rank(inputGraph.edgeHead(stopLocations[i])));
+                }
+            }
+
+            Timer selectionTimer;
+            RPHASTSelection allStopsSelection = sourcesSelection.run(sources); 
+            
+            // Run one PHAST query for every dropoff and populate map
+            for (const auto &dropoff : dropoffs) {
+                const auto dropoffLoc = dropoff.loc;
+                const auto dropoffVertex = inputGraph.edgeTail(dropoffLoc);
+                const auto dropoffOffset = inputGraph.travelTime(dropoffLoc);
+                const auto dropoffRank = vehCh.rank(dropoffVertex);
+
+                reverseQuery.run(allStopsSelection, dropoffRank);
+
+                for (const auto pVehId : pVehIds) {
+                    const auto stopLocations = routeState.stopLocationsFor(pVehId);
+                    std::vector<int> distances;
+                    
+                    for (int i = 1; i < stopLocations.size(); i++) {
+                        const auto vertex = inputGraph.edgeHead(stopLocations[i]);
+                        const auto rank = vehCh.rank(vertex);
+                        const auto rankInSelection = allStopsSelection.fullToSubMapping[rank];
+
+                        const auto distance = dropoffOffset + reverseQuery.getDistance(rankInSelection);
+                        distances.push_back(distance);
+                    }
+
+                    result[pVehId][dropoff.id] = distances;
+                }
+            }
 
             return result;
         }

@@ -182,8 +182,6 @@ else(KARRI_COL_PALS_ONLY_PROMISING_DROPOFFS)
     target_compile_definitions(karri PRIVATE KARRI_COL_PALS_ONLY_PROMISING_DROPOFFS=false)
 endif (KARRI_COL_PALS_ONLY_PROMISING_DROPOFFS)
 
-
-
 ## Compile time parameters for transfers
 option(KARRI_USE_DIJKSTRA_TRANSFER_POINT_STRATEGY "Use Dijkstra searches to find transfer points (slow)." OFF)
 if (KARRI_USE_DIJKSTRA_TRANSFER_POINT_STRATEGY)
@@ -212,3 +210,19 @@ if (KARRI_DIRECT_TRANSFER_DISTANCES_USE_SIMD)
 else(KARRI_DIRECT_TRANSFER_DISTANCES_USE_SIMD)
     target_compile_definitions(karri PRIVATE KARRI_DIRECT_TRANSFER_DISTANCES_USE_SIMD=false)
 endif (KARRI_DIRECT_TRANSFER_DISTANCES_USE_SIMD)
+
+
+### Strategy for calulcating shortest paths in the transfer ALS case
+set(TALS_CH 1)
+set(TALS_PHAST 2)
+
+set(KARRI_TALS_CH TALS_CH CACHE STRING "Transfer ALS using CH Approach.")
+set(KARRI_TALS_PHAST TALS_PHAST CACHE STRING "Transfer ALS using PHAST Approach.")
+
+target_compile_definitions(karri PRIVATE KARRI_TALS_CH=1)
+target_compile_definitions(karri PRIVATE KARRI_TALS_PHAST=2)
+
+## Set the strategy here...
+set(KARRI_TALS_STRAT KARRI_TALS_PHAST CACHE STRING "Strategy for computing shortest path in the transfer ALS case.")
+
+target_compile_definitions(karri PRIVATE KARRI_TALS_STRAT=${KARRI_TALS_STRAT})

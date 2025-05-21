@@ -72,7 +72,7 @@ namespace karri {
             std::map<int, std::map<int, std::vector<int>>> result;
         
             for (const auto pVehId : pVehIds) {
-                const auto &pVeh = &fleet[pVehId];
+                // const auto &pVeh = &fleet[pVehId];
                 const int numStopsPVeh = routeState.numStopsOf(pVehId);
                 const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
 
