@@ -285,7 +285,7 @@ namespace karri::stats {
 
         // Overall stats
         int64_t totalTime;
-        
+
         // Stats for the PD Locs
         int64_t numCandidateVehiclesPickupBNS;
         int64_t numCandidateVehiclesPickupORD;
@@ -293,7 +293,7 @@ namespace karri::stats {
         int64_t numCandidateVehiclesDropoffBNS;
         int64_t numCandidateVehiclesDropoffORD;
         int64_t numCandidateVehiclesDropoffALS;
-        
+
         // Stats for the tried assignments
         int64_t numPartialsTriedPickupBNS;
         int64_t numPartialsTriedPickupORD;
@@ -306,7 +306,7 @@ namespace karri::stats {
         int64_t numAssignmentsTriedDropoffALS;
 
         int64_t tryAssignmentsTime;
-        
+
         // Stats for the transfer search itself
         int64_t numStopPairs;
         int64_t numTransferPoints;
@@ -362,7 +362,7 @@ namespace karri::stats {
                << searchTime;
             return ss.str();
         }
-        
+
         int64_t getTotalTime() const {
             return totalTime;
         }
@@ -394,7 +394,7 @@ namespace karri::stats {
     struct AssignmentsWithTransferALSPVehPerformanceStats {
         // Overall stats
         int64_t totalTime;
-        
+
         // Stats for the PD Locs
         int64_t numCandidateVehiclesPickupBNS;
         int64_t numCandidateVehiclesPickupORD;
@@ -405,7 +405,7 @@ namespace karri::stats {
 
         int64_t numPickups;
         int64_t numDropoffs;
-        
+
         // Stats for the tried assignments 
         int64_t numAssignmentsTriedPickupBNS;
         int64_t numAssignmentsTriedPickupORD;
@@ -415,15 +415,15 @@ namespace karri::stats {
         int64_t numAssignmentsTriedDropoffALS;
 
         int64_t tryAssignmentsTime;
-        
+
         // Stats for the transfer search itself
         int64_t numTransferPoints;
-        
+
         int64_t searchTimePickupALS;
         int64_t searchTimeDropoffALS;
         int64_t searchTimeLastStopToTransfer;
         int64_t searchTimePickupToTransfer;
-        
+
         static constexpr auto LOGGER_NAME = "perf_transf_als_pveh.csv";
         static constexpr auto LOGGER_COLS =
                 "total_time,"
@@ -498,15 +498,15 @@ namespace karri::stats {
     };
 
     struct AssignmentsWithTransferALSDVehPerformanceStats {
-        
+
         // Overall stats
         int64_t totalTime;
-        
+
         // Stats for the PD Locs
         int64_t numCandidateVehiclesPickupBNS;
         int64_t numCandidateVehiclesPickupORD;
         int64_t numCandidateVehiclesDropoffALS;
-        
+
         int64_t numPickups;
         int64_t numDropoffs;
 
@@ -516,7 +516,7 @@ namespace karri::stats {
         int64_t numAssignmentsTriedDropoffALS;
 
         int64_t tryAssignmentsTime;
-        
+
         // Stats for the transfer search itself
         int64_t numTransferPoints;
 
@@ -550,14 +550,14 @@ namespace karri::stats {
                << numCandidateVehiclesDropoffALS << ", "
                << numPickups << ", "
                << numDropoffs << ", "
-               
+
                << numAssignmentsTriedPickupBNS << ", "
                << numAssignmentsTriedPickupORD << ", "
                << numAssignmentsTriedDropoffALS << ", "
                << tryAssignmentsTime << ", "
-               
+
                << numTransferPoints << ", "
-               
+
                << searchTimeDropoffALS << ", "
                << searchTimeLastStopToTransfer << ", "
                << searchTimeTransferToDropoff;
@@ -580,7 +580,7 @@ namespace karri::stats {
             numAssignmentsTriedDropoffALS = 0;
             tryAssignmentsTime = 0;
             numTransferPoints = 0;
-            
+
             searchTimeDropoffALS = 0;
             searchTimeLastStopToTransfer = 0;
             searchTimeTransferToDropoff = 0;
@@ -666,9 +666,6 @@ namespace karri::stats {
             return ss.str();
         }
     };
-
-
-
 
 
     struct PalsAssignmentsPerformanceStats {
@@ -963,6 +960,9 @@ namespace karri::stats {
                    pbnsAssignmentsStats.getTotalTime() +
                    palsAssignmentsStats.getTotalTime() +
                    dalsAssignmentsStats.getTotalTime() +
+                   ordinaryTransferStats.getTotalTime() +
+                   transferALSPVehStats.getTotalTime() +
+                   transferALSDVehStats.getTotalTime() +
                    updateStats.getTotalTime();
         }
 
