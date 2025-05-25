@@ -212,6 +212,7 @@ else(KARRI_DIRECT_TRANSFER_DISTANCES_USE_SIMD)
     target_compile_definitions(karri PRIVATE KARRI_DIRECT_TRANSFER_DISTANCES_USE_SIMD=false)
 endif (KARRI_DIRECT_TRANSFER_DISTANCES_USE_SIMD)
 
+
 ### Strategy for calulcating shortest paths in the transfer ALS case
 set(TALS_CH 1)
 set(TALS_PHAST 2)
