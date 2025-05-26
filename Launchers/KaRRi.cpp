@@ -711,7 +711,7 @@ int main(int argc, char *argv[]) {
 
         using SystemStateUpdaterImpl = SystemStateUpdater<VehicleInputGraph, EllipticBucketsEnv, LastStopBucketsEnv, CurVehLocToPickupSearchesImpl, VehPathTracker, std::ofstream>;
         SystemStateUpdaterImpl
-                systemStateUpdater(vehicleInputGraph, reqState, curVehLocToPickupSearches,
+                systemStateUpdater(vehicleInputGraph, vehChEnv->getCH(), reqState, curVehLocToPickupSearches,
                                    pathTracker, routeState, ellipticBucketsEnv, lastStopBucketsEnv);
 
 
