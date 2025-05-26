@@ -43,12 +43,13 @@ namespace karri {
 
     public:
 
-        SystemStateUpdater(const InputGraphT &inputGraph, RequestState &requestState,
+        SystemStateUpdater(const InputGraphT &inputGraph, const CH &vehCh, RequestState &requestState,
                            const CurVehLocsT &curVehLocs,
                            PathTrackerT &pathTracker,
                            RouteState &routeState, EllipticBucketsEnvT &ellipticBucketsEnv,
                            LastStopBucketsEnvT &lastStopBucketsEnv)
                 : inputGraph(inputGraph),
+                  vehCh(vehCh),
                   requestState(requestState),
                   curVehLocs(curVehLocs),
                   pathTracker(pathTracker),
@@ -76,38 +77,38 @@ namespace karri {
                                                                        "not_using_vehicle,"
                                                                        "cost\n")),
                   bestAssignmentsWithTransferLogger(LogManager<LoggerT>::getLogger("bestassignmentswithtransfer.csv",
-                                                                        "request_id,"
-                                                                        "request_time,"
-                                                                        "direct_od_dist,"
-                                                                        "pickup_vehicle_id,"
-                                                                        "dropoff_vehicle_id,"
-                                                                        "pickup_insertion_point,"
-                                                                        "transfer_pveh_insertion_point,"
-                                                                        "transfer_dveh_insertion_point,"
-                                                                        "dropoff_insertion_point,"
-                                                                        "dist_to_pickup,"
-                                                                        "dist_from_pickup,"
-                                                                        "dist_to_transfer_pveh,"
-                                                                        "dist_from_transfer_pveh,"
-                                                                        "dist_to_transfer_dveh,"
-                                                                        "dist_from_transfer_dveh,"
-                                                                        "dist_to_dropoff,"
-                                                                        "dist_from_dropoff,"
-                                                                        "pickup_type,"
-                                                                        "transfer_type_pveh,"
-                                                                        "transfer_type_dveh,"
-                                                                        "dropoff_type,"
-                                                                        "pickup_id,"
-                                                                        "pickup_walking_dist,"
-                                                                        "dropoff_id,"
-                                                                        "dropoff_walking_dist,"
-                                                                        "num_stops_pveh,"
-                                                                        "num_stops_dveh,"
-                                                                        "veh_dep_time_at_stop_before_pickup,"
-                                                                        "veh_dep_time_at_stop_before_transfer_pveh,"
-                                                                        "veh_dep_time_at_stop_before_transfer_dveh,"
-                                                                        "veh_dep_time_at_stop_before_dropoff,"
-                                                                        "cost\n")),
+                                                                                   "request_id,"
+                                                                                   "request_time,"
+                                                                                   "direct_od_dist,"
+                                                                                   "pickup_vehicle_id,"
+                                                                                   "dropoff_vehicle_id,"
+                                                                                   "pickup_insertion_point,"
+                                                                                   "transfer_pveh_insertion_point,"
+                                                                                   "transfer_dveh_insertion_point,"
+                                                                                   "dropoff_insertion_point,"
+                                                                                   "dist_to_pickup,"
+                                                                                   "dist_from_pickup,"
+                                                                                   "dist_to_transfer_pveh,"
+                                                                                   "dist_from_transfer_pveh,"
+                                                                                   "dist_to_transfer_dveh,"
+                                                                                   "dist_from_transfer_dveh,"
+                                                                                   "dist_to_dropoff,"
+                                                                                   "dist_from_dropoff,"
+                                                                                   "pickup_type,"
+                                                                                   "transfer_type_pveh,"
+                                                                                   "transfer_type_dveh,"
+                                                                                   "dropoff_type,"
+                                                                                   "pickup_id,"
+                                                                                   "pickup_walking_dist,"
+                                                                                   "dropoff_id,"
+                                                                                   "dropoff_walking_dist,"
+                                                                                   "num_stops_pveh,"
+                                                                                   "num_stops_dveh,"
+                                                                                   "veh_dep_time_at_stop_before_pickup,"
+                                                                                   "veh_dep_time_at_stop_before_transfer_pveh,"
+                                                                                   "veh_dep_time_at_stop_before_transfer_dveh,"
+                                                                                   "veh_dep_time_at_stop_before_dropoff,"
+                                                                                   "cost\n")),
                   overallPerfLogger(
                           LogManager<LoggerT>::getLogger(stats::DispatchingPerformanceStats::LOGGER_NAME,
                                                          "request_id, " +
@@ -149,26 +150,40 @@ namespace karri {
                                                                   "request_id, " +
                                                                   std::string(
                                                                           stats::UpdatePerformanceStats::LOGGER_COLS))),
-                  
-                  ordinaryTransferPerfLogger(LogManager<LoggerT>::getLogger(stats::AssignmentsWithOrdinaryTransferPerformanceStats::LOGGER_NAME,
-                                                                  "request_id," +
-                                                                  std::string(stats::AssignmentsWithOrdinaryTransferPerformanceStats::LOGGER_COLS))),                              
-                  
-                  transferALSPVehPerfLogger(LogManager<LoggerT>::getLogger(stats::AssignmentsWithTransferALSPVehPerformanceStats::LOGGER_NAME,
-                                                                   "request_id," +
-                                                                   std::string(stats::AssignmentsWithTransferALSPVehPerformanceStats::LOGGER_COLS))),
-                  
-                  transferALSDVehPerfLogger(LogManager<LoggerT>::getLogger(stats::AssignmentsWithTransferALSDVehPerformanceStats::LOGGER_NAME,
-                                                                   "request_id," +
-                                                                   std::string(stats::AssignmentsWithTransferALSDVehPerformanceStats::LOGGER_COLS))),
-                  
+
+                  ordinaryTransferPerfLogger(LogManager<LoggerT>::getLogger(
+                          stats::AssignmentsWithOrdinaryTransferPerformanceStats::LOGGER_NAME,
+                          "request_id," +
+                          std::string(stats::AssignmentsWithOrdinaryTransferPerformanceStats::LOGGER_COLS))),
+
+                  transferALSPVehPerfLogger(LogManager<LoggerT>::getLogger(
+                          stats::AssignmentsWithTransferALSPVehPerformanceStats::LOGGER_NAME,
+                          "request_id," +
+                          std::string(stats::AssignmentsWithTransferALSPVehPerformanceStats::LOGGER_COLS))),
+
+                  transferALSDVehPerfLogger(LogManager<LoggerT>::getLogger(
+                          stats::AssignmentsWithTransferALSDVehPerformanceStats::LOGGER_NAME,
+                          "request_id," +
+                          std::string(stats::AssignmentsWithTransferALSDVehPerformanceStats::LOGGER_COLS))),
+
                   assignmentsCostLogger(LogManager<LoggerT>::getLogger(stats::AssignmentCostStats::LOGGER_NAME,
-                                                                  "request_id," +
-                                                                  std::string(
-                                                                          stats::AssignmentCostStats::LOGGER_COLS))) {}
+                                                                       "request_id," +
+                                                                       std::string(
+                                                                               stats::AssignmentCostStats::LOGGER_COLS))),
+                  ordinaryTransferRanksLogger(LogManager<LoggerT>::getLogger("ordinarytransfer_ranks.csv",
+                                                                             "request_id,"
+                                                                             "pickup_vehicle_id,"
+                                                                             "dropoff_vehicle_id,"
+                                                                             "transfer_rank,"
+                                                                             "pveh_prev_stop_rank,"
+                                                                             "pveh_next_stop_rank,"
+                                                                             "dveh_prev_stop_rank,"
+                                                                             "dveh_next_stop_rank\n")) {}
 
 
-        void insertBestAssignmentWithTransfer(const AssignmentWithTransfer &asgn, int &pickupStopId, int &transferStopIdPVeh, int &transferStopIdDVeh, int &dropoffStopId) {
+        void
+        insertBestAssignmentWithTransfer(const AssignmentWithTransfer &asgn, int &pickupStopId, int &transferStopIdPVeh,
+                                         int &transferStopIdDVeh, int &dropoffStopId) {
             Timer timer;
 
             requestState.chosenPDLocsRoadCategoryStats().incCountForCat(inputGraph.osmRoadCategory(asgn.pickup->loc));
@@ -179,7 +194,7 @@ namespace karri {
 
             const auto pVehId = asgn.pVeh->vehicleId;
             const auto dVehId = asgn.dVeh->vehicleId;
-            
+
             const auto numStopsBeforePVeh = routeState.numStopsOf(pVehId);
             const auto numStopsBeforeDVeh = routeState.numStopsOf(dVehId);
 
@@ -193,10 +208,12 @@ namespace karri {
 
             // If the vehicle has to be rerouted at its current location for a PBNS assignment, we introduce an
             // intermediate stop at its current location representing the rerouting.
-            if (asgn.pickupIdx == 0 && numStopsBeforePVeh > 1 && routeState.schedDepTimesFor(pVehId)[0] < requestState.originalRequest.requestTime) {                
-                createIntermediateStopStopAtCurrentLocationForReroute(*asgn.pVeh, requestState.originalRequest.requestTime);
+            if (asgn.pickupIdx == 0 && numStopsBeforePVeh > 1 &&
+                routeState.schedDepTimesFor(pVehId)[0] < requestState.originalRequest.requestTime) {
+                createIntermediateStopStopAtCurrentLocationForReroute(*asgn.pVeh,
+                                                                      requestState.originalRequest.requestTime);
                 assert(routeState.vehicleIdOf(routeState.stopIdsFor(pVehId)[1]) == pVehId);
-                
+
                 ++pIdxPVeh;
                 ++dIdxPVeh;
             }
@@ -206,8 +223,10 @@ namespace karri {
             auto [pIdxDVeh, dIdxDVeh] = routeState.insertDVeh(asgn, requestState);
             updateBucketStateDVeh(asgn, pIdxDVeh, dIdxDVeh, depTimeAtLastStopBeforeDVeh);
 
-            if (asgn.transferIdxDVeh == 0 && numStopsBeforeDVeh > 1 && routeState.schedDepTimesFor(dVehId)[0] < requestState.originalRequest.requestTime) {
-                createIntermediateStopStopAtCurrentLocationForReroute(*asgn.dVeh, requestState.originalRequest.requestTime);
+            if (asgn.transferIdxDVeh == 0 && numStopsBeforeDVeh > 1 &&
+                routeState.schedDepTimesFor(dVehId)[0] < requestState.originalRequest.requestTime) {
+                createIntermediateStopStopAtCurrentLocationForReroute(*asgn.dVeh,
+                                                                      requestState.originalRequest.requestTime);
                 assert(routeState.vehicleIdOf(routeState.stopIdsFor(dVehId)[1]) == dVehId);
 
                 ++pIdxDVeh;
@@ -310,7 +329,7 @@ namespace karri {
                     << requestState.originalRequest.requestId << ", "
                     << requestState.originalRequest.requestTime << ", "
                     << requestState.originalReqDirectDist << ", ";
-            
+
             bestAssignmentsWithTransferLogger
                     << requestState.originalRequest.requestId << ", "
                     << requestState.originalRequest.requestTime << ", "
@@ -322,20 +341,22 @@ namespace karri {
 
             if (requestState.isNotUsingVehicleBest()) {
                 bestAssignmentsLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, true, "
-                                        << requestState.getBestCost() << "\n";
-                bestAssignmentsWithTransferLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
+                                      << requestState.getBestCost() << "\n";
+                bestAssignmentsWithTransferLogger
+                        << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
                 return;
             }
 
             const int costWT = requestState.getCostObjectWithTransfer().total;
             const int costWOT = requestState.getCostObjectWithoutTransfer().total;
-                    
+
             if (costWOT >= INFTY) {
                 bestAssignmentsLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
             }
 
             if (costWT >= INFTY) {
-                bestAssignmentsWithTransferLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
+                bestAssignmentsWithTransferLogger
+                        << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
             }
 
             using time_utils::getVehDepTimeAtStopForRequest;
@@ -345,7 +366,7 @@ namespace karri {
                 const auto &vehId = bestAsgn.vehicle->vehicleId;
                 const auto &numStops = routeState.numStopsOf(vehId);
                 const auto &vehDepTimeBeforePickup = getVehDepTimeAtStopForRequest(vehId, bestAsgn.pickupStopIdx,
-                                                                                requestState, routeState);
+                                                                                   requestState, routeState);
                 const auto &vehDepTimeBeforeDropoff = getVehDepTimeAtStopForRequest(vehId, bestAsgn.dropoffStopIdx,
                                                                                     requestState, routeState);
                 bestAssignmentsLogger
@@ -379,13 +400,13 @@ namespace karri {
                 const auto &numStopsPVeh = routeState.numStopsOf(pVehId);
                 const auto &numStopsDVeh = routeState.numStopsOf(dVehId);
                 const auto &vehDepTimeBeforePickupWT = getVehDepTimeAtStopForRequest(pVehId, pickupIdx,
-                                                                                requestState, routeState);
+                                                                                     requestState, routeState);
                 const auto &vehDepTimeBeforeTransferPVeh = getVehDepTimeAtStopForRequest(pVehId, transferIdxPVeh,
-                                                                                requestState, routeState);
+                                                                                         requestState, routeState);
                 const auto &vehDepTimeBeforeTransferDVeh = getVehDepTimeAtStopForRequest(dVehId, transferIdxDVeh,
-                                                                                requestState, routeState);
+                                                                                         requestState, routeState);
                 const auto &vehDepTimeBeforeDropoffWT = getVehDepTimeAtStopForRequest(dVehId, dropoffIdx,
-                                                                                requestState, routeState);
+                                                                                      requestState, routeState);
 
                 const std::array<std::string, 4> types = {"NOT_SET", "BNS", "ORD", "ALS"};
 
@@ -393,6 +414,21 @@ namespace karri {
                 const auto transferTypePVeh = types[bestAsgnWT.transferTypePVeh];
                 const auto transferTypeDVeh = types[bestAsgnWT.transferTypeDVeh];
                 const auto dropoffType = types[bestAsgnWT.dropoffType];
+
+                if (bestAsgnWT.transferTypePVeh == ORDINARY && bestAsgnWT.transferTypeDVeh == ORDINARY) {
+                    // Log CH ranks of transfer and stop pairs for ordinary transfer
+                    const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
+                    const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
+                    ordinaryTransferRanksLogger
+                            << requestState.originalRequest.requestId << ","
+                            << pVehId << ","
+                            << dVehId << ","
+                            << vehCh.rank(inputGraph.edgeHead(bestAsgnWT.transfer.loc)) << ","
+                            << vehCh.rank(inputGraph.edgeHead(stopLocationsPVeh[transferIdxPVeh])) << ","
+                            << vehCh.rank(inputGraph.edgeHead(stopLocationsPVeh[transferIdxPVeh + 1])) << ","
+                            << vehCh.rank(inputGraph.edgeHead(stopLocationsDVeh[transferIdxDVeh])) << ","
+                            << vehCh.rank(inputGraph.edgeHead(stopLocationsDVeh[transferIdxDVeh + 1])) << "\n" << std::flush;
+                }
 
 
                 bestAssignmentsWithTransferLogger
@@ -448,11 +484,11 @@ namespace karri {
             updatePerfLogger << requestState.originalRequest.requestId << ", "
                              << requestState.stats().updateStats.getLoggerRow() << "\n";
             ordinaryTransferPerfLogger << requestState.originalRequest.requestId << ", "
-                               << requestState.stats().ordinaryTransferStats.getLoggerRow() << "\n";
+                                       << requestState.stats().ordinaryTransferStats.getLoggerRow() << "\n";
             transferALSPVehPerfLogger << requestState.originalRequest.requestId << ", "
-                               << requestState.stats().transferALSPVehStats.getLoggerRow() << "\n";
+                                      << requestState.stats().transferALSPVehStats.getLoggerRow() << "\n";
             transferALSDVehPerfLogger << requestState.originalRequest.requestId << ", "
-                               << requestState.stats().transferALSDVehStats.getLoggerRow() << "\n";
+                                      << requestState.stats().transferALSDVehStats.getLoggerRow() << "\n";
         }
 
     private:
@@ -471,7 +507,8 @@ namespace karri {
         }
 
 
-        void updateBucketStatePVeh(const AssignmentWithTransfer &asgn, const int pickupIdx, const int transferIdxPVeh, const int depTimeAtLastBeforePVeh) {
+        void updateBucketStatePVeh(const AssignmentWithTransfer &asgn, const int pickupIdx, const int transferIdxPVeh,
+                                   const int depTimeAtLastBeforePVeh) {
             // generateBucketStateForNewStops(asgn, pickupIdx, transferIdxPVeh, transferIdxDVeh, dropoffIdx);
 
             generateBucketStateForNewStopsPVeh(asgn, pickupIdx, transferIdxPVeh);
@@ -498,7 +535,8 @@ namespace karri {
             }
         }
 
-        void updateBucketStateDVeh(const AssignmentWithTransfer &asgn, const int transferIdxDVeh, const int dropoffIdx, const int depTimeAtLastBeforeDVeh) {
+        void updateBucketStateDVeh(const AssignmentWithTransfer &asgn, const int transferIdxDVeh, const int dropoffIdx,
+                                   const int depTimeAtLastBeforeDVeh) {
             // generateBucketStateForNewStops(asgn, pickupIdx, transferIdxPVeh, transferIdxDVeh, dropoffIdx);
             generateBucketStateForNewStopsDVeh(asgn, transferIdxDVeh, dropoffIdx);
 
@@ -519,7 +557,7 @@ namespace karri {
 
             const auto depTimeAtLastStopAfterDVeh = routeState.schedDepTimesFor(dVehId)[numStopsAfterDVeh - 1];
             const bool depTimeAtLastChangedDVeh = depTimeAtLastStopAfterDVeh != depTimeAtLastBeforeDVeh;
-            
+
             if ((dropoffAtExistingStop || dropoffIdx < numStopsAfterDVeh - 1) && depTimeAtLastChangedDVeh) {
                 lastStopBucketsEnv.updateBucketEntries(*asgn.dVeh, numStopsAfterDVeh - 1);
             }
@@ -556,12 +594,13 @@ namespace karri {
             }
         }
 
-        void generateBucketStateForNewStopsPVeh(const AssignmentWithTransfer &asgn, const int pickupIdx, const int transferIdxPVeh) {
+        void generateBucketStateForNewStopsPVeh(const AssignmentWithTransfer &asgn, const int pickupIdx,
+                                                const int transferIdxPVeh) {
             const auto pVehId = asgn.pVeh->vehicleId;
             const auto &numStopsPVeh = routeState.numStopsOf(pVehId);
 
             const bool pickupAtExistingStop = pickupIdx == asgn.pickupIdx;
-            const bool transferAtExistingStopPVeh = transferIdxPVeh == asgn.transferIdxPVeh +!pickupAtExistingStop;
+            const bool transferAtExistingStopPVeh = transferIdxPVeh == asgn.transferIdxPVeh + !pickupAtExistingStop;
 
             if (!pickupAtExistingStop) {
                 assert(pickupIdx > 0);
@@ -594,7 +633,8 @@ namespace karri {
             }
         }
 
-        void generateBucketStateForNewStopsDVeh(const AssignmentWithTransfer &asgn, const int transferIdxDVeh, const int dropoffIdx) {
+        void generateBucketStateForNewStopsDVeh(const AssignmentWithTransfer &asgn, const int transferIdxDVeh,
+                                                const int dropoffIdx) {
             const auto dVehId = asgn.dVeh->vehicleId;
             const auto &numStopsDVeh = routeState.numStopsOf(dVehId);
 
@@ -606,7 +646,7 @@ namespace karri {
                 ellipticBucketsEnv.generateTargetBucketEntries(*asgn.dVeh, transferIdxDVeh);
                 ellipticBucketsEnv.generateSourceBucketEntries(*asgn.dVeh, transferIdxDVeh);
             }
-            
+
             if (!dropoffAtExistingStop) {
                 ellipticBucketsEnv.generateTargetBucketEntries(*asgn.dVeh, dropoffIdx);
 
@@ -671,6 +711,7 @@ namespace karri {
         }
 
         const InputGraphT &inputGraph;
+        const CH &vehCh;
         RequestState &requestState;
         const CurVehLocsT &curVehLocs;
         PathTrackerT &pathTracker;
@@ -700,6 +741,8 @@ namespace karri {
         LoggerT &transferALSDVehPerfLogger;
 
         LoggerT &assignmentsCostLogger;
+
+        LoggerT &ordinaryTransferRanksLogger;
 
     };
 }
