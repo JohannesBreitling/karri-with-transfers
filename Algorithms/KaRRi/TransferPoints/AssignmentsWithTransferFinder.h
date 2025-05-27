@@ -36,7 +36,7 @@
 
 namespace karri {
 
-    template <typename OrdinaryTransferFinderT, typename TransferALSPVehFinderT, typename TransferALSDVehFinderT, typename InsertionAsserterT>
+    template <typename OrdinaryTransferFinderT, typename TransferALSPVehFinderT, typename TransferALSDVehFinderT, typename InsertionAsserterT, typename HeuristicTransferFinderT>
     class AssignmentsWithTransferFinder {
 
     public:
@@ -44,11 +44,13 @@ namespace karri {
             OrdinaryTransferFinderT &ordinaryTransfers,
             TransferALSPVehFinderT &transfersALSPVeh,
             TransferALSDVehFinderT &transfersALSDVeh,
+            HeuristicTransferFinderT &heuristicTransfers,
             RequestState &requestState,
             InsertionAsserterT &asserter)
                             : ordinaryTransfers(ordinaryTransfers),
                               transfersALSPVeh(transfersALSPVeh),
                               transfersALSDVeh(transfersALSDVeh),
+                              heuristicTransfers(heuristicTransfers),
                               requestState(requestState),
                               asserter(asserter) {}
 
@@ -71,8 +73,11 @@ namespace karri {
             // * TRANSFER AFTER LAST STOP (PVeh)
             transfersALSDVeh.findAssignments();
 
+            // * HEURISTIC TRANSFERS
+            heuristicTransfers.findAssignments();
+
             //* Test the best assignment found
-            // assert(asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
+            KASSERT(asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
         }
 
 
@@ -81,6 +86,7 @@ namespace karri {
         OrdinaryTransferFinderT &ordinaryTransfers;
         TransferALSPVehFinderT &transfersALSPVeh;
         TransferALSDVehFinderT &transfersALSDVeh;
+        HeuristicTransferFinderT &heuristicTransfers;
 
         RequestState &requestState;
 

@@ -109,6 +109,112 @@ namespace karri {
                 requestState.stats().initializationStats.notUsingVehicleTime = notUsingVehiclesTime;
             }
         }
+        
+        void initializeIntermediatePickupState(const Request &req) {
+            // Timer timer;
+
+            requestState.reset();
+
+            requestState.originalRequest = req;
+
+            assert(psgInputGraph.toCarEdge(vehInputGraph.toPsgEdge(req.origin)) == req.origin);
+            const auto originInPsgGraph = vehInputGraph.toPsgEdge(req.origin);
+
+            // assert(psgInputGraph.toCarEdge(vehInputGraph.toPsgEdge(req.destination)) == req.destination);
+            // const auto destInPsgGraph = vehInputGraph.toPsgEdge(req.destination);
+
+            findPdLocsInRadiusQuery.findPDLocs(originInPsgGraph, originInPsgGraph);
+            requestState.dropoffs.clear();
+            
+            PDLoc dropoff;
+            dropoff.id = 0;
+            dropoff.loc = req.destination;
+            
+            dropoff.psgLoc = INVALID_EDGE;
+            dropoff.vehDistFromCenter = 0;
+            dropoff.vehDistToCenter = 0;
+            dropoff.walkingDist = 0;
+
+            requestState.dropoffs.push_back(dropoff); // ! Workaround
+            
+            
+
+            // const auto findHaltingSpotsTime = timer.elapsed<std::chrono::nanoseconds>();
+            // requestState.stats().initializationStats.findPDLocsInRadiusTime = findHaltingSpotsTime;
+            // requestState.stats().numPickups = requestState.numPickups();
+            // requestState.stats().numDropoffs = requestState.numDropoffs();
+            // timer.restart();
+
+            // Precalculate the vehicle distances from pickups to origin and from destination to dropoffs for upper bounds on PD distances
+            vehicleToPdLocQuery.runReverse(requestState.pickups);
+            // vehicleToPdLocQuery.runForward(requestState.dropoffs);
+
+            // const auto findVehicleToPdLocsDistancesTime = timer.elapsed<std::chrono::nanoseconds>();
+            // requestState.stats().initializationStats.findVehicleToPdLocsDistancesTime = findVehicleToPdLocsDistancesTime;
+
+            // Calculate the direct distance between the requests origin and destination
+            // timer.restart();
+            const auto source = vehCh.rank(vehInputGraph.edgeHead(req.origin));
+            const auto target = vehCh.rank(vehInputGraph.edgeTail(req.destination));
+            vehChQuery.run(source, target);
+            requestState.originalReqDirectDist = vehChQuery.getDistance() + vehInputGraph.travelTime(req.destination);
+
+            // const auto directSearchTime = timer.elapsed<std::chrono::nanoseconds>();
+            // requestState.stats().initializationStats.computeODDistanceTime = directSearchTime;
+        }
+
+        void initializeIntermediateTransferState(const Request &req) {
+            // Timer timer;
+
+            requestState.reset();
+
+            requestState.originalRequest = req;
+
+            // assert(psgInputGraph.toCarEdge(vehInputGraph.toPsgEdge(req.origin)) == req.origin);
+            // const auto originInPsgGraph = vehInputGraph.toPsgEdge(req.origin);
+
+            assert(psgInputGraph.toCarEdge(vehInputGraph.toPsgEdge(req.destination)) == req.destination); // ! Workaround
+            const auto destInPsgGraph = vehInputGraph.toPsgEdge(req.destination);
+
+            findPdLocsInRadiusQuery.findPDLocs(destInPsgGraph, destInPsgGraph);
+            requestState.pickups.clear();
+
+            PDLoc pickup;
+            pickup.id = 0;
+            pickup.loc = req.origin;
+            
+            pickup.psgLoc = INVALID_EDGE;
+            pickup.vehDistFromCenter = 0;
+            pickup.vehDistToCenter = 0;
+            pickup.walkingDist = 0;
+
+            requestState.pickups.push_back(pickup);
+
+            // const auto findHaltingSpotsTime = timer.elapsed<std::chrono::nanoseconds>();
+            // requestState.stats().initializationStats.findPDLocsInRadiusTime = findHaltingSpotsTime;
+            // requestState.stats().numPickups = requestState.numPickups();
+            // requestState.stats().numDropoffs = requestState.numDropoffs();
+            // timer.restart();
+
+            // Precalculate the vehicle distances from pickups to origin and from destination to dropoffs for upper bounds on PD distances
+            // vehicleToPdLocQuery.runReverse(requestState.pickups);
+            vehicleToPdLocQuery.runForward(requestState.dropoffs);
+
+            // const auto findVehicleToPdLocsDistancesTime = timer.elapsed<std::chrono::nanoseconds>();
+            // requestState.stats().initializationStats.findVehicleToPdLocsDistancesTime = findVehicleToPdLocsDistancesTime;
+
+            // Calculate the direct distance between the requests origin and destination
+            // timer.restart();
+            const auto source = vehCh.rank(vehInputGraph.edgeHead(req.origin));
+            const auto target = vehCh.rank(vehInputGraph.edgeTail(req.destination));
+            vehChQuery.run(source, target);
+            requestState.originalReqDirectDist = vehChQuery.getDistance() + vehInputGraph.travelTime(req.destination);
+
+            // const auto directSearchTime = timer.elapsed<std::chrono::nanoseconds>();
+            // requestState.stats().initializationStats.computeODDistanceTime = directSearchTime;
+        }
+
+        
 
 
     private:

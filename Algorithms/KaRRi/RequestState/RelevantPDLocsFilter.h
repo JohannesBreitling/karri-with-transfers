@@ -64,6 +64,8 @@ namespace karri {
             const int numRelStopsForPickups = filterOrdinaryPickups();
             const int numRelStopsForDropoffs = filterOrdinaryDropoffs();
 
+            // std::cout << "Ordinary PVehs: " << relOrdinaryPickups.getVehiclesWithRelevantPDLocs().size() << " Ordinary DVehs: " << relOrdinaryDropoffs.getVehiclesWithRelevantPDLocs().size() << std::endl;
+
             const int64_t time = timer.elapsed<std::chrono::nanoseconds>();
             requestState.stats().ordAssignmentsStats.filterRelevantPDLocsTime += time;
             requestState.stats().ordAssignmentsStats.numRelevantStopsForPickups += numRelStopsForPickups;
@@ -83,6 +85,8 @@ namespace karri {
 
             const int numRelStopsForPickups = filterPickupsBeforeNextStop();
             const int numRelStopsForDropoffs = filterDropoffsBeforeNextStop();
+
+            // std::cout << "BNS PVehs: " << relPickupsBeforeNextStop.getVehiclesWithRelevantPDLocs().size() << " BNS DVehs: " << relDropoffsBeforeNextStop.getVehiclesWithRelevantPDLocs().size() << std::endl;
 
             const int64_t time = timer.elapsed<std::chrono::nanoseconds>();
             requestState.stats().pbnsAssignmentsStats.filterRelevantPDLocsTime += time;

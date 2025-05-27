@@ -49,7 +49,8 @@ namespace karri {
                   pickup(pickup),
                   dropoff(dropoff),
                   pickupStopIdx(pickupStopIdx),
-                  dropoffStopIdx(dropoffStopIdx) {
+                  dropoffStopIdx(dropoffStopIdx),
+                  cost() {
             assert(pickupStopIdx >= 0);
             assert(dropoffStopIdx >= 0);
         }
@@ -67,7 +68,8 @@ namespace karri {
                   distToPickup(distToPickup),
                   distFromPickup(distFromPickup),
                   distToDropoff(distToDropoff),
-                  distFromDropoff(distFromDropoff) {
+                  distFromDropoff(distFromDropoff),
+                  cost() {
             assert(pickupStopIdx >= 0);
             assert(dropoffStopIdx >= 0);
             assert(distToPickup >= 0);
@@ -80,8 +82,6 @@ namespace karri {
         const PDLoc *pickup = nullptr;
         const PDLoc *dropoff = nullptr;
 
-        RequestCost cost;
-
         int pickupStopIdx = INVALID_INDEX; // Pickup is inserted at or after stop with index pickupStopIdx in route of vehicle
         int dropoffStopIdx = INVALID_INDEX; // Dropoff is inserted at or after stop with index dropoffStopIdx in route of vehicle
 
@@ -89,6 +89,8 @@ namespace karri {
         int distFromPickup = 0; // Distance from pickup to next stop (or 0 if pickupStopIdx == dropoffStopIdx)
         int distToDropoff = 0; // Distance from previous stop to dropoff (or from pickup to dropoff if pickupStopIdx == dropoffStopIdx)
         int distFromDropoff = 0; // Distance from dropoff to next stop (or 0 if there is no next stop)
+    
+        RequestCost cost;
     };
 
     // Criterion to make decision between two assignments with the same cost deterministic.

@@ -136,7 +136,6 @@ namespace karri {
             }
 
             if (recomputePVeh && !unfinishedPVeh) {
-                // std::cout << "recompute pVeh finished" << std::endl;
                 calcPartialCostForPVeh<checkHardConstraints>(asgn, context);
 
                 if (asgn.costPVeh.total >= INFTY) {
@@ -919,6 +918,7 @@ namespace karri {
             cost.changeInTripCostsOfOthers = changeInTripCostsOfOthers;
             cost.vehCost = vehCost;
             cost.total = vehCost + walkingCost + tripCost + waitTimeViolationCost + changeInTripCostsOfOthers;
+            cost.arrAtDropoff = arrTimeAtDropoff;
 
             return cost;
         }
@@ -930,7 +930,7 @@ namespace karri {
                                  const bool transferAtExistingStop,
                                  const int addedTripTimeForExistingPassengers) const {
 
-            asgn.cost = {0, 0, 0, 0, 0, 0};
+            // asgn.cost = {0, 0, 0, 0, 0, 0};
 
             if (!asgn.pVeh || !asgn.pickup) {
                 asgn.costPVeh = RequestCost::INFTY_COST();

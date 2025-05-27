@@ -76,6 +76,8 @@
 #include "Algorithms/KaRRi/TransferPoints/TransfersALS/CHStrategyALS.h"
 #include "Algorithms/KaRRi/TransferPoints/TransfersALS/TransfersALSPVeh/TransferALSPVehFinder.h"
 #include "Algorithms/KaRRi/TransferPoints/TransfersALS/TransfersALSDVeh/TransferALSDVehFinder.h"
+#include "Algorithms/KaRRi/TransferPoints/Heuristic/IntermediateAssignmentFinder.h"
+#include "Algorithms/KaRRi/TransferPoints/Heuristic/HeuristicTransferFinder.h"
 
 #include "Algorithms/KaRRi/LastStopSearches/SortedLastStopBucketsEnvironment.h"
 #include "Algorithms/KaRRi/LastStopSearches/UnsortedLastStopBucketsEnvironment.h"
@@ -432,17 +434,23 @@ int main(int argc, char *argv[]) {
         using VehicleLocatorImpl = VehicleLocator<VehicleInputGraph, VehCHEnv>;
         VehicleLocatorImpl locator(vehicleInputGraph, *vehChEnv, routeState);
 
+        VehicleLocatorImpl indermediateLocator(vehicleInputGraph, *vehChEnv, routeState); // * For intermediateAssignmentFinder
+
         CostCalculator calc(routeState);
         
         std::vector<AssignmentWithTransfer> postponedAssignments = std::vector<AssignmentWithTransfer>{};
 
         RequestState reqState(calc, postponedAssignments);
+        RequestState intermediateReqState(calc, postponedAssignments); // * For intermediateAssignmentFinder
 
         // Construct Elliptic BCH bucket environment:
         static constexpr bool ELLIPTIC_SORTED_BUCKETS = KARRI_ELLIPTIC_BCH_SORTED_BUCKETS;
         using EllipticBucketsEnv = EllipticBucketsEnvironment<VehicleInputGraph, VehCHEnv, ELLIPTIC_SORTED_BUCKETS>;
         EllipticBucketsEnv ellipticBucketsEnv(vehicleInputGraph, *vehChEnv, routeState,
                                               reqState.stats().updateStats);
+
+        EllipticBucketsEnv intermediateEllipticBucketsEnv(vehicleInputGraph, *vehChEnv, routeState,
+                                              reqState.stats().updateStats); // * For intermediateAssignmentFinder
 
         // If we use any BCH queries in the PALS or DALS strategies, we construct the according bucket data structure.
         // Otherwise, we use a last stop buckets substitute that only stores which vehicles' last stops are at a vertex.
@@ -457,6 +465,9 @@ int main(int argc, char *argv[]) {
         LastStopBucketsEnv lastStopBucketsEnv(vehicleInputGraph, *vehChEnv, routeState,
                                               reqState.stats().updateStats);
 
+        // LastStopBucketsEnv intermediateLastStopBucketsEnv(vehicleInputGraph, *vehChEnv, routeState,
+        //                                       intermediateReqState.stats().updateStats); // * For intermediateAssignmentFinder
+
 #else
         using LastStopBucketsEnv = OnlyLastStopsAtVerticesBucketSubstitute;
         LastStopBucketsEnv lastStopBucketsEnv(vehicleInputGraph, varRouteState, fleet.size());
@@ -467,9 +478,13 @@ int main(int argc, char *argv[]) {
         using EllipticBCHLabelSet = std::conditional_t<KARRI_ELLIPTIC_BCH_USE_SIMD,
                 SimdLabelSet<KARRI_ELLIPTIC_BCH_LOG_K, ParentInfo::NO_PARENT_INFO>,
                 BasicLabelSet<KARRI_ELLIPTIC_BCH_LOG_K, ParentInfo::NO_PARENT_INFO>>;
+        
         using FeasibleEllipticDistancesImpl = FeasibleEllipticDistances<EllipticBCHLabelSet>;
         FeasibleEllipticDistancesImpl feasibleEllipticPickups(fleet.size(), routeState);
         FeasibleEllipticDistancesImpl feasibleEllipticDropoffs(fleet.size(), routeState);
+
+        FeasibleEllipticDistancesImpl intermediateFeasibleEllipticPickups(fleet.size(), routeState); // * For intermediateAssignmentFinder
+        FeasibleEllipticDistancesImpl intermediateFeasibleEllipticDropoffs(fleet.size(), routeState); // * For intermediateAssignmentFinder
 
 
         using EllipticBCHSearchesImpl = EllipticBCHSearches<VehicleInputGraph, VehCHEnv, CostCalculator::CostFunction,
@@ -477,6 +492,10 @@ int main(int argc, char *argv[]) {
         EllipticBCHSearchesImpl ellipticSearches(vehicleInputGraph, fleet, ellipticBucketsEnv, lastStopBucketsEnv,
                                                  *vehChEnv, routeState, feasibleEllipticPickups,
                                                  feasibleEllipticDropoffs, reqState);
+                                                
+        EllipticBCHSearchesImpl intermediateEllipticSearches(vehicleInputGraph, fleet, intermediateEllipticBucketsEnv, lastStopBucketsEnv,
+                                                *vehChEnv, routeState, intermediateFeasibleEllipticPickups,
+                                                intermediateFeasibleEllipticDropoffs, intermediateReqState); // * For intermediateAssignmentFinder
 
 
         // Construct remaining request state
@@ -484,16 +503,29 @@ int main(int argc, char *argv[]) {
         RelevantPDLocs relOrdinaryDropoffs(fleet.size());
         RelevantPDLocs relPickupsBeforeNextStop(fleet.size());
         RelevantPDLocs relDropoffsBeforeNextStop(fleet.size());
+        
+        RelevantPDLocs intermediateRelOrdinaryPickups(fleet.size()); // * For intermediateAssignmentFinder
+        RelevantPDLocs intermediateRelOrdinaryDropoffs(fleet.size()); // * For intermediateAssignmentFinder
+        RelevantPDLocs intermediateRelPickupsBeforeNextStop(fleet.size()); // * For intermediateAssignmentFinder
+        RelevantPDLocs intermediateRelDropoffsBeforeNextStop(fleet.size()); // * For intermediateAssignmentFinder
+
+
         using RelevantPDLocsFilterImpl = RelevantPDLocsFilter<FeasibleEllipticDistancesImpl, VehicleInputGraph, VehCHEnv>;
         RelevantPDLocsFilterImpl relevantPdLocsFilter(fleet, vehicleInputGraph, *vehChEnv, calc, reqState, routeState,
                                                       feasibleEllipticPickups, feasibleEllipticDropoffs,
                                                       relOrdinaryPickups, relOrdinaryDropoffs, relPickupsBeforeNextStop,
                                                       relDropoffsBeforeNextStop);
 
+        RelevantPDLocsFilterImpl intermediateRelevantPdLocsFilter(fleet, vehicleInputGraph, *vehChEnv, calc, intermediateReqState, routeState,
+                                                      intermediateFeasibleEllipticPickups, intermediateFeasibleEllipticDropoffs,
+                                                      intermediateRelOrdinaryPickups, intermediateRelOrdinaryDropoffs, intermediateRelPickupsBeforeNextStop,
+                                                      intermediateRelDropoffsBeforeNextStop); // * For intermediateAssignmentFinder
+
 
         const auto revVehicleGraph = vehicleInputGraph.getReverseGraph();
         using VehicleToPDLocQueryImpl = VehicleToPDLocQuery<VehicleInputGraph>;
         VehicleToPDLocQueryImpl vehicleToPdLocQuery(vehicleInputGraph, revVehicleGraph);
+        VehicleToPDLocQueryImpl intermediateVehicleToPdLocQuery(vehicleInputGraph, revVehicleGraph);
 
 
         // Construct PD-distance query
@@ -501,11 +533,15 @@ int main(int argc, char *argv[]) {
                 SimdLabelSet<KARRI_PD_DISTANCES_LOG_K, ParentInfo::NO_PARENT_INFO>,
                 BasicLabelSet<KARRI_PD_DISTANCES_LOG_K, ParentInfo::NO_PARENT_INFO>>;
         using PDDistancesImpl = PDDistances<PDDistancesLabelSet>;
+        
         PDDistancesImpl pdDistances(reqState);
+        PDDistancesImpl intermediatePdDistances(intermediateReqState); // * For intermediateAssignmentFinder
 
 #if KARRI_PD_STRATEGY == KARRI_BCH_PD_STRAT
         using PDDistanceQueryImpl = PDDistanceQueryStrategies::BCHStrategy<VehicleInputGraph, VehCHEnv, VehicleToPDLocQueryImpl, PDDistancesLabelSet>;
+        
         PDDistanceQueryImpl pdDistanceQuery(vehicleInputGraph, *vehChEnv, pdDistances, reqState, vehicleToPdLocQuery);
+        PDDistanceQueryImpl intermediatePdDistanceQuery(vehicleInputGraph, *vehChEnv, intermediatePdDistances, intermediateReqState, intermediateVehicleToPdLocQuery);
 
 #else // KARRI_PD_STRATEGY == KARRI_CH_PD_STRAT
         using PDDistanceQueryImpl = PDDistanceQueryStrategies::CHStrategy<VehicleInputGraph, VehCHEnv, PDDistancesLabelSet>;
@@ -522,17 +558,30 @@ int main(int argc, char *argv[]) {
                                                                calc, routeState,
                                                                reqState);
 
+        OrdinaryAssignmentsFinderImpl intermediateOrdinaryInsertionsFinder(intermediateRelOrdinaryPickups, intermediateRelOrdinaryDropoffs,
+                                                               intermediatePdDistances, fleet, pVehs, dVehs,
+                                                               calc, routeState,
+                                                               intermediateReqState); // * For intermediateAssignmentFinder
+
         // Construct PBNS assignments finder:
         using CurVehLocToPickupLabelSet = PDDistancesLabelSet;
         using CurVehLocToPickupSearchesImpl = CurVehLocToPickupSearches<VehicleInputGraph, VehicleLocatorImpl, VehCHEnv, CurVehLocToPickupLabelSet>;
         CurVehLocToPickupSearchesImpl curVehLocToPickupSearches(vehicleInputGraph, locator, *vehChEnv, routeState,
                                                                 reqState, fleet.size());
+        
+        CurVehLocToPickupSearchesImpl intermediateCurVehLocToPickupSearches(vehicleInputGraph, locator, *vehChEnv, routeState,
+                                                                intermediateReqState, fleet.size());
 
-
+        
         using PBNSInsertionsFinderImpl = PBNSAssignmentsFinder<PDDistancesImpl, CurVehLocToPickupSearchesImpl>;
         PBNSInsertionsFinderImpl pbnsInsertionsFinder(relPickupsBeforeNextStop, relOrdinaryDropoffs,
                                                       relDropoffsBeforeNextStop, pdDistances, curVehLocToPickupSearches,
                                                       fleet, pVehs, dVehs, calc, routeState, reqState);
+
+        PBNSInsertionsFinderImpl intermediatePbnsInsertionsFinder(intermediateRelPickupsBeforeNextStop, intermediateRelOrdinaryDropoffs,
+                                                      intermediateRelDropoffsBeforeNextStop, intermediatePdDistances, intermediateCurVehLocToPickupSearches,
+                                                      fleet, pVehs, dVehs, calc, routeState, intermediateReqState);
+
 
         // Construct PALS strategy and assignment finder:
         using PALSLabelSet = std::conditional_t<KARRI_PALS_USE_SIMD,
@@ -545,6 +594,10 @@ int main(int argc, char *argv[]) {
         using PALSStrategy = PickupAfterLastStopStrategies::CollectiveBCHStrategy<VehicleInputGraph, VehCHEnv, LastStopBucketsEnv, VehicleToPDLocQueryImpl, PDDistancesImpl, PALSLabelSet>;
         PALSStrategy palsStrategy(vehicleInputGraph, fleet, *vehChEnv,
                                   vehicleToPdLocQuery, lastStopBucketsEnv, pdDistances, calc, routeState, reqState);
+
+        PALSStrategy intermediatePalsStrategy(vehicleInputGraph, fleet, *vehChEnv,
+                                  intermediateVehicleToPdLocQuery, lastStopBucketsEnv, intermediatePdDistances, calc, routeState, intermediateReqState);
+
 #elif KARRI_PALS_STRATEGY == KARRI_IND
         // Use Individual-BCH PALS Strategy
         using PALSStrategy = PickupAfterLastStopStrategies::IndividualBCHStrategy<VehicleInputGraph, VehCHEnv, LastStopBucketsEnv, PDDistancesImpl, PALSLabelSet>;
@@ -560,6 +613,8 @@ int main(int argc, char *argv[]) {
         PALSInsertionsFinderImpl palsInsertionsFinder(palsStrategy, vehicleInputGraph, fleet, calc, lastStopBucketsEnv,
                                                       routeState, pdDistances, reqState);
 
+        PALSInsertionsFinderImpl intermediatePalsInsertionsFinder(intermediatePalsStrategy, vehicleInputGraph, fleet, calc, lastStopBucketsEnv,
+                                                      routeState, intermediatePdDistances, intermediateReqState);
 
         // Construct DALS strategy and assignment finder:
 
@@ -568,6 +623,10 @@ int main(int argc, char *argv[]) {
         using DALSStrategy = DropoffAfterLastStopStrategies::CollectiveBCHStrategy<VehicleInputGraph, VehCHEnv, LastStopBucketsEnv, CurVehLocToPickupSearchesImpl>;
         DALSStrategy dalsStrategy(vehicleInputGraph, fleet, routeState, *vehChEnv, lastStopBucketsEnv, calc,
                                   curVehLocToPickupSearches, reqState, relOrdinaryPickups, relPickupsBeforeNextStop);
+
+        DALSStrategy intermediateDalsStrategy(vehicleInputGraph, fleet, routeState, *vehChEnv, lastStopBucketsEnv, calc,
+                                  intermediateCurVehLocToPickupSearches, intermediateReqState, intermediateRelOrdinaryPickups, intermediateRelPickupsBeforeNextStop);
+
 #elif KARRI_DALS_STRATEGY == KARRI_IND
         // Use Individual-BCH DALS Strategy
         using DALSLabelSet = std::conditional_t<KARRI_DALS_USE_SIMD,
@@ -586,21 +645,17 @@ int main(int argc, char *argv[]) {
         DALSStrategy dalsStrategy(vehicleInputGraph, revVehicleGraph, fleet, calc, curVehLocToPickupSearches, routeState, lastStopsAtVertices, reqState, relOrdinaryPickups, relPickupsBeforeNextStop);
 #endif
 
-        // Create RPHAST Environment
-        // RPHASTEnvironment rphastEnv(vehChEnv->getCH());
-        // using EllipticSearchSpacesImpl = EllipticSearchSpaces<VehicleInputGraph, VehCHEnv>;
-        // EllipticSearchSpacesImpl ellipticSearchSpaces(vehicleInputGraph, *vehChEnv, routeState);
-        // using OrdinaryStopsRPHASTSelectionImpl = OrdinaryStopsRPHASTSelection<VehicleInputGraph, EllipticSearchSpacesImpl, std::ofstream>;
-        // OrdinaryStopsRPHASTSelectionImpl ordinaryStopsRphastSelection(vehicleInputGraph, vehChEnv->getCH(), fleet,
-        //                                                               routeState, ellipticSearchSpaces, rphastEnv);
-
-
         using DALSInsertionsFinderImpl = DALSAssignmentsFinder<DALSStrategy>;
         DALSInsertionsFinderImpl dalsInsertionsFinder(dalsStrategy);
+        
+        DALSInsertionsFinderImpl intermediateDalsInsertionsFinder(intermediateDalsStrategy);
 
         using RequestStateInitializerImpl = RequestStateInitializer<VehicleInputGraph, PsgInputGraph, VehCHEnv, PsgCHEnv, VehicleToPDLocQueryImpl>;
         RequestStateInitializerImpl requestStateInitializer(vehicleInputGraph, psgInputGraph, *vehChEnv, *psgChEnv,
                                                             reqState, vehicleToPdLocQuery);
+
+        RequestStateInitializerImpl intermediateRequestStateInitializer(vehicleInputGraph, psgInputGraph, *vehChEnv, *psgChEnv,
+                                                            intermediateReqState, intermediateVehicleToPdLocQuery);
         
         using TransferPointsLabelSet = BasicLabelSet<1, ParentInfo::NO_PARENT_INFO>;
         using TransferPointStrategy = TransferPointStrategies::DijkstraTransferPointStrategy<VehicleInputGraph, TransferPointsLabelSet>;
@@ -648,7 +703,6 @@ int main(int argc, char *argv[]) {
         TransferALSDVehFinderImpl transferALSDVehInsertions = TransferALSDVehFinderImpl(transferALSStrategy, transferDropoffALSStrategy, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, postponedAssignments, fleet, routeState, reqState, calc, asserter);
 
 
-
         std::vector<int> heuristicTpSample;
         if (!heuristicTpSampleFileName.empty()) {
             std::cout << "Reading heuristic transfer point sample from file and generating buckets for sample... " << std::flush;
@@ -664,13 +718,29 @@ int main(int argc, char *argv[]) {
             std::cout << "done.\n";
         }
 
-        // TODO: Use heuristic transfer point picker for additional transfer point strategy
-        unused(heuristicTransferPointPicker);
+        using IntermediateInsertionFinderImpl = IntermediateAssignmentFinder<
+                RequestStateInitializerImpl,
+                EllipticBCHSearchesImpl,
+                PDDistanceQueryImpl,
+                OrdinaryAssignmentsFinderImpl,
+                PBNSInsertionsFinderImpl,
+                PALSInsertionsFinderImpl,
+                DALSInsertionsFinderImpl,
+                RelevantPDLocsFilterImpl
+            >;
+        
+        IntermediateInsertionFinderImpl intermediateInsertionsFinder(intermediateReqState, intermediateRequestStateInitializer, intermediateEllipticSearches, intermediatePdDistanceQuery,
+                                            intermediateOrdinaryInsertionsFinder, intermediatePbnsInsertionsFinder, intermediatePalsInsertionsFinder,
+                                            intermediateDalsInsertionsFinder, intermediateRelevantPdLocsFilter);
 
-        using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<OrdinaryTransferInsertionsImpl, TransferALSPVehFinderImpl, TransferALSDVehFinderImpl, TransferAsserterImpl>;
-        AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(ordinaryTransferInsertions, transferALSPVehInsertions, transferALSDVehInsertions, reqState, asserter);
+        using HeuristicTransferFinderImpl = HeuristicTransferFinder<HeuristicTransferPointPickerImpl, IntermediateInsertionFinderImpl, RequestStateInitializerImpl>;
+        HeuristicTransferFinderImpl heuristicTransferInsertions(reqState, intermediateReqState, intermediateRequestStateInitializer, heuristicTransferPointPicker, intermediateInsertionsFinder);
 
-        using InsertionFinderImpl = AssignmentFinder<RequestStateInitializerImpl,
+        using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<OrdinaryTransferInsertionsImpl, TransferALSPVehFinderImpl, TransferALSDVehFinderImpl, TransferAsserterImpl, HeuristicTransferFinderImpl>;
+        AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(ordinaryTransferInsertions, transferALSPVehInsertions, transferALSDVehInsertions, heuristicTransferInsertions, reqState, asserter);
+
+        using InsertionFinderImpl = AssignmentFinder<
+                RequestStateInitializerImpl,
                 EllipticBCHSearchesImpl,
                 PDDistanceQueryImpl,
                 OrdinaryAssignmentsFinderImpl,
@@ -680,11 +750,12 @@ int main(int argc, char *argv[]) {
                 RelevantPDLocsFilterImpl,
                 TransferPointFinderImpl,
                 AssignmentsWithTransferFinderImpl
-                >;
+            >;
         InsertionFinderImpl insertionFinder(reqState, requestStateInitializer, ellipticSearches, pdDistanceQuery,
                                             ordinaryInsertionsFinder, pbnsInsertionsFinder, palsInsertionsFinder,
                                             dalsInsertionsFinder, relevantPdLocsFilter, transferPointFinder, insertionsWithTransferFinder);
 
+        
 
 #if KARRI_OUTPUT_VEHICLE_PATHS
         using VehPathTracker = PathTracker<VehicleInputGraph, VehCHEnv, std::ofstream>;

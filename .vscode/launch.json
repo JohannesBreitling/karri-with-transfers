@@ -87,7 +87,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/Build/Debug/Launchers/karri",
-            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-1pct-500.csv", "-r", "./Inputs/Requests/Berlin-1pct-2000.csv", "-o", "./Outputs/Berlin-Short-Debug", "-p-radius", "0", "-d-radius", "0"],
+            "args": ["-veh-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_veh.gr.bin", "-psg-g", "./Inputs/Graphs/Berlin-1pct_pedestrian_psg.gr.bin", "-veh-h", "./Inputs/CHs/Berlin-1pct_pedestrian_veh_time.ch.bin", "-psg-h", "./Inputs/CHs/Berlin-1pct_pedestrian_psg_time.ch.bin", "-v", "./Inputs/Vehicles/Berlin-1pct-500.csv", "-r", "./Inputs/Requests/Berlin-1pct-2000.csv", "-o", "./Outputs/Berlin-Short-Debug", "-p-radius", "0", "-d-radius", "0", "-tp-sample", "./Inputs/Berlin-1pct_300.tranfersamp.bin"],
             "environment": [{ "name": "config", "value": "Debug" }],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "karri-build-debug"

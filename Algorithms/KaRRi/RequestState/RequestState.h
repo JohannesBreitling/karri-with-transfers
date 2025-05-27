@@ -190,12 +190,15 @@ namespace karri {
 
         bool tryAssignmentWithKnownCost(const Assignment &asgn, const RequestCost cost) {
             assert(calculator.calc(asgn, *this).total == cost.total);
+            
+            Assignment newAsgn = asgn;
+            newAsgn.cost = cost;
 
             if (cost.total < INFTY && (cost.total < bestCost || (cost.total == bestCost &&
                                     breakCostTie(asgn, bestAssignment)))) {
 
                 
-                bestAssignment = asgn;
+                bestAssignment = newAsgn;
                 bestCost = cost.total;
                 bestCostObjectWOT = cost;
                 notUsingVehicleIsBest = false;

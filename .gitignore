@@ -13,6 +13,10 @@
 /Publications/karri-with-transfers/sizes/
 /Publications/karri-with-transfers/inputs/
 
+/Publications/single-transfer-journeys/inputs/
+/Publications/single-transfer-journeys/outputs/
+__pycache__
+
 # Various config files.
 /.settings/
 /.cproject
