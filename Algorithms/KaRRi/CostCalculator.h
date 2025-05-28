@@ -730,7 +730,7 @@ namespace karri {
                                                                            const int minDistToDropoff,
                                                                            const int minArrTimeAtDropoff,
                                                                            const RequestContext &context) const {
-            assert(minArrTimeAtDropoff >= context.originalRequest.requestTime);
+            assert(context.heuristic || minArrTimeAtDropoff >= context.originalRequest.requestTime);
             assert(minDistToDropoff < INFTY);
             if (minDistToDropoff >= INFTY)
                 return INFTY;

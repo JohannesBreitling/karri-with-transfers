@@ -41,12 +41,13 @@ namespace karri {
     // Holds information relating to a specific request like its pickups and dropoffs and the best known assignment.
     struct RequestState {
 
-        RequestState(const CostCalculator &calculator, std::vector<AssignmentWithTransfer> &postponedAssignments)
+        RequestState(const CostCalculator &calculator, std::vector<AssignmentWithTransfer> &postponedAssignments, const bool heuristic)
                 : originalRequest(),
                   originalReqDirectDist(-1),
                   minDirectPDDist(-1),
                   pickups(),
                   dropoffs(),
+                  heuristic(heuristic),
                   calculator(calculator),
                   postponedAssignments(postponedAssignments) {}
 
@@ -67,6 +68,7 @@ namespace karri {
 
         std::vector<PDLoc> pickups;
         std::vector<PDLoc> dropoffs;
+        const bool heuristic;
 
         int numPickups() const {
             return pickups.size();

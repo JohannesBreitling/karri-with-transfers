@@ -123,8 +123,7 @@ namespace karri {
             // assert(psgInputGraph.toCarEdge(vehInputGraph.toPsgEdge(req.destination)) == req.destination);
             // const auto destInPsgGraph = vehInputGraph.toPsgEdge(req.destination);
 
-            findPdLocsInRadiusQuery.findPDLocs(originInPsgGraph, originInPsgGraph);
-            requestState.dropoffs.clear();
+            findPdLocsInRadiusQuery.findPickupLocs(originInPsgGraph);
             
             PDLoc dropoff;
             dropoff.id = 0;
@@ -176,8 +175,7 @@ namespace karri {
             assert(psgInputGraph.toCarEdge(vehInputGraph.toPsgEdge(req.destination)) == req.destination); // ! Workaround
             const auto destInPsgGraph = vehInputGraph.toPsgEdge(req.destination);
 
-            findPdLocsInRadiusQuery.findPDLocs(destInPsgGraph, destInPsgGraph);
-            requestState.pickups.clear();
+            findPdLocsInRadiusQuery.findDropoffLocs(destInPsgGraph);
 
             PDLoc pickup;
             pickup.id = 0;

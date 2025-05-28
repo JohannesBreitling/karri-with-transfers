@@ -65,13 +65,13 @@ namespace karri {
             // single transfer journey for the given request
             
             // * TRANSFER AFTER LAST STOP (PVeh)
-            transfersALSPVeh.findAssignments();
+            // transfersALSPVeh.findAssignments();
 
             // * ORDINARY TRANSFER
             // ordinaryTransfers.findAssignments();
             
             // * TRANSFER AFTER LAST STOP (PVeh)
-            transfersALSDVeh.findAssignments();
+            // transfersALSDVeh.findAssignments();
 
             // * HEURISTIC TRANSFERS
             heuristicTransfers.findAssignments();

@@ -12,6 +12,17 @@ namespace karri {
         TransferPoint(const Vehicle *pVeh, const Vehicle *dVeh) : pVeh(pVeh), dVeh(dVeh) {}
         TransferPoint(const TransferPoint&) = default;
 
+        // TransferPoint(const TransferPoint& tp) :
+        //     loc(tp.loc),
+        //     pVeh(tp.pVeh),
+        //     dVeh(tp.dVeh),
+        //     dropoffAtTransferStopIdx(tp.dropoffAtTransferStopIdx),
+        //     pickupFromTransferStopIdx(tp.pickupFromTransferStopIdx),
+        //     distancePVehToTransfer(tp.distancePVehToTransfer),
+        //     distancePVehFromTransfer(tp.distancePVehFromTransfer),
+        //     distanceDVehToTransfer(tp.distanceDVehToTransfer),
+        //     distanceDVehFromTransfer(tp.distanceDVehFromTransfer) {}
+    
         TransferPoint(
             const int loc,
             const Vehicle *pVeh, const Vehicle *dVeh,

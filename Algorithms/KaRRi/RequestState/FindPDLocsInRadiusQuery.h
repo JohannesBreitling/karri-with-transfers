@@ -110,6 +110,35 @@ namespace karri {
             finalizePDLocs(destination, dropoffs, InputConfig::getInstance().maxNumDropoffs);
         }
 
+        // Pickups will be collected into the given pickups vector and dropoffs will be collected into the given dropoffs vector
+        void findPickupLocs(const int origin) {
+            assert(origin < forwardGraph.numEdges());
+            pickups.clear();
+            dropoffs.clear();
+
+            searchSpace.clear();
+            auto headOfOriginEdge = forwardGraph.edgeHead(origin);
+            pickupSearch.run(headOfOriginEdge);
+            turnSearchSpaceIntoPickupLocations();
+
+            finalizePDLocs(origin, pickups, InputConfig::getInstance().maxNumPickups);
+        }
+
+        // Pickups will be collected into the given pickups vector and dropoffs will be collected into the given dropoffs vector
+        void findDropoffLocs(const int destination) {
+            assert(destination < forwardGraph.numEdges());
+            pickups.clear();
+            dropoffs.clear();
+
+            searchSpace.clear();
+            auto tailOfDestEdge = forwardGraph.edgeTail(destination);
+            auto destOffset = forwardGraph.travelTime(destination);
+            dropoffSearch.runWithOffset(tailOfDestEdge, destOffset);
+            turnSearchSpaceIntoDropoffLocations();
+
+            finalizePDLocs(destination, dropoffs, InputConfig::getInstance().maxNumDropoffs);
+        }
+
     private:
 
         void turnSearchSpaceIntoPickupLocations() {

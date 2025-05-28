@@ -440,8 +440,8 @@ int main(int argc, char *argv[]) {
         
         std::vector<AssignmentWithTransfer> postponedAssignments = std::vector<AssignmentWithTransfer>{};
 
-        RequestState reqState(calc, postponedAssignments);
-        RequestState intermediateReqState(calc, postponedAssignments); // * For intermediateAssignmentFinder
+        RequestState reqState(calc, postponedAssignments, false);
+        RequestState intermediateReqState(calc, postponedAssignments, true); // * For intermediateAssignmentFinder
 
         // Construct Elliptic BCH bucket environment:
         static constexpr bool ELLIPTIC_SORTED_BUCKETS = KARRI_ELLIPTIC_BCH_SORTED_BUCKETS;
@@ -734,7 +734,7 @@ int main(int argc, char *argv[]) {
                                             intermediateDalsInsertionsFinder, intermediateRelevantPdLocsFilter);
 
         using HeuristicTransferFinderImpl = HeuristicTransferFinder<HeuristicTransferPointPickerImpl, IntermediateInsertionFinderImpl, RequestStateInitializerImpl>;
-        HeuristicTransferFinderImpl heuristicTransferInsertions(reqState, intermediateReqState, intermediateRequestStateInitializer, heuristicTransferPointPicker, intermediateInsertionsFinder);
+        HeuristicTransferFinderImpl heuristicTransferInsertions(reqState, intermediateReqState, routeState, intermediateRequestStateInitializer, heuristicTransferPointPicker, intermediateInsertionsFinder);
 
         using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<OrdinaryTransferInsertionsImpl, TransferALSPVehFinderImpl, TransferALSDVehFinderImpl, TransferAsserterImpl, HeuristicTransferFinderImpl>;
         AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(ordinaryTransferInsertions, transferALSPVehInsertions, transferALSDVehInsertions, heuristicTransferInsertions, reqState, asserter);
