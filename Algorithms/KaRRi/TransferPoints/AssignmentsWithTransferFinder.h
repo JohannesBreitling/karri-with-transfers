@@ -109,7 +109,7 @@ namespace karri {
             transfersALSDVeh.findAssignments(relALSDropoffs);
 
             //* Test the best assignment found
-            KASSERT(asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
+            KASSERT(requestState.getBestCostWithTransfer() == INFTY || asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
         }
 
 

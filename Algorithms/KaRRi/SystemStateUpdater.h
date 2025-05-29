@@ -460,7 +460,7 @@ namespace karri {
                         << vehDepTimeBeforeTransferPVeh << ", "
                         << vehDepTimeBeforeTransferDVeh << ", "
                         << vehDepTimeBeforeDropoffWT << ", "
-                        << bestAsgnWT.cost.total << "\n";
+                        << requestState.getBestCostWithTransfer() << "\n";
             }
         }
 

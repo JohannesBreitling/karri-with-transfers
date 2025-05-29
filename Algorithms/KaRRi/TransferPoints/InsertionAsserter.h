@@ -17,8 +17,6 @@ namespace karri {
         
 
         bool assertAssignment(const AssignmentWithTransfer &asgn) {
-            if (asgn.cost.total >= INFTY)
-                return true;
 
             // Assert the distances
             if (!assertPVeh(asgn) || !assertDVeh(asgn))

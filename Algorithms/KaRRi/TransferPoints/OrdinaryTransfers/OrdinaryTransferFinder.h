@@ -481,7 +481,7 @@ namespace karri {
                 asgn.pickupBNSLowerBoundUsed = false;
 
                 if (!asgn.isFinished()) {
-                    total = calc.calcBaseLowerBound<true, true>(asgn, requestState);
+                    total = calc.calcBaseLowerBound<true>(asgn, requestState);
 
                     if (total.total > requestState.getBestCost())
                         continue;
@@ -515,7 +515,7 @@ namespace karri {
 
                     // Try the assignments with the calculated distances
                     if (!asgn.isFinished()) {
-                        total = calc.calcBaseLowerBound<true, true>(asgn, requestState);
+                        total = calc.calcBaseLowerBound<true>(asgn, requestState);
 
                         if (total.total > requestState.getBestCost())
                             continue;
@@ -561,7 +561,7 @@ namespace karri {
                 asgn.dropoffBNSLowerBoundUsed = false;
 
                 if (!asgn.isFinished()) {
-                    total = calc.calcBaseLowerBound<true, false>(asgn, requestState);
+                    total = calc.calcBaseLowerBound<true>(asgn, requestState);
 
                     if (total.total > requestState.getBestCost())
                         continue;

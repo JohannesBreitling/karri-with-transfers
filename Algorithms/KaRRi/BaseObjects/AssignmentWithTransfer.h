@@ -43,10 +43,7 @@ namespace karri {
 
     struct AssignmentWithTransfer {
 
-        AssignmentWithTransfer() {
-            cost = RequestCost::INFTY_COST();
-            costPVeh = RequestCost::INFTY_COST();
-        }
+        AssignmentWithTransfer() {}
 
         AssignmentWithTransfer(const Vehicle *pVehArg, const Vehicle *dVehArg, const TransferPoint tpArg) {
             pVeh = pVehArg;
@@ -106,8 +103,6 @@ namespace karri {
         TransferPoint transfer;
         const PDLoc *dropoff = nullptr;
 
-        RequestCost cost;
-
         int pickupIdx = INVALID_INDEX;
         int transferIdxPVeh = INVALID_INDEX;
         int transferIdxDVeh = INVALID_INDEX;
@@ -128,7 +123,6 @@ namespace karri {
         int distToDropoff; // distance from previous stop to dropoff (or from transfer point if transferIdxDVeh == dropoffIdx)
         int distFromDropoff; // distance from dropoff to next stop (or 0 if there is no next stop)
 
-        RequestCost costPVeh; // Cost of the trip until the passenger arrives at the transfer point
         int waitTimeAtPickup; // Wait time at pickup
 
         // For statistics
@@ -149,12 +143,6 @@ namespace karri {
         int arrAtDropoff;
     
         bool transferAtStopPVeh;
-        bool dropoffAtStop;
-        int initalPickupDetour;
-        int initalTransferDetour;
-        int initialDropoffDetour;
-
-        int maxDepAtPickup;
     };
 
 }

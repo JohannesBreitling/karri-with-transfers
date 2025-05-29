@@ -141,29 +141,6 @@ namespace karri {
                 notUsingVehicleIsBest = false;
                 notUsingVehicleDist = INFTY;
             }
-//
-//            // Calculate the cost of the assignment and try to update the best known assignment if the assignment is finished
-//            RequestCost cost;
-//            if (!asgn.isFinished()) {
-//                cost = calculator.calcLowerBound(asgn, *this);
-//            } else {
-//                calculator.recomputePVeh(asgn, *this);
-//                cost = calculator.calc(asgn, *this);
-//            }
-//
-//            if (cost.total >= INFTY)
-//                return;
-//
-//            if (asgn.isFinished() && cost.total < bestCostWithTransfer) {
-//                asgn.maxDepAtPickup = getMaxDepTimeAtPickup();
-//                bestAssignmentWithTransfer = AssignmentWithTransfer(asgn);
-//                bestCostWithTransfer = cost.total;
-//                bestCostObjectWT = cost;
-//                notUsingVehicleIsBest = false;
-//                notUsingVehicleDist = INFTY;
-//            } else if (cost.total < bestCostWithTransfer) {
-//                postponedAssignments.push_back(asgn);
-//            }
         }
         
         bool improvementThroughTransfer() const {
