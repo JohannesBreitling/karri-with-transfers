@@ -964,7 +964,6 @@ namespace karri {
                    asgn.pickupIdx != asgn.transferIdxPVeh || transferAtExistingStop ||
                    asgn.arrAtTransferPoint != asgn.depAtPickup);
             const int tripTime = arrTimeAtTransfer - context.originalRequest.requestTime;
-            asgn.tripTimePVeh = tripTime;
 
             const auto walkingCostPVeh = F::calcWalkingCost(asgn.pickup->walkingDist,
                                                             InputConfig::getInstance().pickupRadius);

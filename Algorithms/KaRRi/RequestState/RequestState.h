@@ -134,7 +134,6 @@ namespace karri {
             KASSERT(cost == calculator.calc(asgn, *this));
 
             if (cost.total < bestCostWithTransfer) {
-                asgn.maxDepAtPickup = getMaxDepTimeAtPickup();
                 bestAssignmentWithTransfer = AssignmentWithTransfer(asgn);
                 bestCostWithTransfer = cost.total;
                 bestCostObjectWT = cost;

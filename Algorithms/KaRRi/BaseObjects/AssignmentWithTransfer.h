@@ -132,7 +132,6 @@ namespace karri {
         enum INS_TYPES transferTypeDVeh = NOT_SET;
         enum INS_TYPES dropoffType = NOT_SET;
 
-        int tripTimePVeh;
         int tripTimeDVeh;
 
         // Used to test the insertions of the assignments
