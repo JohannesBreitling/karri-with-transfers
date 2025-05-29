@@ -24,31 +24,29 @@
 
 #pragma once
 
-#include "Algorithms/KaRRi/RouteState.h"
-#include "Algorithms/CH/CH.h"
-#include "DataStructures/Labels/BasicLabelSet.h"
-#include "Algorithms/Dijkstra/Dijkstra.h"
+#include <vector>
 #include "VertexInEllipse.h"
-#include "DataStructures/Containers/TimestampedVector.h"
-#include "DataStructures/Containers/FastResetFlagArray.h"
+#include <kassert/kassert.hpp>
 
 namespace karri {
+    struct EdgeEllipseContainer {
 
-        struct CHEllipseReconstructorStats {
-            int numVerticesSettled = 0;
-            int numEdgesRelaxed = 0;
-            int64_t initTime = 0;
-            int64_t topoSearchTime = 0;
-            int64_t postprocessTime = 0;
+        EdgeEllipseContainer() = default;
 
-            void reset() {
-                numVerticesSettled = 0;
-                numEdgesRelaxed = 0;
-                initTime = 0;
-                topoSearchTime = 0;
-                postprocessTime = 0;
-            }
-        };
+        const std::vector<EdgeInEllipse> &getEdgesInEllipse(const int stopId) const {
+            KASSERT(stopId < static_cast<int>(idxOfStop.size()));
+            const auto idx = idxOfStop[stopId];
+            KASSERT(idx != INVALID_INDEX);
+            return edgeEllipses[idx];
+        }
 
 
-} // karri
+    private:
+        template<typename, typename, typename, typename, typename, typename>
+        friend class CHEllipseReconstructor;
+
+        // Maps a stop ID to an internal index in the vector of stop IDs.
+        std::vector<int> idxOfStop;
+        std::vector<std::vector<EdgeInEllipse>> edgeEllipses;
+    };
+}

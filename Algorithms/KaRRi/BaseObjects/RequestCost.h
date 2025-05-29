@@ -26,6 +26,8 @@ namespace karri {
 
                 return cost;
             }
+
+            friend bool operator==(const RequestCost &lhs, const RequestCost &rhs) = default;
     };
 
 }

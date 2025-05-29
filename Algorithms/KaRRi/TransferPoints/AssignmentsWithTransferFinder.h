@@ -35,7 +35,12 @@
 
 namespace karri {
 
-    template<typename OrdinaryTransferFinderT, typename TransferALSPVehFinderT, typename TransferALSDVehFinderT, typename InsertionAsserterT>
+    template<typename OrdinaryTransferFinderT,
+            typename TransferALSPVehFinderT,
+            typename TransferALSDVehFinderT,
+            typename DropoffALSStrategyT,
+            typename EllipseReconstructorT,
+            typename InsertionAsserterT>
     class AssignmentsWithTransferFinder {
 
     public:
@@ -43,12 +48,18 @@ namespace karri {
                 OrdinaryTransferFinderT &ordinaryTransfers,
                 TransferALSPVehFinderT &transfersALSPVeh,
                 TransferALSDVehFinderT &transfersALSDVeh,
+                DropoffALSStrategyT &dropoffALSStrategy,
+                EllipseReconstructorT &ellipseReconstructor,
                 RequestState &requestState,
+                const RouteState &routeState,
                 InsertionAsserterT &asserter)
                 : ordinaryTransfers(ordinaryTransfers),
                   transfersALSPVeh(transfersALSPVeh),
                   transfersALSDVeh(transfersALSDVeh),
+                  dropoffALSStrategy(dropoffALSStrategy),
+                  ellipseReconstructor(ellipseReconstructor),
                   requestState(requestState),
+                  routeState(routeState),
                   asserter(asserter) {}
 
         void init() {
@@ -57,18 +68,45 @@ namespace karri {
             transfersALSDVeh.init();
         }
 
-        void findBestAssignment() {
+        void findBestAssignment(const RelevantPDLocs &relORDPickups,
+                                const RelevantPDLocs &relBNSPickups,
+                                const RelevantPDLocs &relORDDropoffs,
+                                const RelevantPDLocs &relBNSDropoffs) {
             // Method to find the best assignment with exactly one transfer, i. e. the best possible
             // single transfer journey for the given request
 
+            const auto relALSDropoffs = dropoffALSStrategy.findDropoffsAfterLastStop();
+            std::vector<int> pVehStopIds;
+            std::vector<int> dVehStopIds;
+            getPVehAndDVehStopIdsForOrdinaryTransfers(relORDPickups, relBNSPickups, relORDDropoffs, relBNSDropoffs,
+                                                      relALSDropoffs, pVehStopIds, dVehStopIds);
+
+
+            std::vector<int> allStopIds;
+            allStopIds.reserve(pVehStopIds.size() + dVehStopIds.size());
+            stopSeen.reset();
+            for (const auto &stopId: pVehStopIds) {
+                if (!stopSeen.isSet(stopId)) {
+                    stopSeen.set(stopId);
+                    allStopIds.push_back(stopId);
+                }
+            }
+            for (const auto &stopId: dVehStopIds) {
+                if (!stopSeen.isSet(stopId)) {
+                    stopSeen.set(stopId);
+                    allStopIds.push_back(stopId);
+                }
+            }
+            const auto ellipseContainer = ellipseReconstructor.computeEllipses(allStopIds);
+
             // * TRANSFER AFTER LAST STOP (PVeh)
-            transfersALSPVeh.findAssignments();
+            transfersALSPVeh.findAssignments(relALSDropoffs);
 
             // * ORDINARY TRANSFER
-            ordinaryTransfers.findAssignments();
+            ordinaryTransfers.findAssignments(pVehStopIds, dVehStopIds, relALSDropoffs, ellipseContainer);
 
             // * TRANSFER AFTER LAST STOP (DVeh)
-            transfersALSDVeh.findAssignments();
+            transfersALSDVeh.findAssignments(relALSDropoffs);
 
             //* Test the best assignment found
             KASSERT(asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
@@ -77,12 +115,89 @@ namespace karri {
 
     private:
 
+        template<typename RelALSDropoffs>
+        void getPVehAndDVehStopIdsForOrdinaryTransfers(const RelevantPDLocs &relORDPickups,
+                                                       const RelevantPDLocs &relBNSPickups,
+                                                       const RelevantPDLocs &relORDDropoffs,
+                                                       const RelevantPDLocs &relBNSDropoffs,
+                                                       const RelALSDropoffs &relALSDropoffs,
+                                                       std::vector<int> &pVehStopIds,
+                                                       std::vector<int> &dVehStopIds) {
+            if (routeState.getMaxStopId() + 1 > stopSeen.size())
+                stopSeen.resize(routeState.getMaxStopId() + 1);
+            stopSeen.reset();
+
+            for (const int pVehId: relBNSPickups.getVehiclesWithRelevantPDLocs()) {
+                const int earliestRelevantStopIdx = 0;
+                const auto stopIds = routeState.stopIdsFor(pVehId);
+                for (int i = earliestRelevantStopIdx; i < routeState.numStopsOf(pVehId) - 1; ++i) {
+                    if (!stopSeen.isSet(stopIds[i])) {
+                        stopSeen.set(stopIds[i]);
+                        pVehStopIds.push_back(stopIds[i]);
+                    }
+                }
+            }
+
+            for (const int pVehId: relORDPickups.getVehiclesWithRelevantPDLocs()) {
+                const int earliestRelevantStopIdx = relORDPickups.relevantSpotsFor(pVehId)[0].stopIndex;
+                const auto stopIds = routeState.stopIdsFor(pVehId);
+                for (int i = earliestRelevantStopIdx; i < routeState.numStopsOf(pVehId) - 1; ++i) {
+                    if (!stopSeen.isSet(stopIds[i])) {
+                        stopSeen.set(stopIds[i]);
+                        pVehStopIds.push_back(stopIds[i]);
+                    }
+                }
+            }
+
+            stopSeen.reset();
+
+            for (const int dVehId: relBNSDropoffs.getVehiclesWithRelevantPDLocs()) {
+                const int latestRelevantStopIdx = 0;
+                const auto stopIds = routeState.stopIdsFor(dVehId);
+                for (int i = 0; i < latestRelevantStopIdx + 1; ++i) {
+                    if (!stopSeen.isSet(stopIds[i])) {
+                        stopSeen.set(stopIds[i]);
+                        dVehStopIds.push_back(stopIds[i]);
+                    }
+                }
+            }
+
+            for (const int dVehId: relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
+                const auto numStops = routeState.numStopsOf(dVehId);
+                const auto& rel = relORDDropoffs.relevantSpotsFor(dVehId);
+                const int latestRelevantStopIdx = std::min(numStops - 2, rel[rel.size() - 1].stopIndex);
+                const auto stopIds = routeState.stopIdsFor(dVehId);
+                for (int i = 0; i < latestRelevantStopIdx + 1; ++i) {
+                    if (!stopSeen.isSet(stopIds[i])) {
+                        stopSeen.set(stopIds[i]);
+                        dVehStopIds.push_back(stopIds[i]);
+                    }
+                }
+            }
+
+            for (const int dVehId: relALSDropoffs.getVehiclesWithRelevantPDLocs()) {
+                const int latestRelevantStopIdx = routeState.numStopsOf(dVehId) - 2;
+                const auto stopIds = routeState.stopIdsFor(dVehId);
+                for (int i = 0; i < latestRelevantStopIdx + 1; ++i) {
+                    if (!stopSeen.isSet(stopIds[i])) {
+                        stopSeen.set(stopIds[i]);
+                        dVehStopIds.push_back(stopIds[i]);
+                    }
+                }
+            }
+        }
+
         OrdinaryTransferFinderT &ordinaryTransfers;
         TransferALSPVehFinderT &transfersALSPVeh;
         TransferALSDVehFinderT &transfersALSDVeh;
+        DropoffALSStrategyT &dropoffALSStrategy;
+        EllipseReconstructorT &ellipseReconstructor;
 
         RequestState &requestState;
+        const RouteState &routeState;
 
         InsertionAsserterT &asserter;
+
+        FastResetFlagArray<uint32_t> stopSeen;
     };
 }
