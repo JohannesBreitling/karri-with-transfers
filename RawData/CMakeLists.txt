@@ -49,7 +49,7 @@ target_compile_definitions(OsmToCarAndPassengerGraph PRIVATE CSV_IO_NO_THREAD)
 target_link_libraries(OsmToCarAndPassengerGraph ${PROJ_LIBRARY} ${RoutingKit_LIBRARY} kassert ${BOOST_LIBRARIES})
 
 add_executable(SampleHeuristicTransferPointsUsingBetweenness SampleHeuristicTransferPointsUsingBetweenness.cc)
-target_link_libraries(SampleHeuristicTransferPointsUsingBetweenness kassert)
+target_link_libraries(SampleHeuristicTransferPointsUsingBetweenness kassert ${RoutingKit_LIBRARY})
 
 add_executable(TransformLocations TransformLocations.cc)
 target_compile_definitions(TransformLocations PRIVATE CSV_IO_NO_THREAD)

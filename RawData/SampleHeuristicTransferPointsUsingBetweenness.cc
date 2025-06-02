@@ -28,6 +28,7 @@
 #include "DataStructures/Labels/BasicLabelSet.h"
 #include "Tools/CommandLine/ProgressBar.h"
 #include "DataStructures/Graph/Attributes/EdgeTailAttribute.h"
+#include "Algorithms/KaRRi/CHEnvironment.h"
 
 inline void printUsage() {
     std::cout <<
@@ -61,7 +62,7 @@ int main(int argc, char *argv[]) {
 
         // Read the vehicle network from file.
         std::cout << "Reading vehicle network from file... " << std::flush;
-        using InputGraph = StaticGraph<VertexAttrs<>, EdgeAttrs<EdgeTailAttribute, Weight>>;
+        using InputGraph = StaticGraph<VertexAttrs<LatLngAttribute>, EdgeAttrs<EdgeTailAttribute, Weight>>;
         std::ifstream graphFile(graphFileName, std::ios::binary);
         if (!graphFile.good())
             throw std::invalid_argument("file not found -- '" + graphFileName + "'");
@@ -70,6 +71,8 @@ int main(int argc, char *argv[]) {
         FORALL_VALID_EDGES(inputGraph, v, e) {
                 inputGraph.edgeTail(e) = v;
             }
+
+        const auto revGraph = inputGraph.getReverseGraph();
         std::cout << "done.\n";
 
         // Read betweenness from file
@@ -100,10 +103,10 @@ int main(int argc, char *argv[]) {
             throw std::invalid_argument("file cannot be opened -- '" + outputFileName + "'");
 
         using LabelSet = BasicLabelSet<0, ParentInfo::NO_PARENT_INFO>;
-        struct StopWhenMinDistanceReachedOrExistingCandidateSeen {
-            StopWhenMinDistanceReachedOrExistingCandidateSeen(int minDistance,
-                                                              const std::vector<int> &offsetForCandidateTail,
-                                                              uint8_t &seenOtherCandidate)
+        struct StopForwardSearchWhenMinDistanceReachedOrCandidateTailSeen {
+            StopForwardSearchWhenMinDistanceReachedOrCandidateTailSeen(int minDistance,
+                                                                       const std::vector<int> &offsetForCandidateTail,
+                                                                       uint8_t &seenOtherCandidate)
                     : minDistance(minDistance),
                       offsetForCandidateTail(offsetForCandidateTail),
                       seenOtherCandidate(seenOtherCandidate) {}
@@ -130,13 +133,59 @@ int main(int argc, char *argv[]) {
             uint8_t &seenOtherCandidate;
         };
 
+        struct StopReverseSearchWhenMinDistanceReachedOrExistingCandidateHeadSeen {
+            StopReverseSearchWhenMinDistanceReachedOrExistingCandidateHeadSeen(int minDistance,
+                                                                               const BitVector &hasCandidateHead,
+                                                                               uint8_t &seenOtherCandidate)
+                    : minDistance(minDistance),
+                      hasCandidateHead(hasCandidateHead),
+                      seenOtherCandidate(seenOtherCandidate) {}
+
+            bool operator()(const int v, LabelSet::DistanceLabel &dist,
+                            const StampedDistanceLabelContainer<LabelSet::DistanceLabel> &) {
+
+                if (dist[0] >= minDistance)
+                    return true;
+
+                // If we have reached the head of another candidate edge within the minimum distance between candidates,
+                // then the current source edge is too close to the other candidate.
+                if (hasCandidateHead[v]) {
+                    seenOtherCandidate = static_cast<uint8_t>(true);
+                    return true;
+                }
+                return false;
+            }
+
+        private:
+            int minDistance;
+
+            const BitVector &hasCandidateHead;
+
+            uint8_t &seenOtherCandidate;
+        };
+
         uint8_t seenOtherCandidate = false;
         std::vector<int> candidateEdges;
         std::vector<int> offsetForCandidateTail(inputGraph.numVertices(), INFTY);
-        using Search = Dijkstra<InputGraph, Weight, LabelSet, StopWhenMinDistanceReachedOrExistingCandidateSeen,
+        BitVector hasCandidateHead(inputGraph.numVertices(), false);
+        using ForwardSearch = Dijkstra<InputGraph, Weight, LabelSet, StopForwardSearchWhenMinDistanceReachedOrCandidateTailSeen,
                 dij::NoCriterion, StampedDistanceLabelContainer>;
-        Search search(inputGraph, StopWhenMinDistanceReachedOrExistingCandidateSeen(minDistance, offsetForCandidateTail,
-                                                                                    seenOtherCandidate));
+        ForwardSearch forwardSearch(inputGraph, StopForwardSearchWhenMinDistanceReachedOrCandidateTailSeen(minDistance,
+                                                                                                           offsetForCandidateTail,
+                                                                                                           seenOtherCandidate));
+        using ReverseSearch = Dijkstra<InputGraph, Weight, LabelSet, StopReverseSearchWhenMinDistanceReachedOrExistingCandidateHeadSeen,
+                dij::NoCriterion, StampedDistanceLabelContainer>;
+        ReverseSearch reverseSearch(revGraph, StopReverseSearchWhenMinDistanceReachedOrExistingCandidateHeadSeen(minDistance,
+                                                                                                                   hasCandidateHead,
+                                                                                                                   seenOtherCandidate));
+
+//        std::cout << "Debug: Building CH..." << std::flush;
+//        using CHEnv = karri::CHEnvironment<InputGraph, TravelTimeAttribute>;
+//        CHEnv chEnv(inputGraph);
+//        const auto& ch = chEnv.getCH();
+//        auto chQuery = chEnv.getFullCHQuery();
+//        std:: cout << "done." << std::endl;
+
         std::cout << "Computing candidates... " << std::flush;
         ProgressBar progressBar(inputGraph.numEdges());
         progressBar.setDotOutputInterval(1);
@@ -144,13 +193,44 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < inputGraph.numEdges(); ++i) {
             const int e = edgesInOrder[i];
             seenOtherCandidate = static_cast<uint8_t>(false);
-            search.run(inputGraph.edgeHead(e)); // Run until minimum distance is reached or another candidate is seen
-            if (!static_cast<bool>(seenOtherCandidate)) {
-                candidateEdges.push_back(e);
-                auto &offset = offsetForCandidateTail[inputGraph.edgeTail(e)];
-                offset = std::min(offset, inputGraph.travelTime(e));
+
+            forwardSearch.run(inputGraph.edgeHead(e)); // Run until minimum distance is reached or tail of another candidate is seen
+            if (static_cast<bool>(seenOtherCandidate)) {
+                ++progressBar;
+                continue;
             }
+
+            reverseSearch.runWithOffset(inputGraph.edgeTail(e), inputGraph.travelTime(e)); // Run until minimum distance is reached or head of another candidate is seen
+            if (static_cast<bool>(seenOtherCandidate)) {
+                ++progressBar;
+                continue;
+            }
+
+//            for (const auto& can : candidateEdges) {
+//                const auto canHead = inputGraph.edgeHead(can);
+//                const auto canTail = inputGraph.edgeTail(can);
+//                const auto eHead = inputGraph.edgeHead(e);
+//                const auto eTail = inputGraph.edgeTail(e);
+//                // Assert that the edge is not too close to can
+//                chQuery.run(ch.rank(canHead), ch.rank(eTail));
+//                const auto dist = chQuery.getDistance() + inputGraph.travelTime(e);
+//                KASSERT(dist >= minDistance);
+//                chQuery.run(ch.rank(eHead), ch.rank(canTail));
+//                const auto dist2 = chQuery.getDistance() + inputGraph.travelTime(can);
+//                KASSERT(dist2 >= minDistance);
+//            }
+
+            candidateEdges.push_back(e);
+
+            // Mark head of candidate edge as seen
+            hasCandidateHead[inputGraph.edgeHead(e)] = true;
+
+            // Mark tail of candidate edge as seen (with offset)
+            auto &offset = offsetForCandidateTail[inputGraph.edgeTail(e)];
+            offset = std::min(offset, inputGraph.travelTime(e));
+
             ++progressBar;
+
         }
         std::cout << " done." << std::endl;
 
