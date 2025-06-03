@@ -60,13 +60,18 @@ namespace karri::Transfers {
             // any vehicle with a last stop distance greater than the given one can also never lead to a better
             // assignment than the best known.
             LabelMask doesDistanceNotAdmitBestAsgn(const DistanceLabel &distancesToDropoffs,
-                                                   const bool /*considerWalkingDists*/) const {
-                // return strat.upperBoundCost < INFTY;  // No actual pruning because of the transfer
-                return ~(distancesToDropoffs < INFTY);
+                                                   const bool considerWalkingDists) const {
+                if (strat.upperBoundCost >= INFTY) {
+                    // If current best is INFTY, only indices i with distancesToDropoffs[i] >= INFTY are worse than the
+                    // current best.
+                    return ~(distancesToDropoffs < INFTY);
+                }
 
-                // const DistanceLabel costLowerBound = calc.template calcKVehicleIndependentCostLowerBoundsForDALSWithKnownMinDistToDropoff<LabelSet>(
-                //         0, /* distancesToDropoffs */ 0, 0, strat.requestState);
-                // return strat.upperBoundCost < costLowerBound;
+                const DistanceLabel walkingDists = considerWalkingDists ? strat.currentDropoffWalkingDists : 0;
+                const DistanceLabel costLowerBound = calc.template calcKVehicleIndependentCostLowerBoundsForDALSWithKnownMinDistToDropoff<LabelSet>(
+                        walkingDists, distancesToDropoffs, 0, strat.requestState);
+
+                return strat.upperBoundCost < costLowerBound;
             }
 
             // Returns whether a given arrival time and minimum distance from a vehicle's last stop to the dropoff cannot
@@ -76,12 +81,29 @@ namespace karri::Transfers {
             // minDistancesToDropoffs needs to be a vehicle-independent lower bound on the last stop distance.
             LabelMask doesArrTimeNotAdmitBestAsgn(const DistanceLabel &arrTimesAtDropoffs,
                                                   const DistanceLabel &minDistancesToDropoffs) const {
-                return ~((arrTimesAtDropoffs < INFTY) & (minDistancesToDropoffs < INFTY));  // No actual pruning because of the transfer
+                if (strat.upperBoundCost >= INFTY) {
+                    // If current best is INFTY, only indices i with arrTimesAtDropoffs[i] >= INFTY or
+                    // minDistancesToDropoffs[i] >= INFTY are worse than the current best.
+                    return ~((arrTimesAtDropoffs < INFTY) & (minDistancesToDropoffs < INFTY));
+                }
+
+                const DistanceLabel costLowerBound = calc.template calcKVehicleIndependentCostLowerBoundsForDALSWithKnownMinArrTime<LabelSet>(
+                        strat.currentDropoffWalkingDists, minDistancesToDropoffs, arrTimesAtDropoffs, strat.requestState);
+
+                return strat.upperBoundCost < costLowerBound;
             }
 
-            LabelMask isWorseThanBestKnownVehicleDependent(const int /*vehId*/,
+            LabelMask isWorseThanBestKnownVehicleDependent(const int vehId,
                                                             const DistanceLabel& distancesToDropoffs) {
-                return ~(distancesToDropoffs < INFTY);  // No actual pruning because of the transfer
+                if (strat.upperBoundCost >= INFTY) {
+                    // If current best is INFTY, only indices i with distancesToDropoffs[i] >= INFTY are worse than
+                    // the current best.
+                    return ~(distancesToDropoffs < INFTY);
+                }
+
+                const DistanceLabel costLowerBound = calc.template calcKVehicleDependentCostLowerBoundsForDALSWithKnownDistToDropoff<LabelSet>(
+                        vehId, strat.currentDropoffWalkingDists, distancesToDropoffs, 0, strat.requestState);
+                return strat.upperBoundCost < costLowerBound;
             }
 
             void updateUpperBoundCost(const int, const DistanceLabel &) {
@@ -91,8 +113,8 @@ namespace karri::Transfers {
                 // detour since we only know lower bounds from the elliptic BCH queries
             }
 
-            bool isVehicleEligible(const int /*vehId*/) const {
-                return true;  // No actual pruning because of the transfer
+            bool isVehicleEligible(const int vehId) const {
+                return strat.routeState.numStopsOf(vehId) > 1;
             }
 
         private:

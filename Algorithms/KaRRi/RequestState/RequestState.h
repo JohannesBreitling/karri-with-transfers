@@ -158,7 +158,7 @@ namespace karri {
             return bestCostWithTransfer;
         }
 
-        const int &getBestCost() const {
+        int getBestCost() const {
             return std::min(bestCost, bestCostWithTransfer);
         }
 

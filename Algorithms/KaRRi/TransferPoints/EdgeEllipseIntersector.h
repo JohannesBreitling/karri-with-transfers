@@ -153,7 +153,6 @@ namespace karri {
                                const int stopIdxPVeh, const int stopIdxDVeh,
                                std::vector<TransferPoint> &result) {
             result.clear();
-            result.reserve(std::max(ellipsePVeh.size(), ellipseDVeh.size()));
 
             auto itEdgesPVeh = ellipsePVeh.begin();
             auto itEdgesDVeh = ellipseDVeh.begin();

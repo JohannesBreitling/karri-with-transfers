@@ -591,6 +591,39 @@ namespace karri {
 
         template<typename LabelSet, typename RequestContext>
         typename LabelSet::DistanceLabel
+        calcLowerBoundCostForKPairedPickupAndTransferAssignmentsAfterLastStop(
+                const typename LabelSet::DistanceLabel &detourTillDepAtPickup,
+                const typename LabelSet::DistanceLabel &tripTimeTillDepAtPickup,
+                const typename LabelSet::DistanceLabel &minPickupToDropoffDist,
+                const typename LabelSet::DistanceLabel &pickupWalkingDists,
+                const RequestContext &context) const {
+            using DistanceLabel = typename LabelSet::DistanceLabel;
+            using LabelMask = typename LabelSet::LabelMask;
+            assert(directDist.horizontalMin() >= 0 && directDist.horizontalMax() < INFTY);
+            assert(pickupWalkingDists.horizontalMin() >= 0 && pickupWalkingDists.horizontalMax() < INFTY);
+
+
+            // Calculations with INFTY don't work like mathematical infinity, so set cost to INFTY later.
+            const LabelMask inftyMask = ~((detourTillDepAtPickup < INFTY) & (tripTimeTillDepAtPickup < INFTY));
+            // const DistanceLabel adaptedVehTimeTillDepAtPickup = select(vehTimeInftyMask, 0, vehTimeTillDepAtPickup);
+
+            const DistanceLabel detourCost = F::calcKVehicleCosts(detourTillDepAtPickup + stopTime);
+            const DistanceLabel tripCost = F::calcKTripCosts(tripTimeTillDepAtPickup + minPickupToDropoffDist, context);
+            const DistanceLabel walkingCost = F::calcKWalkingCosts(pickupWalkingDists,
+                                                                   InputConfig::getInstance().pickupRadius);
+            const DistanceLabel waitViolationCost = F::calcKWaitViolationCosts(
+                    context.originalRequest.requestTime + tripTimeTillDepAtPickup, context);
+            // Pickup after last stop so no added trip costs for existing passengers.
+            DistanceLabel minCost = detourCost + tripCost + walkingCost + waitViolationCost;
+
+            // Set cost to INFTY where input times were invalid
+            minCost.setIf(DistanceLabel(INFTY), inftyMask);
+
+            return minCost;
+        }
+
+        template<typename LabelSet, typename RequestContext>
+        typename LabelSet::DistanceLabel
         calcUpperBoundCostForKPairedAssignmentsAfterLastStop(const Vehicle &veh,
                                                              const typename LabelSet::DistanceLabel &distancesToPickups,
                                                              const typename LabelSet::DistanceLabel &psgArrTimesAtPickups,
