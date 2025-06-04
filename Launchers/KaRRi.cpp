@@ -652,8 +652,7 @@ int main(int argc, char *argv[]) {
                                                                                           *vehChEnv, calc,
                                                                                           lastStopBucketsEnv,
                                                                                           pdDistances, routeState,
-                                                                                          reqState,
-                                                                                          reqState.getBestCost());
+                                                                                          reqState);
 
         using TransferAsserterImpl = InsertionAsserter<VehicleInputGraph, VehCHEnv>;
         TransferAsserterImpl asserter(routeState, vehicleInputGraph, *vehChEnv);
