@@ -49,12 +49,20 @@ namespace karri {
             pVeh = pVehArg;
             dVeh = dVehArg;
             transfer = tpArg;
+            distToTransferPVeh = tpArg.distancePVehToTransfer;
+            distFromTransferPVeh = tpArg.distancePVehFromTransfer;
+            distToTransferDVeh = tpArg.distanceDVehToTransfer;
+            distFromTransferDVeh = tpArg.distanceDVehFromTransfer;
         }
 
         AssignmentWithTransfer(const Vehicle &pVehArg, const Vehicle &dVehArg, const TransferPoint tpArg) {
             pVeh = &pVehArg;
             dVeh = &dVehArg;
             transfer = tpArg;
+            distToTransferPVeh = tpArg.distancePVehToTransfer;
+            distFromTransferPVeh = tpArg.distancePVehFromTransfer;
+            distToTransferDVeh = tpArg.distanceDVehToTransfer;
+            distFromTransferDVeh = tpArg.distanceDVehFromTransfer;
         }
 
         AssignmentWithTransfer(const Vehicle *pVehArg, const Vehicle *dVehArg, const TransferPoint tpArg, const PDLoc *pickupPDLoc, int pickupIdxArg, int distToPickupArg, int distFromPickupArg, int tIdxPVeh, int tIdxDVeh) {
