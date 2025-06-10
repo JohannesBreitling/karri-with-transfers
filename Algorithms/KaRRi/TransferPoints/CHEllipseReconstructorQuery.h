@@ -88,7 +88,8 @@ namespace karri::TransferPointStrategies {
             // The number of vertices that need to be settled can be expected to be quite large. Thus, we avoid
             // using a PQ with many costly deleteMin() operations and instead settle every vertex in the graph.
             timer.restart();
-            for (int r = 0; r < numVertices; ++r) {
+            static constexpr int TOP_VERTICES_DIVISION_FACTOR = 10;
+            for (int r = 0; r < numVertices / TOP_VERTICES_DIVISION_FACTOR; ++r) {
                 ++stats.numVerticesSettled;
                 settleVertexInTopodownSearch(r, leeways, stats.numEdgesRelaxed);
             }
