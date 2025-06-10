@@ -88,6 +88,25 @@ compareBestAssignments <- function(file1, file2) {
   }
 }
 
+compareBestAssignmentsWithTransfer <- function(file1, file2) {
+  bestins1 <- read.csv(paste0(file1, ".bestassignmentswithtransfer.csv"))
+  bestins2 <- read.csv(paste0(file2, ".bestassignmentswithtransfer.csv"))
+  
+  bestins1 <- bestins1[order(bestins1$request_id),]
+  bestins2 <- bestins2[order(bestins2$request_id),]
+  
+  # Get smallest row index where at least one value differs
+  idx <- match(TRUE, rowSums(bestins1 != bestins2) > 0)
+  if (is.na(idx)) {
+    print("All best insertions are equal.")
+  } else {
+    print(bestins1[idx, "request_id"])
+    row1 <- bestins1[idx,]
+    row2 <- bestins2[idx,]
+    View(rbind(row1, row2))
+  }
+}
+
 
 perfStats <- function(file_base, type_name) {
   stats <- read.csv(paste0(file_base, ".perf_", type_name, ".csv"))
