@@ -24,9 +24,9 @@ namespace karri {
                 forwardQuery(rphastEnv.getForwardRPHASTQuery()),
                 reverseQuery(rphastEnv.getReverseRPHASTQuery()) {}
 
-        // Maps: lastStopId -> tpIdx -> distance last stop to transfer
-        std::map<int, std::vector<int>> calculateDistancesFromLastStopToAllTransfers(std::vector<int>& lastStopIds, std::vector<EdgeInEllipse>& transferPoints) {
-            std::map<int, std::vector<int>> result;
+        // Maps: lastStopId -> tpLoc -> distance last stop to transfer
+        std::map<int, std::map<int, int>> calculateDistancesFromLastStopToAllTransfers(std::vector<int>& lastStopIds, std::vector<EdgeInEllipse>& transferPoints) {
+            std::map<int, std::map<int, int>> result;
 
             if (lastStopIds.size() == 0 || transferPoints.size() == 0)
                 return result;
@@ -60,19 +60,22 @@ namespace karri {
                     const int tpRank = vehCh.rank(tpTail);
                     const int distance = forwardQuery.getDistance(tpRank);
                     const int offset = inputGraph.travelTime(tpLoc);
-                    distances.push_back(distance + offset);
+                    
+                    result[lastStopId][tpLoc] = distance + offset;
+                    // distances.push_back();
                 }
                 
-                result[lastStopId] = distances;
+                // KASSERT(distances.size() == transferPoints.size());
+                // result[lastStopId] = distances;
             }
 
             return result;
         }
 
 
-        // Maps: pickupLoc -> tpIdx -> distance pickup to transfer point
-        std::map<int, std::vector<int>> caluclateDistancesFromPickupsToAllTransfers(std::vector<int>& pickupLocs, std::vector<EdgeInEllipse>& transferPoints) {
-            std::map<int, std::vector<int>> result;
+        // Maps: pickupLoc -> tpLoc -> distance pickup to transfer point
+        std::map<int, std::map<int, int>> caluclateDistancesFromPickupsToAllTransfers(std::vector<int>& pickupLocs, std::vector<EdgeInEllipse>& transferPoints) {
+            std::map<int, std::map<int, int>> result;
 
             if (pickupLocs.size() == 0 || transferPoints.size() == 0)
                 return result;
@@ -104,10 +107,12 @@ namespace karri {
                     const int tpRank = vehCh.rank(tpTail);
                     const int distance = forwardQuery.getDistance(tpRank);
                     const int offset = inputGraph.travelTime(tpLoc);
-                    distances.push_back(distance + offset);                    
+                    
+                    result[pickupLoc][tpLoc] = distance + offset;
+                    // distances.push_back(distance + offset);                    
                 }
-                
-                result[pickupLoc] = distances;                
+
+                // result[pickupLoc] = distances;                
             }
 
             return result;

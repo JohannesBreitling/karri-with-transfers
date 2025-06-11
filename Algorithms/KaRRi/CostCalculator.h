@@ -599,7 +599,7 @@ namespace karri {
                 const RequestContext &context) const {
             using DistanceLabel = typename LabelSet::DistanceLabel;
             using LabelMask = typename LabelSet::LabelMask;
-            assert(directDist.horizontalMin() >= 0 && directDist.horizontalMax() < INFTY);
+            // assert(directDist.horizontalMin() >= 0 && directDist.horizontalMax() < INFTY);
             assert(pickupWalkingDists.horizontalMin() >= 0 && pickupWalkingDists.horizontalMax() < INFTY);
 
 

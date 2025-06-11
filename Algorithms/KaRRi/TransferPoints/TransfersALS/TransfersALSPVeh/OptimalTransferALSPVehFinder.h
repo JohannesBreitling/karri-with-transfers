@@ -188,18 +188,18 @@ namespace karri {
             
             // Combine all potential locations from the ellipses
             // Maps the stopId to the start index of the ellipse in the transferEdges
-            startInTransferEdges = std::vector<int>(routeState.getMaxStopId());
-            endInTransferEdges = std::vector<int>(routeState.getMaxStopId());
+            // startInTransferEdges = std::vector<int>(routeState.getMaxStopId());
+            // endInTransferEdges = std::vector<int>(routeState.getMaxStopId());
             transferEdges.clear();
             
             for (const int stopId : stopIdsDVehs) {
                 const auto& ellipse = ellipseContainer.getEdgesInEllipse(stopId);
-                startInTransferEdges[stopId] = transferEdges.size();
+                // startInTransferEdges[stopId] = transferEdges.size();
 
                 for (const auto edge : ellipse) {
                     transferEdges.push_back(edge);
                 }
-                endInTransferEdges[stopId] = transferEdges.size();
+                // endInTransferEdges[stopId] = transferEdges.size();
             }
 
             // Calculate the distances from all last stops (pickup ord, bns) to the potential transfers
@@ -388,7 +388,7 @@ namespace karri {
                             const auto edge = transferEdges[tpIdx];
                             const int transferLoc = edge.edge;
                             const int edgeOffset = inputGraph.travelTime(transferLoc);
-                            const int distancePVehToTransfer = pickupToTransfersDistances[pickup->loc][ellipseStart + tpIdx];
+                            const int distancePVehToTransfer = pickupToTransfersDistances[pickup->loc][transferLoc];
 
                             // Build the transfer point
                             TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh - 1, i,
@@ -472,7 +472,7 @@ namespace karri {
                             const auto edge = transferEdges[tpIdx];
                             const int transferLoc = edge.edge;
                             const int edgeOffset = inputGraph.travelTime(transferLoc);
-                            const int distancePVehToTransfer = pickupToTransfersDistances[pickup->loc][ellipseStart + tpIdx];
+                            const int distancePVehToTransfer = pickupToTransfersDistances[pickup->loc][transferLoc];
 
                             KASSERT(distancePVehToTransfer > 0 || transferLoc == pickup->loc);
                             
@@ -559,10 +559,10 @@ namespace karri {
 
                         const int stopId = stopIdsDVeh[i];
                         const auto& transferPoints = ellipseContainer.getEdgesInEllipse(stopId);
-                        const int startEllipse = startInTransferEdges[stopId];
-                        const int endEllipse = endInTransferEdges[stopId];
+                        // const int startEllipse = startInTransferEdges[stopId];
+                        // const int endEllipse = endInTransferEdges[stopId];
 
-                        KASSERT(endEllipse - startEllipse == transferPoints.size());
+                        // KASSERT(endEllipse - startEllipse == transferPoints.size());
 
                         // Loop over all possible transfer points
                         for (int tpIdx = 0; tpIdx < transferPoints.size(); tpIdx++) {
@@ -570,7 +570,8 @@ namespace karri {
                             const auto edge = transferPoints[tpIdx];
                             const int transferLoc = edge.edge;
                             const auto edgeOffset = inputGraph.travelTime(transferLoc);
-                            const int distancePVehToTransfer = lastStopToTransfersDistances[lastStopIdPVeh][startEllipse + tpIdx];
+                            const int distancePVehToTransfer = lastStopToTransfersDistances[lastStopIdPVeh][transferLoc];
+                            assert(distancePVehToTransfer == asserter.assertLastStopDistance(pVeh->vehicleId, transferLoc));
                         
                             TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh, i,
                                                          distancePVehToTransfer, 0, edge.distToTail + edgeOffset, edge.distFromHead);
@@ -655,16 +656,15 @@ namespace karri {
                     for (int i = 1; i < numStopsDVeh - 1; i++) {
                         const int stopId = stopIdsDVeh[i];
                         const auto& transferPoints = ellipseContainer.getEdgesInEllipse(stopId);
-                        const int startEllipse = startInTransferEdges[stopId];
-                        const int endEllipse = endInTransferEdges[stopId];
-
-                        KASSERT(endEllipse - startEllipse == transferPoints.size());
+                        // const int startEllipse = startInTransferEdges[stopId];
+                        // const int endEllipse = endInTransferEdges[stopId];
 
                         for (int tpIdx = 0; tpIdx < transferPoints.size(); tpIdx++) {
-                            const auto edge = transferPoints[tpIdx];
+                            const auto edge = transferPoints[tpIdx]; 
                             const int transferLoc = edge.edge;
                             const auto edgeOffset = inputGraph.travelTime(transferLoc);
-                            const int distancePVehToTransfer = lastStopToTransfersDistances[lastStopIdPVeh][startEllipse + tpIdx];
+                            const int distancePVehToTransfer = lastStopToTransfersDistances[lastStopIdPVeh][transferLoc];
+                            assert(distancePVehToTransfer == asserter.assertLastStopDistance(pVeh->vehicleId, transferLoc));
                             
                             TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh, i,
                                                          distancePVehToTransfer, 0, edge.distToTail + edgeOffset, edge.distFromHead);
@@ -950,8 +950,8 @@ namespace karri {
         std::vector<int> endInTransferEdges;
         
         // Stores for each pickup vehicle, the distances to all possible stops of dropoff vehicles
-        std::map<int, std::vector<int>> lastStopToTransfersDistances;
-        std::map<int, std::vector<int>> pickupToTransfersDistances;
+        std::map<int, std::map<int, int>> lastStopToTransfersDistances;
+        std::map<int, std::map<int, int>> pickupToTransfersDistances;
 
         Subset pVehIdsALS;
 

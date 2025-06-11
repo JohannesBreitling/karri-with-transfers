@@ -198,7 +198,9 @@ namespace karri {
 
                 for (const auto &pickup: relORDPickups.relevantSpotsFor(pVehId)) {
                     tryDropoffORD(pVeh, &pickup, postponedAssignments);
-                    tryDropoffALS(pVeh, &pickup, relALSDropoffs, postponedAssignments);
+
+                    if (!relALSDropoffs.getVehiclesWithRelevantPDLocs().empty())
+                        tryDropoffALS(pVeh, &pickup, relALSDropoffs, postponedAssignments);
                 }
                 KASSERT(postponedAssignments.empty());
             }
@@ -265,8 +267,11 @@ namespace karri {
                 for (const auto &pickup: requestState.pickups) {
                     // Get the distance from the last stop of the pVeh to the pickup
                     const int distanceToPickup = pickupALSStrategy.getDistanceToPickup(pVehId, pickup.id);
+                    if (distanceToPickup >= INFTY)
+                        continue;
+                    
                     assert(asserter.assertLastStopDistance(pVehId, pickup.loc) == distanceToPickup);
-                    KASSERT(!relALSDropoffs.getVehiclesWithRelevantPDLocs().empty());
+                    KASSERT(!relALSDropoffs.getVehiclesWithRelevantPDLocs().empty() || !relORDDropoffs.getVehiclesWithRelevantPDLocs().empty());
                     tryDropoffORDForPickupALS(pVeh, &pickup, distanceToPickup);
                     tryDropoffALSForPickupALS(pVeh, &pickup, distanceToPickup, relALSDropoffs);
                 }
@@ -649,7 +654,7 @@ namespace karri {
             if (pairedPVeh)
                 asgn.distToTransferPVeh = pairedDistancePVeh;
 
-            if (!pickupAfterLastStop && transferAfterLastStopPVeh)
+            if (!pickupAfterLastStop && transferAfterLastStopPVeh && !transferAtStopPVeh)
                 asgn.distToTransferPVeh = alsDistancePVeh;
 
             // Distance from transfer pVeh
