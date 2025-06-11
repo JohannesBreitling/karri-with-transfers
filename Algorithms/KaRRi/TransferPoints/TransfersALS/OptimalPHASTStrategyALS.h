@@ -19,10 +19,26 @@ namespace karri {
                 vehCh(vehChEnv.getCH()),
                 // vehChQuery(vehChEnv.template getFullCHQuery<>())
                 rphastEnv(rphastEnv),
-                targetsSelection(rphastEnv.getTargetsSelectionPhase()),
-                sourcesSelection(rphastEnv.getSourcesSelectionPhase()),
+//                targetsSelection(rphastEnv.getTargetsSelectionPhase()),
+//                sourcesSelection(rphastEnv.getSourcesSelectionPhase()),
+                fullSelection(),
                 forwardQuery(rphastEnv.getForwardRPHASTQuery()),
-                reverseQuery(rphastEnv.getReverseRPHASTQuery()) {}
+                reverseQuery(rphastEnv.getReverseRPHASTQuery()) {
+
+            // Build the full selection for a PHAST query
+            const auto numVertices = vehCh.downwardGraph().numVertices();
+
+            fullSelection.fullToSubMapping = std::vector<int>(numVertices);
+            fullSelection.subToFullMapping = std::vector<int>(numVertices);
+            for (int i = 0; i < numVertices; i++) {
+                fullSelection.fullToSubMapping[i] = numVertices - 1 - i;
+                fullSelection.subToFullMapping[i] = numVertices - 1 - i;
+            }
+
+            fullSelection.subGraph = vehCh.downwardGraph();
+            Permutation perm(fullSelection.fullToSubMapping.begin(), fullSelection.fullToSubMapping.end());
+            fullSelection.subGraph.permuteVertices(perm);
+        }
 
         // Maps: lastStopId -> tpLoc -> distance last stop to transfer
         std::map<int, std::map<int, int>> calculateDistancesFromLastStopToAllTransfers(std::vector<int>& lastStopIds, std::vector<EdgeInEllipse>& transferPoints) {
@@ -30,24 +46,6 @@ namespace karri {
 
             if (lastStopIds.size() == 0 || transferPoints.size() == 0)
                 return result;
-        
-            // Build the full selection for a PHAST query
-            auto searchGraph = vehCh.downwardGraph();
-            std::vector<int> mapping;
-            Permutation reverseMapping(searchGraph.numVertices());
-            mapping.reserve(searchGraph.numVertices());
-            
-            for (int i = 0; i < searchGraph.numVertices(); i++) {
-                reverseMapping[i] = searchGraph.numVertices() - 1 - i;
-                mapping.push_back(i);
-            }
-            
-            searchGraph.permuteVertices(reverseMapping);
-
-            RPHASTSelection fullSelection;
-            fullSelection.subGraph = searchGraph;
-            fullSelection.fullToSubMapping = mapping;
-            fullSelection.subToFullMapping = mapping;
 
             for (const int lastStopId : lastStopIds) {
                 const auto lastStopLoc = routeState.stopPositionOf(lastStopId);
@@ -83,24 +81,6 @@ namespace karri {
 
             if (pickupLocs.size() == 0 || transferPoints.size() == 0)
                 return result;
-        
-            // Build the full selection for a PHAST query 
-            auto searchGraph = vehCh.downwardGraph();
-            std::vector<int> mapping;
-            Permutation reverseMapping(searchGraph.numVertices());
-            mapping.reserve(searchGraph.numVertices());
-            
-            for (int i = 0; i < searchGraph.numVertices(); i++) {
-                reverseMapping[i] = searchGraph.numVertices() - 1 - i;
-                mapping.push_back(i);
-            }
-
-            searchGraph.permuteVertices(reverseMapping);
-            
-            RPHASTSelection fullSelection;
-            fullSelection.subGraph = searchGraph;
-            fullSelection.fullToSubMapping = mapping;
-            fullSelection.subToFullMapping = mapping;
 
             for (const int pickupLoc : pickupLocs) {
                 const auto pickupVertex = inputGraph.edgeHead(pickupLoc);
@@ -312,8 +292,9 @@ namespace karri {
         using SelectionPhase = RPHASTSelectionPhase<dij::NoCriterion>; 
         RPHASTEnv &rphastEnv;
 
-        SelectionPhase targetsSelection;
-        SelectionPhase sourcesSelection;
+//        SelectionPhase targetsSelection;
+//        SelectionPhase sourcesSelection;
+        RPHASTSelection fullSelection;
 
         using Query = PHASTQuery<CH::SearchGraph, CH::Weight, BasicLabelSet<0, ParentInfo::NO_PARENT_INFO>, dij::NoCriterion>;
         Query forwardQuery;
