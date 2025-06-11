@@ -32,14 +32,18 @@ namespace karri {
                 return result;
         
             // Build the full selection for a PHAST query
-            const auto searchGraph = vehCh.downwardGraph();
+            auto searchGraph = vehCh.downwardGraph();
             std::vector<int> mapping;
+            Permutation reverseMapping(searchGraph.numVertices());
             mapping.reserve(searchGraph.numVertices());
             
             for (int i = 0; i < searchGraph.numVertices(); i++) {
+                reverseMapping[i] = searchGraph.numVertices() - 1 - i;
                 mapping.push_back(i);
             }
             
+            searchGraph.permuteVertices(reverseMapping);
+
             RPHASTSelection fullSelection;
             fullSelection.subGraph = searchGraph;
             fullSelection.fullToSubMapping = mapping;
@@ -80,14 +84,18 @@ namespace karri {
             if (pickupLocs.size() == 0 || transferPoints.size() == 0)
                 return result;
         
-            // Build the full selection for a PHAST query
-            const auto searchGraph = vehCh.downwardGraph();
+            // Build the full selection for a PHAST query 
+            auto searchGraph = vehCh.downwardGraph();
             std::vector<int> mapping;
+            Permutation reverseMapping(searchGraph.numVertices());
             mapping.reserve(searchGraph.numVertices());
             
             for (int i = 0; i < searchGraph.numVertices(); i++) {
+                reverseMapping[i] = searchGraph.numVertices() - 1 - i;
                 mapping.push_back(i);
             }
+
+            searchGraph.permuteVertices(reverseMapping);
             
             RPHASTSelection fullSelection;
             fullSelection.subGraph = searchGraph;
