@@ -620,9 +620,9 @@ namespace karri {
                                                   : 0;
 
             const bool pickupAtStop = asgn.pickup->loc == stopLocationsPVeh[pickupIdx];
-            const bool transferAtStopPVeh = asgn.transfer.loc == stopLocationsPVeh[transferIdxPVeh];
+            const bool transferAtStopPVeh = asgn.transfer.loc == stopLocationsPVeh[transferIdxPVeh] && asgn.transferIdxPVeh > asgn.pickupIdx;
             const bool transferAtStopDVeh = asgn.transfer.loc == stopLocationsDVeh[transferIdxDVeh];
-            const bool dropoffAtStop = asgn.dropoff->loc == stopLocationsDVeh[dropoffIdx];
+            const bool dropoffAtStop = asgn.dropoff->loc == stopLocationsDVeh[dropoffIdx] && asgn.dropoffIdx > asgn.transferIdxDVeh;
 
             const bool pairedPVeh = pickupIdx == transferIdxPVeh;
             const bool pairedDVeh = transferIdxDVeh == dropoffIdx;
@@ -680,15 +680,15 @@ namespace karri {
                 asgn.distFromTransferDVeh = legTransferDVeh;
 
             // Distance to dropoff
-            if (dropoffAtStop)
-                asgn.distToDropoff = 0;
-
             if (pairedDVeh && !dropoffAfterLastStop)
                 asgn.distToDropoff = pairedDistanceDVeh;
 
             if ((!transferAfterLastStopDVeh && dropoffAfterLastStop) ||
                 (transferAfterLastStopDVeh && transferAtStopDVeh))
                 asgn.distToDropoff = alsDistanceDVeh;
+
+            if (dropoffAtStop)
+                asgn.distToDropoff = 0;
 
             // Distance from dropoff
             if (dropoffAtStop)

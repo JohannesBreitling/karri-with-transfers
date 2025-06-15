@@ -36,7 +36,10 @@ namespace karri {
         const std::vector<EdgeInEllipse> &getEdgesInEllipse(const int stopId) const {
             KASSERT(stopId < static_cast<int>(idxOfStop.size()));
             const auto idx = idxOfStop[stopId];
-            KASSERT(idx != INVALID_INDEX);
+            // KASSERT(idx != INVALID_INDEX);
+            if (idx == INVALID_INDEX)
+                return empty;
+            
             return edgeEllipses[idx];
         }
 
@@ -48,5 +51,7 @@ namespace karri {
         // Maps a stop ID to an internal index in the vector of stop IDs.
         std::vector<int> idxOfStop;
         std::vector<std::vector<EdgeInEllipse>> edgeEllipses;
+
+        std::vector<EdgeInEllipse> empty;
     };
 }

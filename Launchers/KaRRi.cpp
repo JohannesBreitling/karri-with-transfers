@@ -80,6 +80,7 @@
 #include "Algorithms/KaRRi/TransferPoints/TransfersALS/OptimalPHASTStrategyALS.h"
 #include "Algorithms/KaRRi/TransferPoints/TransfersALS/TransfersALSPVeh/TransferALSPVehFinder.h"
 #include "Algorithms/KaRRi/TransferPoints/TransfersALS/TransfersALSPVeh/OptimalTransferALSPVehFinder.h"
+#include "Algorithms/KaRRi/TransferPoints/TransfersALS/TransfersALSDVeh/OptimalTransferALSDVehFinder.h"
 #include "Algorithms/KaRRi/TransferPoints/TransfersALS/TransfersALSDVeh/TransferALSDVehFinder.h"
 
 #include "Algorithms/KaRRi/LastStopSearches/SortedLastStopBucketsEnvironment.h"
@@ -680,15 +681,27 @@ int main(int argc, char *argv[]) {
                                                                                         asserter);
 
 
-        using OptimalTransferALSPVehFinderImpl = OptimalTransferALSPVehFinder<VehicleInputGraph, OptimalTransferStrategyALSImpl, TransfersPickupALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;                                                                                        
-        OptimalTransferALSPVehFinderImpl optimalTransferALSPVehInsertions = OptimalTransferALSPVehFinderImpl(vehicleInputGraph, optimalTransferALSStrategy,
+        using OptimalTransferALSPVehFinderImpl = OptimalTransferALSPVehFinder<VehicleInputGraph, VehCHEnv, OptimalTransferStrategyALSImpl, TransfersPickupALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;                                                                                        
+        OptimalTransferALSPVehFinderImpl optimalTransferALSPVehInsertions = OptimalTransferALSPVehFinderImpl(vehicleInputGraph, *vehChEnv, optimalTransferALSStrategy,
                                                                                         transferPickupALSStrategy,
                                                                                         curVehLocToPickupSearches,
                                                                                         relOrdinaryPickups,
                                                                                         relPickupsBeforeNextStop,
                                                                                         relOrdinaryDropoffs, fleet,
                                                                                         routeState, reqState, calc,
-                                                                                        asserter);                                                        
+                                                                                        asserter);    
+                                                                                        
+        using OptimalTransferALSDVehFinderImpl = OptimalTransferALSDVehFinder<VehicleInputGraph, VehCHEnv, OptimalTransferStrategyALSImpl, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;                                                                                        
+        OptimalTransferALSDVehFinderImpl optimalTransferALSDVehInsertions = OptimalTransferALSDVehFinderImpl(
+                                                                                        vehicleInputGraph,
+                                                                                        *vehChEnv,
+                                                                                        optimalTransferALSStrategy,
+                                                                                        curVehLocToPickupSearches,
+                                                                                        relOrdinaryPickups,
+                                                                                        relPickupsBeforeNextStop,
+                                                                                        fleet,
+                                                                                        routeState, reqState,
+                                                                                        asserter);                                                                                    
 
 
         using TransferALSDVehFinderImpl = TransferALSDVehFinder<TransferStrategyALSImpl, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
@@ -704,14 +717,16 @@ int main(int argc, char *argv[]) {
                 TransfersDropoffALSStrategy,
                 EllipseReconstructorImpl,
                 TransferAsserterImpl,
-                OptimalTransferALSPVehFinderImpl>;
+                OptimalTransferALSPVehFinderImpl,
+                OptimalTransferALSDVehFinderImpl>;
         AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(ordinaryTransferInsertions,
                                                                        transferALSPVehInsertions,
                                                                        transferALSDVehInsertions,
                                                                        transferDropoffALSStrategy,
                                                                        ellipseReconstructor,
                                                                        reqState, routeState, asserter,
-                                                                       optimalTransferALSPVehInsertions);
+                                                                       optimalTransferALSPVehInsertions,
+                                                                       optimalTransferALSDVehInsertions);
 
         using InsertionFinderImpl = AssignmentFinder<RequestStateInitializerImpl,
                 EllipticBCHSearchesImpl,

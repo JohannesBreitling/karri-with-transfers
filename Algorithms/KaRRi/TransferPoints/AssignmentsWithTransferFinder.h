@@ -41,8 +41,8 @@ namespace karri {
             typename DropoffALSStrategyT,
             typename EllipseReconstructorT,
             typename InsertionAsserterT,
-            typename OptimalTransferALSPVehFinderT
-            // typename OptimalTransferALSDVehFinderT
+            typename OptimalTransferALSPVehFinderT,
+            typename OptimalTransferALSDVehFinderT
             >
     class AssignmentsWithTransferFinder {
 
@@ -56,7 +56,8 @@ namespace karri {
                 RequestState &requestState,
                 const RouteState &routeState,
                 InsertionAsserterT &asserter,
-                OptimalTransferALSPVehFinderT &optimalTransfersALSPVeh)
+                OptimalTransferALSPVehFinderT &optimalTransfersALSPVeh,
+                OptimalTransferALSDVehFinderT &optimalTransfersALSDVeh)
                 : ordinaryTransfers(ordinaryTransfers),
                   transfersALSPVeh(transfersALSPVeh),
                   transfersALSDVeh(transfersALSDVeh),
@@ -65,7 +66,8 @@ namespace karri {
                   requestState(requestState),
                   routeState(routeState),
                   asserter(asserter),
-                  optimalTransfersALSPVeh(optimalTransfersALSPVeh) {}
+                  optimalTransfersALSPVeh(optimalTransfersALSPVeh),
+                  optimalTransfersALSDVeh(optimalTransfersALSDVeh) {}
 
         void init() {
             ordinaryTransfers.init();
@@ -114,6 +116,8 @@ namespace karri {
 
             // * TRANSFER AFTER LAST STOP (DVeh)
             transfersALSDVeh.findAssignments(relALSDropoffs);
+
+            optimalTransfersALSDVeh.findAssignments(relALSDropoffs, ellipseContainer);
 
             //* Test the best assignment found
             KASSERT(requestState.getBestCostWithTransfer() == INFTY || asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
@@ -208,7 +212,7 @@ namespace karri {
         InsertionAsserterT &asserter;
 
         OptimalTransferALSPVehFinderT &optimalTransfersALSPVeh;
-        // OptimalTransferALSDVehFinderT &optimalTransfersALSDVeh;
+        OptimalTransferALSDVehFinderT &optimalTransfersALSDVeh;
 
         FastResetFlagArray<uint32_t> stopSeen;
     };
