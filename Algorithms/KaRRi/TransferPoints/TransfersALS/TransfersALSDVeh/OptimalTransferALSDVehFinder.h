@@ -96,7 +96,6 @@ namespace karri {
                 }
             }
 
-            transferEdges.clear();
             for (const int pVehId : relBNSPickups.getVehiclesWithRelevantPDLocs()) {
                 if (pVehFlags[pVehId])
                     continue;
@@ -124,14 +123,9 @@ namespace karri {
             lastStopToTransfersDistances = strategy.calculateDistancesFromLastStopToAllTransfers(relevantLastStopLocs, transferEdges);
             transferToDropoffDistances = strategy.caluclateDistancesFromAllTransfersToDropoffs(transferEdges, dropoffLocs);
 
-            std::cout << "Initialized Optimal ALS DVeh for request: " << requestState.originalRequest.requestId << "\n";
             findAssignmentsWithDropoffALS(relALSDropoffs, ellipseContainer);
 
-            if (bestCost < INFTY) {
-                std::cout << "Possible optimal assignment ALS DVeh with cost: " << bestCost;
-                KASSERT(asserter.assertAssignment(bestAssignment));
-                std::cout << " -> asserted" << std::endl;
-            }
+            KASSERT(bestCost >= INFTY || asserter.assertAssignment(bestAssignment));
 
             // Write the stats
             auto &stats = requestState.stats().transferALSDVehStats;
@@ -185,8 +179,8 @@ namespace karri {
                 const auto *dVeh = &fleet[dVehId];
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
                 const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
-                const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
-                const int lastStopIdDVeh = stopIdsDVeh[numStopsDVeh - 1];
+                // const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
+                const int lastStopLocDVeh = stopLocationsDVeh[numStopsDVeh - 1];
 
                 // Pickup BNS
                 for (const auto pVehId: relBNSPickups.getVehiclesWithRelevantPDLocs()) {
@@ -198,13 +192,14 @@ namespace karri {
                     const auto *pVeh = &fleet[pVehId];
                     const auto numStopsPVeh = routeState.numStopsOf(pVehId);
                     const auto stopIdsPVeh = routeState.stopIdsFor(pVehId);
+                    const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
 
                     for (const auto &dropoff: requestState.dropoffs) {
                         for (const auto &pickup: relBNSPickups.relevantSpotsFor(pVehId)) {
                             assert(pickup.stopIndex == 0);
                             const auto *pickupPDLoc = &requestState.pickups[pickup.pdId];
 
-                            for (int i = 1; i < numStopsPVeh; i++) { // We start at i = 1 because at the first stop the transfer is only possible if the vehcle is currently waiting for another passenger, so we neglect this case
+                            for (int i = 1; i < numStopsPVeh - 1; i++) { // We start at i = 1 because at the first stop the transfer is only possible if the vehcle is currently waiting for another passenger, so we neglect this case
                                 const int stopId = stopIdsPVeh[i];
                                 const auto& transferPoints = ellipseContainer.getEdgesInEllipse(stopId);
                                 for (int tpIdx = 0; tpIdx < transferPoints.size(); tpIdx++) {
@@ -221,8 +216,9 @@ namespace karri {
                                     tp.distancePVehToTransfer = edge.distToTail + tpOffset;
                                     tp.distancePVehFromTransfer = edge.distFromHead;
                                 
-                                    const int distDVehToTransfer = lastStopToTransfersDistances[lastStopIdDVeh][tpLoc];
-                                    tp.distanceDVehToTransfer = distDVehToTransfer;
+                                    const int distToTransferDVeh = lastStopToTransfersDistances[lastStopLocDVeh][tpLoc];
+                                    KASSERT(tpLoc == stopLocationsDVeh[numStopsDVeh - 1] || distToTransferDVeh > 0);
+                                    tp.distanceDVehToTransfer = distToTransferDVeh;
                                     tp.distanceDVehFromTransfer = 0;
 
                                     tp.stopIdxPVeh = i;
@@ -243,8 +239,17 @@ namespace karri {
                                     asgn.distToDropoff = transferToDropoffDistances[dropoff.loc][tpLoc];
                                     asgn.distFromDropoff = 0;
 
+                                    // Check transfer at stop pVeh
+                                    const bool transferAtStopPVeh = tp.loc == stopLocationsPVeh[i] && asgn.pickupIdx != asgn.transferIdxPVeh;
+                                    if (transferAtStopPVeh) {
+                                        asgn.distToTransferPVeh = 0;
+                                        
+                                        const int nextLeg = asgn.transferIdxPVeh < numStopsPVeh - 1 ? routeState.schedArrTimesFor(pVehId)[asgn.transferIdxPVeh + 1] - routeState.schedDepTimesFor(pVehId)[asgn.transferIdxPVeh] : 0;
+                                        asgn.distFromTransferPVeh = nextLeg;
+                                    }
+
                                     KASSERT(asgn.pickupIdx != asgn.transferIdxPVeh); // In the pickup bns case we do not have a paired assignment
-                                    asgn.distToTransferDVeh = transferAtLastStop ? 0 : distDVehToTransfer;
+                                    asgn.distToTransferDVeh = transferAtLastStop ? 0 : distToTransferDVeh;
                                     asgn.distFromTransferDVeh = 0;
                                 
                                     asgn.pickupType = BEFORE_NEXT_STOP;
@@ -275,9 +280,10 @@ namespace karri {
                     finishAssignmentsWithPickupBNSLowerBound(pVeh, postponedAssignments);
                 }
 
+                KASSERT(postponedAssignments.empty());
+
                 // Pickup ORD
                 for (const auto pVehId: relORDPickups.getVehiclesWithRelevantPDLocs()) {
-                    KASSERT(postponedAssignments.empty());
                     // pVeh an dVeh can not be the same vehicles
                     if (dVehId == pVehId)
                         continue;
@@ -285,13 +291,14 @@ namespace karri {
                     const auto *pVeh = &fleet[pVehId];
                     const auto numStopsPVeh = routeState.numStopsOf(pVehId);
                     const auto stopIdsPVeh = routeState.stopIdsFor(pVehId);
+                    const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
 
                     for (const auto &dropoff: requestState.dropoffs) {
                         //* Calculate the distances from the stops of the pVeh to the possible dropoffs
                         for (const auto &pickup: relORDPickups.relevantSpotsFor(pVehId)) {
                             const auto *pickupPDLoc = &requestState.pickups[pickup.pdId];
 
-                            for (int i = pickup.stopIndex + 1; i < numStopsPVeh; i++) {
+                            for (int i = pickup.stopIndex + 1; i < numStopsPVeh - 1; i++) {
                                 assert(pickup.stopIndex > 0);
                                 const int stopId = stopIdsPVeh[i];
                                 const auto& transferPoints = ellipseContainer.getEdgesInEllipse(stopId);
@@ -308,7 +315,8 @@ namespace karri {
                                     tp.distancePVehToTransfer = edge.distToTail + tpOffset;
                                     tp.distancePVehFromTransfer = edge.distFromHead;
                                 
-                                    const int distToTransferDVeh = lastStopToTransfersDistances[lastStopIdDVeh][tpLoc];
+                                    const int distToTransferDVeh = lastStopToTransfersDistances[lastStopLocDVeh][tpLoc];
+                                    KASSERT(distToTransferDVeh > 0 || stopLocationsDVeh[numStopsDVeh - 1] == tpLoc);
                                     tp.distanceDVehToTransfer = distToTransferDVeh;
                                     tp.distanceDVehFromTransfer = 0;
 
@@ -329,6 +337,15 @@ namespace karri {
                                     asgn.distFromPickup = pickup.distFromPDLocToNextStop;
                                     asgn.distToDropoff = transferToDropoffDistances[dropoff.loc][tpLoc];
                                     asgn.distFromDropoff = 0;
+
+                                    // Check transfer at stop pVeh
+                                    const bool transferAtStopPVeh = tp.loc == stopLocationsPVeh[i] && asgn.pickupIdx != asgn.transferIdxPVeh;
+                                    if (transferAtStopPVeh) {
+                                        asgn.distToTransferPVeh = 0;
+                                        
+                                        const int nextLeg = asgn.transferIdxPVeh < numStopsPVeh - 1 ? routeState.schedArrTimesFor(pVehId)[asgn.transferIdxPVeh + 1] - routeState.schedDepTimesFor(pVehId)[asgn.transferIdxPVeh] : 0;
+                                        asgn.distFromTransferPVeh = nextLeg;
+                                    }
                                     
                                     asgn.distToTransferDVeh = transferAtLastStop ? 0 : distToTransferDVeh;
                                     asgn.distFromTransferDVeh = 0;
@@ -356,6 +373,9 @@ namespace karri {
                     }
                 }
             }
+
+            if (postponedAssignments.empty())
+                return;
 
             finishAssignmentsWithPickupPairedLowerBound(postponedAssignments);
         }
@@ -386,6 +406,8 @@ namespace karri {
         }
 
         void tryFinishedAssignment(AssignmentWithTransfer &asgn) {
+            KASSERT(asgn.isFinished());
+
             if (canSkipAssignment(asgn))
                 return;
 
@@ -405,6 +427,7 @@ namespace karri {
 
         void tryPotentiallyUnfinishedAssignment(AssignmentWithTransfer &asgn,
                                                 std::vector<AssignmentWithTransfer>& postponedAssignments) {
+            
             if (canSkipAssignment(asgn))
                 return;
 
@@ -480,6 +503,8 @@ namespace karri {
                 KASSERT(asgn.isFinished());
                 tryFinishedAssignment(asgn);
             }
+
+            postponedAssignments.clear();
         }
 
         InputGraphT inputGraph;

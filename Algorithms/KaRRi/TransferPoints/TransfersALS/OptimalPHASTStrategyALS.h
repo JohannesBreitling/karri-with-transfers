@@ -40,7 +40,7 @@ namespace karri {
             fullSelection.subGraph.permuteVertices(perm);
         }
 
-        // Maps: lastStopId -> tpLoc -> distance last stop to transfer
+        // Maps: lastStopLoc -> tpLoc -> distance last stop to transfer
         std::map<int, std::map<int, int>> calculateDistancesFromLastStopToAllTransfers(std::vector<int>& lastStopLocs, std::vector<EdgeInEllipse>& transferPoints) {
             std::map<int, std::map<int, int>> result;
 
@@ -49,7 +49,6 @@ namespace karri {
 
             
             // Build selection with all transfer points
-            
             std::vector<int> targetRanks;
             for (const auto edgeInEllipse : transferPoints) {
                 const int tpLoc = edgeInEllipse.edge;
@@ -150,7 +149,7 @@ namespace karri {
             for (const int dropoffLoc : dropoffLocs) {
                 const auto dropoffVertex = inputGraph.edgeTail(dropoffLoc);
                 const auto dropoffRank = vehCh.rank(dropoffVertex);
-                const auto dropoffOffset = inputGraph.travelTime(dropoffVertex);
+                const auto dropoffOffset = inputGraph.travelTime(dropoffLoc);
                 
                 reverseQuery.run(transferSelection, dropoffRank);
                 

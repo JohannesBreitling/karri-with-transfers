@@ -159,8 +159,6 @@ namespace karri {
             if (relevantDVehIds.size() == 0 || relevantPVehIds.empty())
                 return;
 
-            std::cout << "Initialized Optimal ALS PVeh for request : " << requestState.originalRequest.requestId << "\n";
-
             // Get all stop ids of the dropoff vehicles
             std::vector<int> stopIdsDVehs;
             for (const auto dVehId : relevantDVehIds) {
@@ -212,11 +210,7 @@ namespace karri {
             
             KASSERT(postponedAssignments.empty());
 
-            if (bestCost < INFTY) {
-                std::cout << "Possible optimal assignment ALS PVeh with cost: " << bestCost;
-                KASSERT(asserter.assertAssignment(bestAssignment));
-                std::cout << " -> asserted" << std::endl;
-            }
+            KASSERT(bestCost >= INFTY || asserter.assertAssignment(bestAssignment));
 
             // // Write the stats
             // auto &stats = requestState.stats().transferALSPVehStats;
