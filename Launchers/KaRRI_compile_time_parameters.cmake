@@ -182,6 +182,7 @@ else(KARRI_COL_PALS_ONLY_PROMISING_DROPOFFS)
     target_compile_definitions(karri PRIVATE KARRI_COL_PALS_ONLY_PROMISING_DROPOFFS=false)
 endif (KARRI_COL_PALS_ONLY_PROMISING_DROPOFFS)
 
+
 ## Compile time parameters for transfers
 option(KARRI_USE_DIJKSTRA_TRANSFER_POINT_STRATEGY "Use Dijkstra searches to find transfer points (slow)." OFF)
 if (KARRI_USE_DIJKSTRA_TRANSFER_POINT_STRATEGY)
@@ -212,7 +213,7 @@ else(KARRI_DIRECT_TRANSFER_DISTANCES_USE_SIMD)
 endif (KARRI_DIRECT_TRANSFER_DISTANCES_USE_SIMD)
 
 
-### Strategy for calulcating shortest paths in the transfer ALS case
+### Strategy for calculating shortest paths in the transfer ALS case
 set(TALS_CH 1)
 set(TALS_PHAST 2)
 
@@ -226,3 +227,12 @@ target_compile_definitions(karri PRIVATE KARRI_TALS_PHAST=2)
 set(KARRI_TALS_STRAT KARRI_TALS_PHAST CACHE STRING "Strategy for computing shortest path in the transfer ALS case.")
 
 target_compile_definitions(karri PRIVATE KARRI_TALS_STRAT=${KARRI_TALS_STRAT})
+
+
+## Parallelize PHAST queries for computation of detour ellipses?
+option(KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE "Parallelize PHAST queries for computation of detour ellipses. If set, use -max-num-threads." OFF)
+if (KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE)
+    target_compile_definitions(karri PRIVATE KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE=true)
+else(KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE)
+    target_compile_definitions(karri PRIVATE KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE=false)
+endif (KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE)

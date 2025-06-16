@@ -124,6 +124,8 @@
 
 #include "Algorithms/KaRRi/DalsAssignments/CollectiveBCHStrategy.h"
 #include "Algorithms/KaRRi/TransferPoints/OrdinaryTransfers/DirectTransferDistances/BCHDirectTransferDistancesFinder.h"
+#include "Parallel/hardware_topology.h"
+#include "Parallel/tbb_initializer.h"
 
 #elif KARRI_DALS_STRATEGY == KARRI_IND
 
@@ -159,6 +161,7 @@ inline void printUsage() {
               "  -veh-d <file>          separator decomposition for the vehicle network in binary format (needed for CCHs).\n"
               "  -psg-d <file>          separator decomposition for the passenger network in binary format (needed for CCHs).\n"
               "  -csv-in-LOUD-format    if set, assumes that input files are in the format used by LOUD.\n"
+              "  -max-num-threads <int> set the maximum number of threads to use (dflt: 1).\n"
               "  -o <file>              generate output files at name <file> (specify name without file suffix).\n"
               "  -help                  show usage help text.\n";
 }
@@ -171,6 +174,16 @@ int main(int argc, char *argv[]) {
             printUsage();
             return EXIT_SUCCESS;
         }
+
+        // Initialize TBB
+        auto maxNumThreads = clp.getValue<size_t>("max-num-threads", 1);
+        size_t numAvailableCpus = parallel::HardwareTopology<>::instance().num_cpus();
+        if (numAvailableCpus < maxNumThreads) {
+            std::cout << "There are currently only " << numAvailableCpus << " cpus available. "
+                      << "Setting number of threads from " << maxNumThreads << " to " << numAvailableCpus << std::endl;
+            maxNumThreads = numAvailableCpus;
+        }
+        parallel::TBBInitializer<parallel::HardwareTopology<>>::instance(maxNumThreads);
 
 
         // Parse the command-line options.
@@ -616,7 +629,17 @@ int main(int argc, char *argv[]) {
         using TransferPointStrategyLabelSet = std::conditional_t<KARRI_CH_ELLIPSE_RECONSTRUCTOR_USE_SIMD,
                 SimdLabelSet<KARRI_CH_ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>,
                 BasicLabelSet<KARRI_CH_ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>>;
-        using TransferPointStrategyImpl = TransferPointStrategies::CHTransferPointStrategy<VehicleInputGraph, VehCHEnv, EllipticBucketsEnv, TraversalCostAttribute, TransferPointStrategyLabelSet, std::ofstream>;
+        static constexpr bool PARALLELIZE_PHAST_DETOUR_ELLIPSES = KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE;
+
+        if (!PARALLELIZE_PHAST_DETOUR_ELLIPSES && clp.isSet("max-num-threads")) {
+            std::cout
+                    << "Warning: -max-num-threads is set but KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE is OFF, ignoring -max-num-threads."
+                    << std::endl;
+        }
+        if (PARALLELIZE_PHAST_DETOUR_ELLIPSES && !clp.isSet("max-num-threads")) {
+            std::cout << "Warning: KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE is ON but -max-num-threads is not set. Queries will execute using 1 thread." << std::endl;
+        }
+        using TransferPointStrategyImpl = TransferPointStrategies::CHTransferPointStrategy<VehicleInputGraph, VehCHEnv, EllipticBucketsEnv, PARALLELIZE_PHAST_DETOUR_ELLIPSES, TraversalCostAttribute, TransferPointStrategyLabelSet, std::ofstream>;
         TransferPointStrategyImpl transferPointStrategy(vehicleInputGraph, *vehChEnv, fleet, ellipticBucketsEnv,
                                                         reqState, routeState);
 #endif
@@ -676,6 +699,7 @@ int main(int argc, char *argv[]) {
         TransferALSPVehFinderImpl transferALSPVehInsertions = TransferALSPVehFinderImpl(transferALSStrategy, transferPickupALSStrategy, transferDropoffALSStrategy, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, relOrdinaryDropoffs, postponedAssignments, fleet, routeState, reqState, calc, asserter);
 
         using TransferALSDVehFinderImpl = TransferALSDVehFinder<TransferStrategyALSImpl, TransfersDropoffALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
+
         TransferALSDVehFinderImpl transferALSDVehInsertions = TransferALSDVehFinderImpl(transferALSStrategy, transferDropoffALSStrategy, curVehLocToPickupSearches, relOrdinaryPickups, relPickupsBeforeNextStop, postponedAssignments, fleet, routeState, reqState, asserter);
 
         using AssignmentsWithTransferFinderImpl = AssignmentsWithTransferFinder<OrdinaryTransferInsertionsImpl, TransferALSPVehFinderImpl, TransferALSDVehFinderImpl, TransferAsserterImpl>;

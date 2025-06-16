@@ -48,6 +48,15 @@ namespace karri::TransferPointStrategies {
                 topoSearchTime = 0;
                 postprocessTime = 0;
             }
+
+            CHEllipseReconstructorStats& operator+=(const CHEllipseReconstructorStats& other) {
+                numVerticesSettled += other.numVerticesSettled;
+                numEdgesRelaxed += other.numEdgesRelaxed;
+                initTime += other.initTime;
+                topoSearchTime += other.topoSearchTime;
+                postprocessTime += other.postprocessTime;
+                return *this;
+            }
         };
 
 

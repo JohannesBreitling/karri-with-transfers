@@ -112,6 +112,14 @@ public:
             return isMarked[i];
         }
 
+        std::array<int, K> toIntArray() const {
+            std::array<int, K> arr;
+            for (int i = 0; i < K; ++i) {
+                arr[i] = static_cast<int>(isMarked[i]);
+            }
+            return arr;
+        }
+
 //        // Returns true if this mask marks at least one component.
 //        operator bool() const {
 //            bool res = isMarked[0];
@@ -161,6 +169,10 @@ public:
             assert(i >= 0);
             assert(i < K);
             return values[i];
+        }
+
+        std::array<int, K> toIntArray() const {
+            return values;
         }
 
         // Returns the packed sum of lhs and rhs.
