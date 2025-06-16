@@ -253,7 +253,8 @@ namespace karri {
 
                 for (const auto &pickup: relORDPickups.relevantSpotsFor(pVehId)) {
                     tryDropoffORD(pVeh, &pickup, postponedAssignments, ellipseContainer);
-                    tryDropoffALS(pVeh, &pickup, relALSDropoffs, postponedAssignments, ellipseContainer);
+                    if (!relALSDropoffs.getVehiclesWithRelevantPDLocs().empty())
+                        tryDropoffALS(pVeh, &pickup, relALSDropoffs, postponedAssignments, ellipseContainer);
                 }
             }
         }
@@ -269,7 +270,8 @@ namespace karri {
                 
                 for (const auto &pickup: relORDPickups.relevantSpotsFor(pVehId)) {
                     tryDropoffORD(pVeh, &pickup, postponedAssignments, ellipseContainer);
-                    tryDropoffALS(pVeh, &pickup, relALSDropoffs, postponedAssignments, ellipseContainer);
+                    if (!relALSDropoffs.getVehiclesWithRelevantPDLocs().empty())
+                        tryDropoffALS(pVeh, &pickup, relALSDropoffs, postponedAssignments, ellipseContainer);
                 }
 
                 if (postponedAssignments.empty())
@@ -328,7 +330,8 @@ namespace karri {
                     // KASSERT(asserter.assertLastStopDistance(pVehId, pickup.loc) == distanceToPickup);
                     KASSERT(!relALSDropoffs.getVehiclesWithRelevantPDLocs().empty() || !relORDDropoffs.getVehiclesWithRelevantPDLocs().empty());
                     tryDropoffORDForPickupALS(pVeh, &pickup, distanceToPickup, ellipseContainer, postponedAssignments);
-                    tryDropoffALSForPickupALS(pVeh, &pickup, distanceToPickup, relALSDropoffs, ellipseContainer);
+                    if (!relALSDropoffs.getVehiclesWithRelevantPDLocs().empty())
+                        tryDropoffALSForPickupALS(pVeh, &pickup, distanceToPickup, relALSDropoffs, ellipseContainer);
                 }
             }
         }
@@ -794,8 +797,10 @@ namespace karri {
             if (pairedDVeh || transferAfterLastStopDVeh)
                 asgn.distFromTransferDVeh = 0;
 
-            if (!pairedDVeh && transferAtStopDVeh)
+            if (!pairedDVeh && transferAtStopDVeh) {
+                KASSERT(legTransferDVeh > 0);
                 asgn.distFromTransferDVeh = legTransferDVeh;
+            }
 
             // Distance to dropoff
             if (pairedDVeh && !dropoffAfterLastStop)
