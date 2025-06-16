@@ -32,9 +32,6 @@
 #include "DataStructures/Containers/TimestampedVector.h"
 #include "CHEllipseReconstructorQuery.h"
 
-#include <tbb/parallel_for.h>
-#include <tbb/enumerable_thread_specific.h>
-
 namespace karri::TransferPointStrategies {
 
     // Computes the set of vertices contained in the detour ellipse between a pair of consecutive stops in a vehicle
@@ -42,6 +39,7 @@ namespace karri::TransferPointStrategies {
     template<typename InputGraphT,
             typename CHEnvT,
             typename EllipticBucketsEnvironmentT,
+            bool ParallelizeQuery,
             typename WeightT = TraversalCostAttribute,
             typename LabelSetT = SimdLabelSet<3, ParentInfo::NO_PARENT_INFO>,
             typename LoggerT = NullLogger>
@@ -73,11 +71,11 @@ namespace karri::TransferPointStrategies {
                   calc(routeState),
                   downGraph(chEnv.getCH().downwardGraph()),
                   upGraph(chEnv.getCH().upwardGraph()),
-                  topDownRankPermutation(chEnv.getCH().downwardGraph().numVertices()),
+                  sweepVertexPermutation(chEnv.getCH().downwardGraph().numVertices()),
                   firstIdxOfLevel(),
-                  inputGraphWithTopDownRankVertexIds(inputGraph),
+                  inputGraphWithSweepVertexIds(inputGraph),
                   queryPerThread([&]() {
-                      return Query(ch, downGraph, upGraph, topDownRankPermutation, firstIdxOfLevel,
+                      return Query(ch, downGraph, upGraph, sweepVertexPermutation, firstIdxOfLevel,
                                    ellipticBucketsEnv, routeState);
                   }),
                   distanceFromVertexToNextStopPerThread(
@@ -99,43 +97,62 @@ namespace karri::TransferPointStrategies {
             KASSERT(downGraph.numVertices() == upGraph.numVertices());
             const int numVertices = downGraph.numVertices();
 
-            auto levels = computeSharedLevelsInUpAndDownGraph(upGraph, downGraph);
-            std::vector<int> inversePerm(numVertices);
-            std::iota(inversePerm.begin(), inversePerm.end(), 0);
-            std::sort(inversePerm.begin(), inversePerm.end(), [&](const auto a, const auto b) {
-                return levels[a] > levels[b] || (levels[a] == levels[b] && a < b);
-            });
-            topDownRankPermutation.assign(inversePerm.begin(), inversePerm.end());
-            KASSERT(topDownRankPermutation.validate());
-            topDownRankPermutation.invert();
+            if constexpr (ParallelizeQuery) {
+
+                // If queries are parallelized internally, we use a vertex order by CH level, allowing parallelization
+                // of vertex scans within each level. We set a threshold for large levels, s.t. only the large levels
+                // at the end will be processed in parallel, ensuring there is enough work to make it worth it.
+                auto levels = computeSharedLevelsInUpAndDownGraph(upGraph, downGraph);
+                std::vector<int> inversePerm(numVertices);
+                std::iota(inversePerm.begin(), inversePerm.end(), 0);
+                std::sort(inversePerm.begin(), inversePerm.end(), [&](const auto a, const auto b) {
+                    return levels[a] > levels[b] || (levels[a] == levels[b] && a < b);
+                });
+                sweepVertexPermutation.assign(inversePerm.begin(), inversePerm.end());
+                KASSERT(sweepVertexPermutation.validate());
+                sweepVertexPermutation.invert();
 
 
-            int curLevel = INFTY;
-            for (int i = 0; i < numVertices; ++i) {
-                if (levels[inversePerm[i]] == curLevel)
-                    continue;
-                curLevel = levels[inversePerm[i]];
-                firstIdxOfLevel.push_back(i);
+                int curLevel = INFTY;
+                for (int i = 0; i < numVertices; ++i) {
+                    if (levels[inversePerm[i]] == curLevel)
+                        continue;
+                    curLevel = levels[inversePerm[i]];
+                    firstIdxOfLevel.push_back(i);
+                }
+                firstIdxOfLevel.push_back(numVertices);
+                static constexpr int LARGE_LEVEL_THRESHOLD = (1 << 7) * CACHE_LINE_SIZE / sizeof(int);
+                int firstLargeLevelIdx = 0;
+                while (firstLargeLevelIdx < firstIdxOfLevel.size() - 1 &&
+                       firstIdxOfLevel[firstLargeLevelIdx + 1] - firstIdxOfLevel[firstLargeLevelIdx] <
+                       LARGE_LEVEL_THRESHOLD) {
+                    ++firstLargeLevelIdx;
+                }
+                firstIdxOfLevel.erase(firstIdxOfLevel.begin(), firstIdxOfLevel.begin() + firstLargeLevelIdx);
+            } else {
+                // If queries are run sequentially, we use a vertex ordering that is the inverse rank in the CH.
+                // We place all vertices in one level, that will be considered small, s.t. all vertices will be
+                // processed sequentially in the query.
+                sweepVertexPermutation = Permutation(numVertices);
+                for (int i = 0; i < numVertices; ++i) {
+                    sweepVertexPermutation[i] = numVertices - 1 - i;
+                }
+                KASSERT(sweepVertexPermutation.validate());
+                firstIdxOfLevel.push_back(numVertices);
             }
-            firstIdxOfLevel.push_back(numVertices);
-            static constexpr int LARGE_LEVEL_THRESHOLD = (1 << 7) * CACHE_LINE_SIZE / sizeof(int);
-            int firstLargeLevelIdx = 0;
-            while (firstLargeLevelIdx < firstIdxOfLevel.size() - 1 &&
-                   firstIdxOfLevel[firstLargeLevelIdx + 1] - firstIdxOfLevel[firstLargeLevelIdx] <
-                   LARGE_LEVEL_THRESHOLD) {
-                ++firstLargeLevelIdx;
-            }
-            firstIdxOfLevel.erase(firstIdxOfLevel.begin(), firstIdxOfLevel.begin() + firstLargeLevelIdx);
 
-            downGraph.permuteVertices(topDownRankPermutation);
-            upGraph.permuteVertices(topDownRankPermutation);
+            // Permute the search graphs by the chosen permutation.
+            downGraph.permuteVertices(sweepVertexPermutation);
+            upGraph.permuteVertices(sweepVertexPermutation);
 
-            Permutation inputGraphVertexIdsToTopDownRank(inputGraph.numVertices());
+            // Create a copy of the input graph with vertex IDs permuted according to the sweep permutation. This graph
+            // is used in converting vertex ellipses from the query output format to the desired format of edges.
+            Permutation inputGraphVertexIdsToSweepId(inputGraph.numVertices());
             for (int i = 0; i < inputGraph.numVertices(); ++i) {
-                inputGraphVertexIdsToTopDownRank[i] = topDownRankPermutation[ch.rank(i)];
+                inputGraphVertexIdsToSweepId[i] = sweepVertexPermutation[ch.rank(i)];
             }
-            KASSERT(inputGraphVertexIdsToTopDownRank.validate());
-            inputGraphWithTopDownRankVertexIds.permuteVertices(inputGraphVertexIdsToTopDownRank);
+            KASSERT(inputGraphVertexIdsToSweepId.validate());
+            inputGraphWithSweepVertexIds.permuteVertices(inputGraphVertexIdsToSweepId);
         }
 
         // Given a set of stop IDs for pickup vehicles and dropoff vehicles, this computes the transfer points between
@@ -331,18 +348,18 @@ namespace karri::TransferPointStrategies {
                 int distFromFirstStopToHead = 0;
                 int distFromHeadToSecondStop =
                         p2pQuery.getDistance() + inputGraph.travelTime(stopLocs[stopIdx + 1]);
-                vertexEllipse.emplace_back(topDownRankPermutation[source], distFromFirstStopToHead,
+                vertexEllipse.emplace_back(sweepVertexPermutation[source], distFromFirstStopToHead,
                                            distFromHeadToSecondStop);
                 for (const auto e: edgePathInInputGraph) {
                     distFromFirstStopToHead += inputGraph.travelTime(e);
                     distFromHeadToSecondStop -= inputGraph.travelTime(e);
-                    const auto v = topDownRankPermutation[ch.rank(inputGraph.edgeHead(e))];
+                    const auto v = sweepVertexPermutation[ch.rank(inputGraph.edgeHead(e))];
                     vertexEllipse.emplace_back(v, distFromFirstStopToHead, distFromHeadToSecondStop);
                 }
                 KASSERT(vertexEllipse.front().vertex ==
-                        topDownRankPermutation[ch.rank(inputGraph.edgeHead(stopLocs[stopIdx]))]);
+                        sweepVertexPermutation[ch.rank(inputGraph.edgeHead(stopLocs[stopIdx]))]);
                 KASSERT(vertexEllipse.back().vertex ==
-                        topDownRankPermutation[ch.rank(inputGraph.edgeTail(stopLocs[stopIdx + 1]))]);
+                        sweepVertexPermutation[ch.rank(inputGraph.edgeTail(stopLocs[stopIdx + 1]))]);
 
                 std::sort(vertexEllipse.begin(), vertexEllipse.end(),
                           [](const VertexInEllipse &v1, const VertexInEllipse &v2) {
@@ -415,10 +432,10 @@ namespace karri::TransferPointStrategies {
 
             for (const auto &vertexInEllipse: vertexEllipse) {
 
-                FORALL_INCIDENT_EDGES(inputGraphWithTopDownRankVertexIds, vertexInEllipse.vertex, e) {
+                FORALL_INCIDENT_EDGES(inputGraphWithSweepVertexIds, vertexInEllipse.vertex, e) {
 
-                    const int travelTime = inputGraphWithTopDownRankVertexIds.travelTime(e);
-                    const int edgeHead = inputGraphWithTopDownRankVertexIds.edgeHead(e);
+                    const int travelTime = inputGraphWithSweepVertexIds.travelTime(e);
+                    const int edgeHead = inputGraphWithSweepVertexIds.edgeHead(e);
                     const int distToTail = vertexInEllipse.distToVertex;
                     const int distFromHead = localDistanceFromVertexToNextStop[edgeHead];
 
@@ -465,7 +482,7 @@ namespace karri::TransferPointStrategies {
 
                 for (const auto &eInInputGraph: edgePathInInputGraph) {
                     if (std::find_if(ellipse.begin(), ellipse.end(), [&](const EdgeInEllipse &e) {
-                        return inputGraphWithTopDownRankVertexIds.edgeId(e.edge) == eInInputGraph;
+                        return inputGraphWithSweepVertexIds.edgeId(e.edge) == eInInputGraph;
                     }) == ellipse.end()) {
                         KASSERT(false);
                         return false;
@@ -515,17 +532,17 @@ namespace karri::TransferPointStrategies {
 
                 const int locInPermutedGraph = edgePVeh.edge;
                 const int distPVehToTransfer =
-                        edgePVeh.distToTail + inputGraphWithTopDownRankVertexIds.travelTime(locInPermutedGraph);
+                        edgePVeh.distToTail + inputGraphWithSweepVertexIds.travelTime(locInPermutedGraph);
                 const int distPVehFromTransfer = edgePVeh.distFromHead;
                 const int distDVehToTransfer =
-                        edgeDVeh.distToTail + inputGraphWithTopDownRankVertexIds.travelTime(locInPermutedGraph);
+                        edgeDVeh.distToTail + inputGraphWithSweepVertexIds.travelTime(locInPermutedGraph);
                 const int distDVehFromTransfer = edgeDVeh.distFromHead;
 
 
                 ++itEdgesPVeh;
                 ++itEdgesDVeh;
 
-                const int locInOriginalGraph = inputGraphWithTopDownRankVertexIds.edgeId(locInPermutedGraph);
+                const int locInOriginalGraph = inputGraphWithSweepVertexIds.edgeId(locInPermutedGraph);
                 const auto tp = TransferPoint(locInOriginalGraph, &fleet[pVehId], &fleet[dVehId], stopIdxPVeh,
                                               stopIdxDVeh, distPVehToTransfer,
                                               distPVehFromTransfer,
@@ -599,12 +616,12 @@ namespace karri::TransferPointStrategies {
         CH::SearchGraph downGraph; // Reverse downward edges in CH. Vertices ordered by decreasing rank.
         CH::SearchGraph upGraph; // Upward edges in CH. Vertices ordered by decreasing rank.
 
-        Permutation topDownRankPermutation; // Permutes vertex ranks in order to linearize top-down passes.
+        Permutation sweepVertexPermutation; // Permutes vertex ranks in order to linearize top-down passes.
 
         std::vector<int> firstIdxOfLevel;
 
-        // Identical to input graph but vertex IDs permuted by topDownRankPermutation.
-        InputGraphT inputGraphWithTopDownRankVertexIds;
+        // Identical to input graph but vertex IDs permuted by sweepVertexPermutation.
+        InputGraphT inputGraphWithSweepVertexIds;
 
         // Permutation that maps edge IDs in permuted input graph to edge IDs in original input graph.
         Permutation ellipseEdgeIdsToOriginalEdgeIds;

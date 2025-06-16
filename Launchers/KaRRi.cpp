@@ -629,7 +629,17 @@ int main(int argc, char *argv[]) {
         using TransferPointStrategyLabelSet = std::conditional_t<KARRI_CH_ELLIPSE_RECONSTRUCTOR_USE_SIMD,
                 SimdLabelSet<KARRI_CH_ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>,
                 BasicLabelSet<KARRI_CH_ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>>;
-        using TransferPointStrategyImpl = TransferPointStrategies::CHTransferPointStrategy<VehicleInputGraph, VehCHEnv, EllipticBucketsEnv, TraversalCostAttribute, TransferPointStrategyLabelSet, std::ofstream>;
+        static constexpr bool PARALLELIZE_PHAST_DETOUR_ELLIPSES = KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE;
+
+        if (!PARALLELIZE_PHAST_DETOUR_ELLIPSES && clp.isSet("max-num-threads")) {
+            std::cout
+                    << "Warning: -max-num-threads is set but KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE is OFF, ignoring -max-num-threads."
+                    << std::endl;
+        }
+        if (PARALLELIZE_PHAST_DETOUR_ELLIPSES && !clp.isSet("max-num-threads")) {
+            std::cout << "Warning: KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE is ON but -max-num-threads is not set. Queries will execute using 1 thread." << std::endl;
+        }
+        using TransferPointStrategyImpl = TransferPointStrategies::CHTransferPointStrategy<VehicleInputGraph, VehCHEnv, EllipticBucketsEnv, PARALLELIZE_PHAST_DETOUR_ELLIPSES, TraversalCostAttribute, TransferPointStrategyLabelSet, std::ofstream>;
         TransferPointStrategyImpl transferPointStrategy(vehicleInputGraph, *vehChEnv, fleet, ellipticBucketsEnv,
                                                         reqState, routeState);
 #endif

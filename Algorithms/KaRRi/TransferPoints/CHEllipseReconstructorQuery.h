@@ -61,7 +61,7 @@ namespace karri::TransferPointStrategies {
                   numVertices(downGraph.numVertices()),
                   downGraph(downGraph),
                   upGraph(upGraph),
-                  topDownRankPermutation(topDownRankPermutation),
+                  sweepVertexPermutation(topDownRankPermutation),
                   firstIdxOfLargeLevels(firstIdxOfLargeLevels),
                   ellipticBucketsEnv(ellipticBucketsEnv),
                   routeState(routeState),
@@ -238,7 +238,7 @@ namespace karri::TransferPointStrategies {
             for (const auto &e: ranksWithSourceBucketEntries) {
 
                 // Map to vertex ordering of CH graphs used
-                const auto r = topDownRankPermutation[e.rank];
+                const auto r = sweepVertexPermutation[e.rank];
 
                 if (!relevantInToSearch.isSet(r)) {
                     // Distances for input ranks are initialized here. Distances of other ranks are initialized
@@ -252,7 +252,7 @@ namespace karri::TransferPointStrategies {
 
             for (const auto &e: ranksWithTargetBucketEntries) {
                 // Map to vertex ordering of CH graphs used
-                const auto r = topDownRankPermutation[e.rank];
+                const auto r = sweepVertexPermutation[e.rank];
 
                 if (!relevantInFromSearch.isSet(r)) {
                     // Distances for input ranks are initialized here. Distances of other ranks are initialized
@@ -322,7 +322,7 @@ namespace karri::TransferPointStrategies {
         const size_t numVertices;
         const CH::SearchGraph &downGraph; // Reverse downward edges in CH. Vertices ordered by decreasing rank.
         const CH::SearchGraph &upGraph; // Upward edges in CH. Vertices ordered by decreasing rank.
-        const Permutation &topDownRankPermutation; // Maps vertex rank to n - rank in order to linearize top-down passes.
+        const Permutation &sweepVertexPermutation; // Maps vertex rank to n - rank in order to linearize top-down passes.
         const std::vector<int> &firstIdxOfLargeLevels; // First index of large levels in top-down rank ordering.
         const EllipticBucketsEnvironmentT &ellipticBucketsEnv;
         const RouteState &routeState;
@@ -335,7 +335,6 @@ namespace karri::TransferPointStrategies {
 
         AlignedVector<DistanceLabel> distTo;
         AlignedVector<DistanceLabel> distFrom;
-//        tbb::combinable<std::vector<int>> threadLocalVerticesInEllipse;
         tbb::enumerable_thread_specific<std::vector<int>> threadLocalVerticesInEllipse;
 
         FastResetFlagArray<> relevantInToSearch; // Flags that mark whether vertex is relevant in to search.
