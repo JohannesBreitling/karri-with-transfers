@@ -41,7 +41,7 @@ namespace karri {
         }
 
         // Maps: lastStopLoc -> tpLoc -> distance last stop to transfer
-        std::map<int, std::map<int, int>> calculateDistancesFromLastStopToAllTransfers(std::vector<int>& lastStopLocs, std::vector<EdgeInEllipse>& transferPoints) {
+        std::map<int, std::map<int, int>> calculateDistancesFromLastStopToAllTransfers(const std::vector<int>& lastStopLocs, const std::vector<EdgeInEllipse>& transferPoints) {
             std::map<int, std::map<int, int>> result;
 
             if (lastStopLocs.size() == 0 || transferPoints.size() == 0)
@@ -88,10 +88,10 @@ namespace karri {
 
 
         // Maps: pickupLoc -> tpLoc -> distance pickup to transfer point
-        std::map<int, std::map<int, int>> caluclateDistancesFromPickupsToAllTransfers(std::vector<int>& pickupLocs, std::vector<EdgeInEllipse>& transferPoints) {
+        std::map<int, std::map<int, int>> caluclateDistancesFromPickupsToAllTransfers(const std::vector<int>& pickupLocs, const std::vector<EdgeInEllipse>& transferPoints) {
             std::map<int, std::map<int, int>> result;
 
-            if (pickupLocs.size() == 0 || transferPoints.size() == 0)
+            if (pickupLocs.empty() || transferPoints.empty())
                 return result;
 
             std::vector<int> targetRanks;
@@ -130,7 +130,7 @@ namespace karri {
         }
 
         // Maps: dropoffLoc -> tpLoc -> distance transfer point to dropoff
-        std::map<int, std::map<int, int>> caluclateDistancesFromAllTransfersToDropoffs(std::vector<EdgeInEllipse>& transferPoints, std::vector<int>& dropoffLocs) {
+        std::map<int, std::map<int, int>> caluclateDistancesFromAllTransfersToDropoffs(const std::vector<EdgeInEllipse>& transferPoints, const std::vector<int>& dropoffLocs) {
             std::map<int, std::map<int, int>> result;
 
             if (dropoffLocs.size() == 0 || transferPoints.size() == 0)

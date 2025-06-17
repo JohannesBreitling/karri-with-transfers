@@ -45,6 +45,7 @@ namespace karri {
     template<typename InputGraphT,
             typename CHEnvT,
             typename EllipticBucketsEnvironmentT,
+            int TOP_VERTICES_DIVISOR,
             typename WeightT = TraversalCostAttribute,
             typename LabelSetT = SimdLabelSet<3, ParentInfo::NO_PARENT_INFO>,
             typename LoggerT = NullLogger>
@@ -54,7 +55,7 @@ namespace karri {
         using LabelMask = typename LabelSetT::LabelMask;
         static constexpr int K = LabelSetT::K;
 
-        using Query = CHEllipseReconstructorQuery<EllipticBucketsEnvironmentT, LabelSetT, WeightT>;
+        using Query = CHEllipseReconstructorQuery<EllipticBucketsEnvironmentT, LabelSetT, TOP_VERTICES_DIVISOR, WeightT>;
 
 
         using P2PLabelSet = BasicLabelSet<0, ParentInfo::FULL_PARENT_INFO>;

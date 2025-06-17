@@ -60,7 +60,8 @@ namespace karri {
             transferToDropoffDistances(),
             asserter(asserter) {}
 
-        void findAssignments(const RelevantDropoffsAfterLastStop& relALSDropoffs, const EdgeEllipseContainer& ellipseContainer) {
+            template<typename EllipsesT>
+        void findAssignments(const RelevantDropoffsAfterLastStop& relALSDropoffs, const EllipsesT& ellipseContainer) {
             Timer total;
 
             if (relALSDropoffs.getVehiclesWithRelevantPDLocs().empty())

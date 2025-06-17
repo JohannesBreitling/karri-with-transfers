@@ -40,9 +40,7 @@ namespace karri {
             typename TransferALSDVehFinderT,
             typename DropoffALSStrategyT,
             typename EllipseReconstructorT,
-            typename InsertionAsserterT,
-            typename OptimalTransferALSPVehFinderT,
-            typename OptimalTransferALSDVehFinderT
+            typename InsertionAsserterT
             >
     class AssignmentsWithTransferFinder {
 
@@ -55,9 +53,7 @@ namespace karri {
                 EllipseReconstructorT &ellipseReconstructor,
                 RequestState &requestState,
                 const RouteState &routeState,
-                InsertionAsserterT &asserter,
-                OptimalTransferALSPVehFinderT &optimalTransfersALSPVeh,
-                OptimalTransferALSDVehFinderT &optimalTransfersALSDVeh)
+                InsertionAsserterT &asserter)
                 : ordinaryTransfers(ordinaryTransfers),
                   transfersALSPVeh(transfersALSPVeh),
                   transfersALSDVeh(transfersALSDVeh),
@@ -65,9 +61,7 @@ namespace karri {
                   ellipseReconstructor(ellipseReconstructor),
                   requestState(requestState),
                   routeState(routeState),
-                  asserter(asserter),
-                  optimalTransfersALSPVeh(optimalTransfersALSPVeh),
-                  optimalTransfersALSDVeh(optimalTransfersALSDVeh) {}
+                  asserter(asserter) {}
 
         void init() {
             ordinaryTransfers.init();
@@ -107,17 +101,13 @@ namespace karri {
             const auto ellipseContainer = ellipseReconstructor.computeEllipses(allStopIds);
 
             // * TRANSFER AFTER LAST STOP (PVeh)
-            transfersALSPVeh.findAssignments(relALSDropoffs);
-
-            optimalTransfersALSPVeh.findAssignments(relALSDropoffs, ellipseContainer);
+            transfersALSPVeh.findAssignments(relALSDropoffs, ellipseContainer);
 
             // * ORDINARY TRANSFER
             ordinaryTransfers.findAssignments(pVehStopIds, dVehStopIds, relALSDropoffs, ellipseContainer);
 
             // * TRANSFER AFTER LAST STOP (DVeh)
-            transfersALSDVeh.findAssignments(relALSDropoffs);
-
-            optimalTransfersALSDVeh.findAssignments(relALSDropoffs, ellipseContainer);
+            transfersALSDVeh.findAssignments(relALSDropoffs, ellipseContainer);
 
             //* Test the best assignment found
             KASSERT(requestState.getBestCostWithTransfer() == INFTY || asserter.assertAssignment(requestState.getBestAssignmentWithTransfer()));
@@ -210,9 +200,6 @@ namespace karri {
         const RouteState &routeState;
 
         InsertionAsserterT &asserter;
-
-        OptimalTransferALSPVehFinderT &optimalTransfersALSPVeh;
-        OptimalTransferALSDVehFinderT &optimalTransfersALSDVeh;
 
         FastResetFlagArray<uint32_t> stopSeen;
     };

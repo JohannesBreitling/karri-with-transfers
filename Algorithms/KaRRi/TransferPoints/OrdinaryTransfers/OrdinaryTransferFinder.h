@@ -45,6 +45,16 @@
 
 namespace karri {
 
+    class NoOpOrdinaryTransferFinder {
+
+    public:
+        void init() {}
+
+        template<typename EllipsesT>
+        void findAssignments(const std::vector<int> &, const std::vector<int> &,
+                             const RelevantDropoffsAfterLastStop &, const EllipsesT &) {}
+    };
+
     template<
             typename InputGraphT,
             typename VehCHEnvT,
@@ -127,8 +137,10 @@ namespace karri {
 
         // Given stop IDs at which a transfer with an ordinary detour (i.e. a detour between two existing stops) may
         // be inserted, this method finds all possible assignments with an ordinary transfer.
+        template<typename EllipsesT>
         void findAssignments(const std::vector<int> &pVehStopIds, const std::vector<int> &dVehStopIds,
-                             const RelevantDropoffsAfterLastStop &relALSDropoffs, const EdgeEllipseContainer& ellipseContainer) {
+                             const RelevantDropoffsAfterLastStop &relALSDropoffs,
+                             const EllipsesT &ellipseContainer) {
             Timer total;
             if (relORDPickups.getVehiclesWithRelevantPDLocs().empty() &&
                 relBNSPickups.getVehiclesWithRelevantPDLocs().empty())
@@ -241,7 +253,7 @@ namespace karri {
     private:
 
         void findPartialAssignmentsForPairOfStopPairs(const int pStopId, const int dStopId,
-                                                      std::vector<AssignmentWithTransfer>& promisingPartials) {
+                                                      std::vector<AssignmentWithTransfer> &promisingPartials) {
             ++numStopPairs;
 
             const auto transferPoints = ellipseIntersector.getTransferPoints(pStopId, dStopId);
@@ -249,8 +261,8 @@ namespace karri {
             ellipseIntersectionLogger << transferPoints.size() << '\n';
 
             // For fixed transfer indices, try to find possible pickups
-            const auto& pVehId = routeState.vehicleIdOf(pStopId);
-            const auto& dVehId = routeState.vehicleIdOf(dStopId);
+            const auto &pVehId = routeState.vehicleIdOf(pStopId);
+            const auto &dVehId = routeState.vehicleIdOf(dStopId);
             const auto trIdxPVeh = routeState.stopPositionOf(pStopId);
             const auto trIdxDVeh = routeState.stopPositionOf(dStopId);
             for (const auto &tp: transferPoints) {
@@ -260,7 +272,7 @@ namespace karri {
         }
 
         void tryPickupORD(const int pVehId, const int dVehId, const int trIdxPVeh, const int trIdxDVeh,
-                          const TransferPoint &tp, std::vector<AssignmentWithTransfer>& promisingPartials) {
+                          const TransferPoint &tp, std::vector<AssignmentWithTransfer> &promisingPartials) {
             if (trIdxPVeh == 0 || !relORDPickups.hasRelevantSpotsFor(pVehId))
                 return;
 
@@ -290,7 +302,7 @@ namespace karri {
         }
 
         void tryPickupBNS(const int pVehId, const int dVehId, const int trIdxPVeh, const int trIdxDVeh,
-                          const TransferPoint &tp, std::vector<AssignmentWithTransfer>& promisingPartials) {
+                          const TransferPoint &tp, std::vector<AssignmentWithTransfer> &promisingPartials) {
             if (!relBNSPickups.hasRelevantSpotsFor(pVehId))
                 return;
 
@@ -325,7 +337,8 @@ namespace karri {
             return false;
         }
 
-        void tryPartialAssignment(AssignmentWithTransfer &asgn, std::vector<AssignmentWithTransfer>& promisingPartials) {
+        void
+        tryPartialAssignment(AssignmentWithTransfer &asgn, std::vector<AssignmentWithTransfer> &promisingPartials) {
             const bool unfinished = asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed;
             // Check the cost of the partial assignment with transfer where pickup vehicle, dropoff vehicle, pickup and transfer point (therefore also both transfer stop indices) are set
             RequestCost pickupVehCost;
@@ -359,8 +372,10 @@ namespace karri {
             promisingPartials.push_back(asgn);
         }
 
-        void tryDropoffBNS(const AssignmentWithTransfer &partialAsgn, std::vector<AssignmentWithTransfer>& postponedAssignments) {
-            if (partialAsgn.transferIdxDVeh != 0 || relBNSDropoffs.relevantSpotsFor(partialAsgn.dVeh->vehicleId).size() == 0)
+        void tryDropoffBNS(const AssignmentWithTransfer &partialAsgn,
+                           std::vector<AssignmentWithTransfer> &postponedAssignments) {
+            if (partialAsgn.transferIdxDVeh != 0 ||
+                relBNSDropoffs.relevantSpotsFor(partialAsgn.dVeh->vehicleId).size() == 0)
                 return;
 
             for (const auto &dropoff: relBNSDropoffs.relevantSpotsFor(partialAsgn.dVeh->vehicleId)) {
@@ -389,7 +404,8 @@ namespace karri {
             }
         }
 
-        void tryDropoffORD(const AssignmentWithTransfer &partialAsgn, std::vector<AssignmentWithTransfer>& postponedAssignments) {
+        void tryDropoffORD(const AssignmentWithTransfer &partialAsgn,
+                           std::vector<AssignmentWithTransfer> &postponedAssignments) {
             if (relORDDropoffs.relevantSpotsFor(partialAsgn.dVeh->vehicleId).size() == 0)
                 return;
 
@@ -419,7 +435,9 @@ namespace karri {
             }
         }
 
-        void tryDropoffALS(const AssignmentWithTransfer &partialAsgn, const RelevantDropoffsAfterLastStop &relALSDropoffs, std::vector<AssignmentWithTransfer>& postponedAssignments) {
+        void
+        tryDropoffALS(const AssignmentWithTransfer &partialAsgn, const RelevantDropoffsAfterLastStop &relALSDropoffs,
+                      std::vector<AssignmentWithTransfer> &postponedAssignments) {
             const auto vehId = partialAsgn.dVeh->vehicleId;
             if (!relALSDropoffs.hasRelevantSpotsFor(vehId))
                 return;
@@ -451,7 +469,8 @@ namespace karri {
             }
         }
 
-        void finishAssignments(const int pVehId, const int dVehId, std::vector<AssignmentWithTransfer> &postponedAssignments) {
+        void finishAssignments(const int pVehId, const int dVehId,
+                               std::vector<AssignmentWithTransfer> &postponedAssignments) {
             // Method to finish the assignments that have lower bounds used
             std::vector<AssignmentWithTransfer> toCalculate;
             std::vector<AssignmentWithTransfer> currentlyCalculating;
@@ -725,7 +744,7 @@ namespace karri {
                 asgn.distFromDropoff = legDropoff;
         }
 
-        void tryAssignment(AssignmentWithTransfer &asgn, std::vector<AssignmentWithTransfer>& postponedAssignments) {
+        void tryAssignment(AssignmentWithTransfer &asgn, std::vector<AssignmentWithTransfer> &postponedAssignments) {
             const auto stopLocationsPVeh = routeState.stopLocationsFor(asgn.pVeh->vehicleId);
             const auto stopLocationsDVeh = routeState.stopLocationsFor(asgn.dVeh->vehicleId);
             const int numStopsPVeh = routeState.numStopsOf(asgn.pVeh->vehicleId);

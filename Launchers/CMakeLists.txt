@@ -41,4 +41,4 @@ if(OpenMP_FOUND)
 endif()
 
 # include KaRRi compile time parameters
-include(KaRRI_compile_time_parameters.cmake)
+include(KaRRi_compile_time_parameters.cmake)

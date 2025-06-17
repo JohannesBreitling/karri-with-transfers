@@ -28,7 +28,7 @@ namespace karri {
         
         // Calculate distances from last stop of every pickup vehicle to all stops of dropoff vehicles
         // Result is of form: vehLastStop - vehAllStops - stop
-        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromLastStopsToAllStops(std::vector<int> &vehIdsLastStop, std::vector<int> &vehIdsAllStops) {
+        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromLastStopsToAllStops(const std::vector<int> &vehIdsLastStop, const std::vector<int> &vehIdsAllStops) {
             std::map<int, std::map<int, std::vector<int>>> result;
 
             if (vehIdsLastStop.size() == 0 || vehIdsAllStops.size() == 0)
@@ -87,7 +87,7 @@ namespace karri {
 
         // Calculate distances from pickup to all stops of dropoff vehicles
         // Result is of form: veh - pickup - stop
-        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromAllPickupsToAllStops(std::vector<PDLoc> &pickups, std::vector<int> &dVehIds) {
+        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromAllPickupsToAllStops(const std::vector<PDLoc> &pickups, const std::vector<int> &dVehIds) {
             std::map<int, std::map<int, std::vector<int>>> result;
 
             if (pickups.size() == 0 || dVehIds.size() == 0)
@@ -140,7 +140,7 @@ namespace karri {
         
         // Calculate distances from all stops of pickup vehicles to all dropoffs
         // Result is of form: veh - stop - dropoff
-        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromAllStopsToAllDropoffs(std::vector<int> &pVehIds, std::vector<PDLoc> &dropoffs) {
+        std::map<int, std::map<int, std::vector<int>>> calculateDistancesFromAllStopsToAllDropoffs(const std::vector<int> &pVehIds, const std::vector<PDLoc> &dropoffs) {
             std::map<int, std::map<int, std::vector<int>>> result;
 
             if (pVehIds.size() == 0 || dropoffs.size() == 0)

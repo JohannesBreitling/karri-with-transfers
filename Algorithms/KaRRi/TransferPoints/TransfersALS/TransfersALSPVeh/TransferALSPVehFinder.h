@@ -93,7 +93,8 @@ namespace karri {
             searchTimePickupToTransfer = 0;
         }
 
-        void findAssignments(const RelevantDropoffsAfterLastStop& relALSDropoffs) {
+        template<typename EllipsesT>
+        void findAssignments(const RelevantDropoffsAfterLastStop& relALSDropoffs,  const EllipsesT&) {
             Timer total;
 
             // Reset the last stop distances

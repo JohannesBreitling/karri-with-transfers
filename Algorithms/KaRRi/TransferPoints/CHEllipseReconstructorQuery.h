@@ -37,7 +37,7 @@ namespace karri {
 
     // Computes the set of vertices contained in the detour ellipse between a pair of consecutive stops in a vehicle
     // route using bucket entries and a CH topological downward search.
-    template<typename EllipticBucketsEnvironmentT, typename LabelSet, typename WeightT = TraversalCostAttribute>
+    template<typename EllipticBucketsEnvironmentT, typename LabelSet, int TOP_VERTICES_DIVISOR = 1, typename WeightT = TraversalCostAttribute>
     class CHEllipseReconstructorQuery {
 
         using DistanceLabel = typename LabelSet::DistanceLabel;
@@ -59,6 +59,7 @@ namespace karri {
                   topDownRankPermutation(topDownRankPermutation),
                   ellipticBucketsEnv(ellipticBucketsEnv),
                   routeState(routeState),
+                  numVerticesToConsider(numVertices / TOP_VERTICES_DIVISOR),
                   enumerateBucketEntriesSearchSpace(numVertices),
                   distTo(numVertices, INFTY),
                   distFrom(numVertices, INFTY),
@@ -88,7 +89,7 @@ namespace karri {
             // The number of vertices that need to be settled can be expected to be quite large. Thus, we avoid
             // using a PQ with many costly deleteMin() operations and instead settle every vertex in the graph.
             timer.restart();
-            for (int r = 0; r < numVertices; ++r) {
+            for (int r = 0; r < numVerticesToConsider; ++r) {
                 ++stats.numVerticesSettled;
                 settleVertexInTopodownSearch(r, leeways, stats.numEdgesRelaxed);
             }
@@ -225,6 +226,7 @@ namespace karri {
         const Permutation &topDownRankPermutation; // Maps vertex rank to n - rank in order to linearize top-down passes.
         const EllipticBucketsEnvironmentT &ellipticBucketsEnv;
         const RouteState &routeState;
+        const int numVerticesToConsider; // Number of vertices at top of CH that are considered as ellipse members. Heuristic if < numVertices.
 
         Subset enumerateBucketEntriesSearchSpace;
 

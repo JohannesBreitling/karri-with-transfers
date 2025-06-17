@@ -100,7 +100,8 @@ namespace karri {
             searchTimePickupToTransfer = 0;
         }
 
-        void findAssignments(const RelevantDropoffsAfterLastStop& relALSDropoffs, const EdgeEllipseContainer& ellipseContainer) {
+        template<typename EllipsesT>
+        void findAssignments(const RelevantDropoffsAfterLastStop& relALSDropoffs, const EllipsesT& ellipseContainer) {
             Timer total;
 
             bestCost = INFTY;
@@ -185,7 +186,7 @@ namespace karri {
             }
 
             // Calculate the distances from all last stops (pickup ord, bns) to the potential transfers
-            if (relevantLastStopLocs.size() > 0 && transferEdges.size() > 0) {
+            if (!relevantLastStopLocs.empty() && !transferEdges.empty()) {
                 lastStopToTransfersDistances = strategy.calculateDistancesFromLastStopToAllTransfers(relevantLastStopLocs, transferEdges);
             }
 
@@ -196,7 +197,7 @@ namespace karri {
             }
 
             // Calculate the distances from all pickups to the potential transfers
-            if (pickupLocs.size() > 0 && transferEdges.size() > 0) {
+            if (!pickupLocs.empty() && !transferEdges.empty()) {
                 pickupToTransfersDistances = strategy.caluclateDistancesFromPickupsToAllTransfers(pickupLocs, transferEdges);
             }
 

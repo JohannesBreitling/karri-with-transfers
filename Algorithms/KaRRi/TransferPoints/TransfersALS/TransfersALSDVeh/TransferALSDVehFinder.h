@@ -55,7 +55,8 @@ namespace karri {
             distancesToDropoff(),
             asserter(asserter) {}
 
-        void findAssignments(const RelevantDropoffsAfterLastStop& relALSDropoffs) {
+        template<typename EllipsesT>
+        void findAssignments(const RelevantDropoffsAfterLastStop& relALSDropoffs, const EllipsesT&) {
             Timer total;
 
             findAssignmentsWithDropoffALS(relALSDropoffs);

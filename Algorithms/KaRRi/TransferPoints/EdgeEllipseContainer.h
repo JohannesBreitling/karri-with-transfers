@@ -45,7 +45,7 @@ namespace karri {
 
 
     private:
-        template<typename, typename, typename, typename, typename, typename>
+        template<typename, typename, typename, int, typename, typename, typename>
         friend class CHEllipseReconstructor;
 
         // Maps a stop ID to an internal index in the vector of stop IDs.
@@ -53,5 +53,11 @@ namespace karri {
         std::vector<std::vector<EdgeInEllipse>> edgeEllipses;
 
         std::vector<EdgeInEllipse> empty;
+    };
+
+    struct NoOpEdgeEllipseContainer {
+        std::vector<EdgeInEllipse> getEdgesInEllipse(const int) const {
+            return {};
+        }
     };
 }
