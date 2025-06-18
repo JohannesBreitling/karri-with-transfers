@@ -281,6 +281,77 @@ namespace karri::stats {
         }
     };
 
+    struct EllipseReconstructionStats {
+
+        int64_t withoutLeewayNumEllipses;
+        int64_t withoutLeewaySumSizesEllipses;
+        int64_t withLeewayNumEllipses;
+        int64_t withLeewaySumSizesEllipses;
+
+        int64_t initTime;
+        int64_t withoutLeewaySearchTime;
+        int64_t withoutLeewayConvertToEdgesTime;
+        int64_t withLeewaySearchTime;
+        int64_t withLeewayConvertToEdgesTime;
+
+        int64_t withLeewayQuery_initTime;
+        int64_t withLeewayQuery_topoSearchTime;
+        int64_t withLeewayQuery_postprocessTime;
+
+        static constexpr auto LOGGER_NAME = "perf_ellipse_reconstruction.csv";
+        static constexpr auto LOGGER_COLS =
+                "without_leeway_num_ellipses,"
+                "without_leeway_sum_sizes_ellipses,"
+                "with_leeway_num_ellipses,"
+                "with_leeway_sum_sizes_ellipses,"
+                "init_time,"
+                "without_leeway_search_time,"
+                "without_leeway_convert_to_edges_time,"
+                "with_leeway_search_time,"
+                "with_leeway_convert_to_edges_time,"
+                "with_leeway_query.init_time,"
+                "with_leeway_query.topo_search_time,"
+                "with_leeway_query.postprocess_time,"
+                "total_time\n";
+
+        int64_t getTotalTime() const {
+            return initTime + withoutLeewaySearchTime + withoutLeewayConvertToEdgesTime + withLeewaySearchTime + withLeewayConvertToEdgesTime;
+        }
+
+        std::string getLoggerRow() const {
+            std::stringstream ss;
+            ss << withoutLeewayNumEllipses << ", "
+            << withoutLeewaySumSizesEllipses << ", "
+            << withLeewayNumEllipses << ", "
+            << withLeewaySumSizesEllipses << ", "
+            << initTime << ", "
+            << withoutLeewaySearchTime << ", "
+            << withoutLeewayConvertToEdgesTime << ", "
+            << withLeewaySearchTime << ", "
+            << withLeewayConvertToEdgesTime << ", "
+            << withLeewayQuery_initTime << ", "
+            << withLeewayQuery_topoSearchTime << ", "
+            << withLeewayQuery_postprocessTime << ", "
+            << getTotalTime();
+            return ss.str();
+        }
+
+        void clear() {
+            withoutLeewayNumEllipses = 0;
+            withoutLeewaySumSizesEllipses = 0;
+            withLeewayNumEllipses = 0;
+            withLeewaySumSizesEllipses = 0;
+            initTime = 0;
+            withoutLeewaySearchTime = 0;
+            withoutLeewayConvertToEdgesTime = 0;
+            withLeewaySearchTime = 0;
+            withLeewayConvertToEdgesTime = 0;
+            withLeewayQuery_initTime = 0;
+            withLeewayQuery_topoSearchTime = 0;
+            withLeewayQuery_postprocessTime = 0;
+        }
+    };
+
     struct AssignmentsWithOrdinaryTransferPerformanceStats {
 
         // Overall stats
@@ -310,10 +381,7 @@ namespace karri::stats {
         // Stats for the transfer search itself
         int64_t numStopPairs;
         int64_t numTransferPoints;
-        int64_t numDijkstraSearchesRun;
-        int64_t numEdgesRelaxed;
-        int64_t numVerticesScanned;
-        int64_t searchTime;
+        int64_t intersectEllipsesTime;
 
         static constexpr auto LOGGER_NAME = "perf_transf_ord.csv";
         static constexpr auto LOGGER_COLS =
@@ -333,10 +401,7 @@ namespace karri::stats {
                 "try_assignments_time,"
                 "num_stop_pairs,"
                 "num_transfer_points,"
-                "num_dijkstra_searches,"
-                "num_edges_relaxed,"
-                "num_vertices_settled,"
-                "tp_search_time\n";
+                "intersect_ellipses_time\n";
 
         std::string getLoggerRow() const {
             std::stringstream ss;
@@ -356,10 +421,7 @@ namespace karri::stats {
                << tryAssignmentsTime << ", "
                << numStopPairs << ", "
                << numTransferPoints << ", "
-               << numDijkstraSearchesRun << ", "
-               << numEdgesRelaxed << ", "
-               << numVerticesScanned << ", "
-               << searchTime;
+               << intersectEllipsesTime;
             return ss.str();
         }
 
@@ -384,10 +446,7 @@ namespace karri::stats {
             tryAssignmentsTime = 0;
             numStopPairs = 0;
             numTransferPoints = 0;
-            numDijkstraSearchesRun = 0;
-            numEdgesRelaxed = 0;
-            numVerticesScanned = 0;
-            searchTime = 0;
+            intersectEllipsesTime = 0;
         }
     };
 
@@ -420,7 +479,6 @@ namespace karri::stats {
         int64_t numTransferPoints;
 
         int64_t searchTimePickupALS;
-        int64_t searchTimeDropoffALS;
         int64_t searchTimeLastStopToTransfer;
         int64_t searchTimePickupToTransfer;
 
@@ -442,7 +500,6 @@ namespace karri::stats {
                 "try_assignments_time,"
                 "num_transfer_points,"
                 "search_time_pickup_als,"
-                "search_time_dropoff_als,"
                 "search_time_last_stop_to_transfer,"
                 "search_time_pickup_to_transfer\n";
 
@@ -464,7 +521,6 @@ namespace karri::stats {
                << tryAssignmentsTime << ", "
                << numTransferPoints << ", "
                << searchTimePickupALS << ", "
-               << searchTimeDropoffALS << ", "
                << searchTimeLastStopToTransfer << ", "
                << searchTimePickupToTransfer;
             return ss.str();
@@ -491,7 +547,6 @@ namespace karri::stats {
             tryAssignmentsTime = 0;
             numTransferPoints = 0;
             searchTimePickupALS = 0;
-            searchTimeDropoffALS = 0;
             searchTimeLastStopToTransfer = 0;
             searchTimePickupToTransfer = 0;
         }
@@ -521,7 +576,6 @@ namespace karri::stats {
         int64_t numTransferPoints;
 
         // Search from last stop to all stops
-        int64_t searchTimeDropoffALS;
         int64_t searchTimeLastStopToTransfer;
         int64_t searchTimeTransferToDropoff;
 
@@ -538,7 +592,6 @@ namespace karri::stats {
                 "num_assignments_dropoff_als,"
                 "try_assignments_time,"
                 "num_transfer_points,"
-                "search_time_dropoff_als,"
                 "search_time_last_stop_to_transfer,"
                 "search_time_transfer_to_dropoff\n";
 
@@ -558,7 +611,6 @@ namespace karri::stats {
 
                << numTransferPoints << ", "
 
-               << searchTimeDropoffALS << ", "
                << searchTimeLastStopToTransfer << ", "
                << searchTimeTransferToDropoff;
             return ss.str();
@@ -581,7 +633,6 @@ namespace karri::stats {
             tryAssignmentsTime = 0;
             numTransferPoints = 0;
 
-            searchTimeDropoffALS = 0;
             searchTimeLastStopToTransfer = 0;
             searchTimeTransferToDropoff = 0;
         }
@@ -945,11 +996,13 @@ namespace karri::stats {
         PbnsAssignmentsPerformanceStats pbnsAssignmentsStats;
         PalsAssignmentsPerformanceStats palsAssignmentsStats;
         DalsAssignmentsPerformanceStats dalsAssignmentsStats;
-        UpdatePerformanceStats updateStats;
 
+        EllipseReconstructionStats ellipseReconstructionStats;
         AssignmentsWithOrdinaryTransferPerformanceStats ordinaryTransferStats;
         AssignmentsWithTransferALSPVehPerformanceStats transferALSPVehStats;
         AssignmentsWithTransferALSDVehPerformanceStats transferALSDVehStats;
+
+        UpdatePerformanceStats updateStats;
         AssignmentCostStats costStats;
 
         int64_t getTotalTime() const {
@@ -960,6 +1013,7 @@ namespace karri::stats {
                    pbnsAssignmentsStats.getTotalTime() +
                    palsAssignmentsStats.getTotalTime() +
                    dalsAssignmentsStats.getTotalTime() +
+                   ellipseReconstructionStats.getTotalTime() +
                    ordinaryTransferStats.getTotalTime() +
                    transferALSPVehStats.getTotalTime() +
                    transferALSDVehStats.getTotalTime() +
@@ -976,10 +1030,11 @@ namespace karri::stats {
             pbnsAssignmentsStats.clear();
             palsAssignmentsStats.clear();
             dalsAssignmentsStats.clear();
-            updateStats.clear();
+            ellipseReconstructionStats.clear();
             ordinaryTransferStats.clear();
             transferALSPVehStats.clear();
             transferALSDVehStats.clear();
+            updateStats.clear();
             costStats.clear();
         }
 
@@ -994,6 +1049,7 @@ namespace karri::stats {
                 "pbns_assignments_time,"
                 "pals_assignments_time,"
                 "dals_assignments_time,"
+                "ellipse_reconstruction_time,"
                 "transf_ord_time,"
                 "transf_als_pveh_time,"
                 "transf_als_dveh_time,"
@@ -1012,6 +1068,7 @@ namespace karri::stats {
                << pbnsAssignmentsStats.getTotalTime() << ", "
                << palsAssignmentsStats.getTotalTime() << ", "
                << dalsAssignmentsStats.getTotalTime() << ", "
+               << ellipseReconstructionStats.getTotalTime() << ", "
                << ordinaryTransferStats.getTotalTime() << ", "
                << transferALSPVehStats.getTotalTime() << ", "
                << transferALSDVehStats.getTotalTime() << ", "

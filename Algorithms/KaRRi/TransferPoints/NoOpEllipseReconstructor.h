@@ -8,7 +8,8 @@ namespace karri {
     class NoOpEllipseReconstructor {
 
     public:
-        NoOpEdgeEllipseContainer computeEllipses(const std::vector<int> &) {
+        template<typename StatsT>
+        NoOpEdgeEllipseContainer computeEllipses(const std::vector<int> &, StatsT&) {
             return {};
         }
     };

@@ -48,8 +48,7 @@ namespace karri {
             bool ParallelizeQuery,
             int TOP_VERTICES_DIVISOR,
             typename WeightT = TraversalCostAttribute,
-            typename LabelSetT = SimdLabelSet<3, ParentInfo::NO_PARENT_INFO>,
-            typename LoggerT = NullLogger>
+            typename LabelSetT = SimdLabelSet<3, ParentInfo::NO_PARENT_INFO>>
     class CHEllipseReconstructor {
 
         using DistanceLabel = typename LabelSetT::DistanceLabel;
@@ -81,23 +80,12 @@ namespace karri {
                   sweepVertexPermutation(),
                   inverseSweepVertexPermutation(),
                   firstIdxOfLevel(),
-//                  inputGraphWithSweepVertexIds(inputGraph),
                   query(ch, downGraph, upGraph, sweepVertexPermutation, firstIdxOfLevel,
                         ellipticBucketsEnv, routeState),
                   distanceFromVertexToNextStopPerThread(
                           [&]() { return std::vector<int>(inputGraph.numVertices(), INFTY); }),
                   p2pQuery(chEnv.template getFullCHQuery<P2PLabelSet>()),
-                  pathUnpacker(chEnv.getCH()),
-                  logger(LogManager<LoggerT>::getLogger("ch_ellipse_reconstruction.csv",
-                                                        "num_ellipses_without_leeway,"
-                                                        "num_ellipses_with_leeway,"
-                                                        "init_time,"
-                                                        "without_leeway_search_time,"
-                                                        "with_leeway_search_time,"
-                                                        "total_time,"
-                                                        "with_leeway_init_time,"
-                                                        "with_leeway_topo_sweep_time,"
-                                                        "with_leeway_postprocess_time\n")) {
+                  pathUnpacker(chEnv.getCH()) {
             KASSERT(downGraph.numVertices() == upGraph.numVertices());
             const int numVertices = downGraph.numVertices();
 
@@ -150,22 +138,13 @@ namespace karri {
             downGraph.permuteVertices(sweepVertexPermutation);
             upGraph.permuteVertices(sweepVertexPermutation);
 
-//            // Create a copy of the input graph with vertex IDs permuted according to the sweep permutation. This graph
-//            // is used in converting vertex ellipses from the query output format to the desired format of edges.
-//            Permutation inputGraphVertexIdsToSweepId(inputGraph.numVertices());
-//            for (int i = 0; i < inputGraph.numVertices(); ++i) {
-//                inputGraphVertexIdsToSweepId[i] = sweepVertexPermutation[ch.rank(i)];
-//            }
-//            KASSERT(inputGraphVertexIdsToSweepId.validate());
-//            inputGraphWithSweepVertexIds.permuteVertices(inputGraphVertexIdsToSweepId);
-
             query.init(); // Initialize query for vertex order, levels
         }
 
         // Given a set of stop IDs for pickup vehicles and dropoff vehicles, this computes the transfer points between
         // any pair of stops in the two sets. The given stop IDs should indicate the first stop in a pair of stops of
         // the respective vehicle.
-        EdgeEllipseContainer computeEllipses(const std::vector<int> &stopIds) {
+        EdgeEllipseContainer computeEllipses(const std::vector<int> &stopIds, stats::EllipseReconstructionStats& stats) {
 
             Timer totalTimer;
             Timer timer;
@@ -205,16 +184,19 @@ namespace karri {
                     indicesWithLeeway.push_back(i);
                 }
             }
+
+            container.edgeEllipses.resize(numEllipses);
+
             const auto initTime = timer.elapsed<std::chrono::nanoseconds>();
 
-            int64_t withoutLeewayTime = 0, withLeewayTime = 0;
-            computeEdgesInEllipsesOfLegsAfterStops(stopIds,
-                                                   indicesWithoutLeeway, indicesWithLeeway,
-                                                   container,
-                                                   withoutLeewayTime, withLeewayTime);
 
-            const auto computeEllipsesTime = withoutLeewayTime + withLeewayTime;
-            const auto totalTime = initTime + computeEllipsesTime;
+            // Construct ellipses without leeway by running point-to-point CH queries.
+            computeEdgeEllipsesWithoutLeeway(stopIds, indicesWithoutLeeway, container, stats);
+
+            // Construct ellipses with leeway by running ellipse reconstructor queries
+            computeEdgeEllipsesWithLeeway(stopIds, indicesWithLeeway, container, stats);
+
+            KASSERT(sanityCheckEdgeEllipses(stopIds, container.edgeEllipses));
 
             for (const auto &edgeEllipse: container.edgeEllipses) {
                 KASSERT(std::is_sorted(edgeEllipse.begin(), edgeEllipse.end(),
@@ -223,53 +205,40 @@ namespace karri {
                                        }));
             }
 
-            logger << indicesWithoutLeeway.size() << "," << indicesWithLeeway.size() << "," << initTime << ","
-                   << withoutLeewayTime << "," << withLeewayTime << ","
-                   << totalTime << "," << queryStats.initTime << "," << queryStats.topoSearchTime << ","
-                   << queryStats.postprocessTime << "\n";
+            int64_t sumSizesEllipsesWithoutLeeway = 0;
+            for (const auto &idx: indicesWithoutLeeway) {
+                sumSizesEllipsesWithoutLeeway += container.edgeEllipses[idx].size();
+            }
+            int64_t sumSizesEllipsesWithLeeway = 0;
+            for (const auto &idx: indicesWithLeeway) {
+                sumSizesEllipsesWithLeeway += container.edgeEllipses[idx].size();
+            }
+
+            stats.withoutLeewayNumEllipses += indicesWithoutLeeway.size();
+            stats.withoutLeewaySumSizesEllipses += sumSizesEllipsesWithoutLeeway;
+            stats.withLeewayNumEllipses += indicesWithLeeway.size();
+            stats.withLeewaySumSizesEllipses += sumSizesEllipsesWithLeeway;
+            stats.initTime += initTime;
+            stats.withLeewayQuery_initTime += queryStats.initTime;
+            stats.withLeewayQuery_topoSearchTime += queryStats.topoSearchTime;
+            stats.withLeewayQuery_postprocessTime += queryStats.postprocessTime;
 
             return container;
         }
 
     private:
 
-        void computeEdgesInEllipsesOfLegsAfterStops(const std::vector<int> &stopIds,
-                                                    const std::vector<int> &indicesWithoutLeeway,
-                                                    const std::vector<int> &indicesWithLeeway,
-                                                    EdgeEllipseContainer &container,
-                                                    int64_t &withoutLeewayTime,
-                                                    int64_t &withLeewayTime) {
-
-            if (stopIds.empty())
-                return;
-
-            container.edgeEllipses.resize(stopIds.size());
-            queryStats.reset();
-
-            Timer timer;
-
-            // Construct ellipses without leeway by running point-to-point CH queries.
-            computeEdgeEllipsesWithoutLeeway(stopIds, indicesWithoutLeeway, container);
-            withoutLeewayTime += timer.elapsed<std::chrono::nanoseconds>();
-
-            timer.restart();
-            computeEdgeEllipsesWithLeeway(stopIds, indicesWithLeeway, container);
-            withLeewayTime += timer.elapsed<std::chrono::nanoseconds>();
-
-            KASSERT(sanityCheckEdgeEllipses(stopIds, container.edgeEllipses));
-
-            numVerticesSettled += queryStats.numVerticesSettled;
-            numEdgesRelaxed += queryStats.numEdgesRelaxed;
-        }
-
         void computeEdgeEllipsesWithoutLeeway(const std::vector<int> &stopIds,
                                               const std::vector<int> &indicesWithoutLeeway,
-                                              EdgeEllipseContainer &container) {
+                                              EdgeEllipseContainer &container,
+                                              stats::EllipseReconstructionStats &stats) {
             const size_t numEllipsesWithoutLeeway = indicesWithoutLeeway.size();
             std::vector<int> edgePathInInputGraph;
             std::vector<VertexInEllipse> vertexEllipse;
             // TODO: parallelize this loop
+            Timer timer;
             for (int i = 0; i < numEllipsesWithoutLeeway; ++i) {
+                timer.restart();
                 // Reconstruct shortest path between stops by running point-to-point CH query.
                 // TODO: what if there is more than one shortest path?
                 const int stopId = stopIds[indicesWithoutLeeway[i]];
@@ -280,6 +249,8 @@ namespace karri {
                 const auto source = ch.rank(inputGraph.edgeHead(stopLocs[stopIdx]));
                 const auto target = ch.rank(inputGraph.edgeTail(stopLocs[stopIdx + 1]));
                 p2pQuery.run(source, target);
+                numVerticesSettled += p2pQuery.getNumVerticesSettled();
+                numEdgesRelaxed += p2pQuery.getNumEdgeRelaxations();
                 KASSERT(p2pQuery.getDistance() + inputGraph.travelTime(stopLocs[stopIdx + 1]) ==
                         routeState.leewayOfLegStartingAt(stopId));
                 edgePathInInputGraph.clear();
@@ -304,6 +275,9 @@ namespace karri {
                 KASSERT(vertexEllipse.front().vertex == inputGraph.edgeHead(stopLocs[stopIdx]));
                 KASSERT(vertexEllipse.back().vertex == inputGraph.edgeTail(stopLocs[stopIdx + 1]));
 
+                stats.withoutLeewaySearchTime += timer.elapsed<std::chrono::nanoseconds>();
+
+                timer.restart();
                 std::sort(vertexEllipse.begin(), vertexEllipse.end(),
                           [](const VertexInEllipse &v1, const VertexInEllipse &v2) {
                               return v1.vertex < v2.vertex;
@@ -314,13 +288,18 @@ namespace karri {
                 auto &edgeEllipse = container.edgeEllipses[indicesWithoutLeeway[i]];
                 convertVertexEllipseIntoEdgeEllipse(vertexEllipse, routeState.leewayOfLegStartingAt(stopId),
                                                     edgeEllipse, distanceFromVertexToNextStopPerThread.local());
+                stats.withoutLeewayConvertToEdgesTime += timer.elapsed<std::chrono::nanoseconds>();
             }
         }
 
         void computeEdgeEllipsesWithLeeway(const std::vector<int> &stopIds,
                                            const std::vector<int> &indicesWithLeeway,
-                                           EdgeEllipseContainer &container) {
+                                           EdgeEllipseContainer &container,
+                                           stats::EllipseReconstructionStats &stats) {
+            queryStats.reset();
+
             // Construct ellipses with leeway by running topological downward sweep in CH.
+            Timer timer;
             const size_t numEllipsesWithLeeway = indicesWithLeeway.size();
             const size_t numBatchesWithLeeway = numEllipsesWithLeeway / K + (numEllipsesWithLeeway % K != 0);
             std::vector<std::vector<VertexInEllipse>> vertexEllipses(numEllipsesWithLeeway);
@@ -339,7 +318,12 @@ namespace karri {
                 query.run(batchStopIds, leeways, numEllipsesInBatch, firstEllipseInBatch, queryStats);
             }
 
+            stats.withLeewaySearchTime += timer.elapsed<std::chrono::nanoseconds>();
+            numVerticesSettled += queryStats.numVerticesSettled;
+            numEdgesRelaxed += queryStats.numEdgesRelaxed;
+
             // Convert vertex ellipses to edge ellipses
+            timer.restart();
             tbb::parallel_for(0ul, numEllipsesWithLeeway, [&](const auto i) {
                 auto &vertexEllipse = vertexEllipses[i];
                 for (auto &v: vertexEllipse)
@@ -355,6 +339,7 @@ namespace karri {
                 convertVertexEllipseIntoEdgeEllipse(vertexEllipse, leeway, edgeEllipse,
                                                     distanceFromVertexToNextStopPerThread.local());
             });
+            stats.withLeewayConvertToEdgesTime += timer.elapsed<std::chrono::nanoseconds>();
         }
 
         // Vertex ellipse must be given using original input graph vertex IDs.
@@ -482,9 +467,6 @@ namespace karri {
         Permutation inverseSweepVertexPermutation;
         std::vector<int> firstIdxOfLevel;
 
-        // Identical to input graph but vertex IDs permuted by sweepVertexPermutation.
-//        InputGraphT inputGraphWithSweepVertexIds;
-
         // Permutation that maps edge IDs in permuted input graph to edge IDs in original input graph.
         Permutation ellipseEdgeIdsToOriginalEdgeIds;
 
@@ -498,7 +480,6 @@ namespace karri {
 
         int64_t numVerticesSettled;
         int64_t numEdgesRelaxed;
-        LoggerT &logger;
     };
 
 } // karri

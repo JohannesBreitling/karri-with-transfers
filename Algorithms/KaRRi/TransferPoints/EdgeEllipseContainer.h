@@ -45,7 +45,7 @@ namespace karri {
 
 
     private:
-        template<typename, typename, typename, bool, int, typename, typename, typename>
+        template<typename, typename, typename, bool, int, typename, typename>
         friend class CHEllipseReconstructor;
 
         // Maps a stop ID to an internal index in the vector of stop IDs.

@@ -36,7 +36,9 @@ namespace karri {
 
     // Computes the set of vertices contained in the detour ellipse between a pair of consecutive stops in a vehicle
     // route using bucket entries and a CH topological downward search.
-    template<typename InputGraphT>
+    template<typename InputGraphT,
+            typename EllipseSizeLoggerT = NullLogger,
+            typename EllipseIntersectionSizeLoggerT = NullLogger>
     class EdgeEllipseIntersector {
 
     public:
@@ -49,7 +51,11 @@ namespace karri {
                   fleet(fleet),
                   requestState(requestState),
                   routeState(routeState),
-                  calc(routeState) {}
+                  calc(routeState),
+                  ellipsesSizeLogger(LogManager<EllipseSizeLoggerT>::getLogger("ellipses.csv",
+                                                                               "size\n")),
+                  ellipseIntersectionSizeLogger(LogManager<EllipseIntersectionSizeLoggerT>::getLogger("ellipse-intersection.csv",
+                                                                                                      "size\n")) {}
 
         // Given a set of stop IDs for pickup vehicles and dropoff vehicles and the previously computed ellipses,
         // this computes the transfer points between any pair of stops in the two sets by intersecting ellipses.
@@ -69,6 +75,7 @@ namespace karri {
             for (const auto &pVehStopId: pVehStopIds) {
                 if (idxOfStopPVeh[pVehStopId] == INVALID_INDEX) {
                     idxOfStopPVeh[pVehStopId] = numStopsPVeh++;
+                    ellipsesSizeLogger << ellipseContainer.getEdgesInEllipse(pVehStopId).size() << "\n";
                 }
             }
 
@@ -76,10 +83,10 @@ namespace karri {
             for (const auto &dVehStopId: dVehStopIds) {
                 if (idxOfStopDVeh[dVehStopId] == INVALID_INDEX) {
                     idxOfStopDVeh[dVehStopId] = numStopsDVeh++;
+                    ellipsesSizeLogger << ellipseContainer.getEdgesInEllipse(dVehStopId).size() << "\n";
                 }
             }
 
-            // Compute ellipses
             std::vector<int> allStopIds;
             allStopIds.insert(allStopIds.end(), pVehStopIds.begin(), pVehStopIds.end());
             allStopIds.insert(allStopIds.end(), dVehStopIds.begin(), dVehStopIds.end());
@@ -104,8 +111,8 @@ namespace karri {
                 }
             }
 
-            // TODO parallelize this loop
-            for (const auto &[stopIdPStop, stopIdDStop]: stopIdPairs) {
+            tbb::parallel_for(0ul, stopIdPairs.size(), [&](const auto i) {
+                const auto &[stopIdPStop, stopIdDStop] = stopIdPairs[i];
                 const auto vehIdPStop = routeState.vehicleIdOf(stopIdPStop);
                 const auto internalIdxPStop = idxOfStopPVeh[stopIdPStop];
                 const auto &ellipsePStop = ellipseContainer.getEdgesInEllipse(stopIdPStop);
@@ -121,6 +128,10 @@ namespace karri {
                 intersectEllipses(ellipsePStop, ellipseDStop, vehIdPStop, vehIdDStop,
                                   routeState.stopPositionOf(stopIdPStop),
                                   routeState.stopPositionOf(stopIdDStop), transferPointsForPair);
+            });
+
+            for (const auto &transferPointsForPair: transferPoints) {
+                ellipseIntersectionSizeLogger << transferPointsForPair.size() << "\n";
             }
         }
 
@@ -241,6 +252,9 @@ namespace karri {
         // For two stop IDs i (pVeh) and j (dVeh), transferPoints[idxOfStopPVeh[i] * numStopsDVeh + idxOfStopDVeh[j]] contains the
         // transfer points between the two stops.
         std::vector<std::vector<TransferPoint>> transferPoints;
+
+        EllipseSizeLoggerT &ellipsesSizeLogger;
+        EllipseIntersectionSizeLoggerT &ellipseIntersectionSizeLogger;
     };
 
 } // karri

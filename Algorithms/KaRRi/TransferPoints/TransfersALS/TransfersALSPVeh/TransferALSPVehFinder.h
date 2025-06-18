@@ -88,7 +88,6 @@ namespace karri {
             numTransferPoints = 0;
 
             searchTimePickupALS = 0;
-            searchTimeDropoffALS = 0;
             searchTimeLastStopToTransfer = 0;
             searchTimePickupToTransfer = 0;
         }
@@ -101,10 +100,7 @@ namespace karri {
             lastStopDistances = std::map<int, std::map<int, std::vector<int>>>{};
 
             //* Calculate the distances from the last stop of the pickup vehicles to all possible stops of the dropoff vehicles (for the case that the pickup is ORD or BNS)
-            Timer dropoffALSTimer;
-            searchTimeDropoffALS += dropoffALSTimer.elapsed<std::chrono::nanoseconds>();
 
-            numCandidateVehiclesDropoffALS += relALSDropoffs.getVehiclesWithRelevantPDLocs().size();
 
             //* More versatile calculation of the last stop distances
             std::vector<int> relevantPVehIds;
@@ -149,6 +145,7 @@ namespace karri {
             numCandidateVehiclesPickupBNS += relBNSPickups.getVehiclesWithRelevantPDLocs().size();
             numCandidateVehiclesPickupORD += relORDPickups.getVehiclesWithRelevantPDLocs().size();
             numCandidateVehiclesDropoffORD += relORDDropoffs.getVehiclesWithRelevantPDLocs().size();
+            numCandidateVehiclesDropoffALS += relALSDropoffs.getVehiclesWithRelevantPDLocs().size();
 
             findAssignmentsWithPickupBNS(relALSDropoffs);
 
@@ -180,7 +177,6 @@ namespace karri {
             stats.numTransferPoints += numTransferPoints;
 
             stats.searchTimePickupALS += searchTimePickupALS;
-            stats.searchTimeDropoffALS += searchTimeDropoffALS;
             stats.searchTimeLastStopToTransfer += searchTimeLastStopToTransfer;
             stats.searchTimePickupToTransfer += searchTimePickupToTransfer;
         }
@@ -853,7 +849,6 @@ namespace karri {
 
         // Search from last stop to all stops
         int64_t searchTimePickupALS;
-        int64_t searchTimeDropoffALS;
         int64_t searchTimePickupToTransfer;
         int64_t searchTimeLastStopToTransfer;
     };

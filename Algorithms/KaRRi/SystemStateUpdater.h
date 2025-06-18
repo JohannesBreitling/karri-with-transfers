@@ -150,7 +150,10 @@ namespace karri {
                                                                   "request_id, " +
                                                                   std::string(
                                                                           stats::UpdatePerformanceStats::LOGGER_COLS))),
-
+                  ellipseReconstructionPerfLogger(
+                          LogManager<LoggerT>::getLogger(stats::EllipseReconstructionStats::LOGGER_NAME,
+                                                         "request_id, " +
+                                                         std::string(stats::EllipseReconstructionStats::LOGGER_COLS))),
                   ordinaryTransferPerfLogger(LogManager<LoggerT>::getLogger(
                           stats::AssignmentsWithOrdinaryTransferPerformanceStats::LOGGER_NAME,
                           "request_id," +
@@ -427,7 +430,8 @@ namespace karri {
                             << vehCh.rank(inputGraph.edgeHead(stopLocationsPVeh[transferIdxPVeh])) << ","
                             << vehCh.rank(inputGraph.edgeHead(stopLocationsPVeh[transferIdxPVeh + 1])) << ","
                             << vehCh.rank(inputGraph.edgeHead(stopLocationsDVeh[transferIdxDVeh])) << ","
-                            << vehCh.rank(inputGraph.edgeHead(stopLocationsDVeh[transferIdxDVeh + 1])) << "\n" << std::flush;
+                            << vehCh.rank(inputGraph.edgeHead(stopLocationsDVeh[transferIdxDVeh + 1])) << "\n"
+                            << std::flush;
                 }
 
 
@@ -483,6 +487,8 @@ namespace karri {
                            << requestState.stats().dalsAssignmentsStats.getLoggerRow() << "\n";
             updatePerfLogger << requestState.originalRequest.requestId << ", "
                              << requestState.stats().updateStats.getLoggerRow() << "\n";
+            ellipseReconstructionPerfLogger << requestState.originalRequest.requestId << ", "
+                                            << requestState.stats().ellipseReconstructionStats.getLoggerRow() << "\n";
             ordinaryTransferPerfLogger << requestState.originalRequest.requestId << ", "
                                        << requestState.stats().ordinaryTransferStats.getLoggerRow() << "\n";
             transferALSPVehPerfLogger << requestState.originalRequest.requestId << ", "
@@ -736,6 +742,7 @@ namespace karri {
         LoggerT &dalsPerfLogger;
         LoggerT &updatePerfLogger;
 
+        LoggerT &ellipseReconstructionPerfLogger;
         LoggerT &ordinaryTransferPerfLogger;
         LoggerT &transferALSPVehPerfLogger;
         LoggerT &transferALSDVehPerfLogger;

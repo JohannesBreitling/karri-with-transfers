@@ -105,11 +105,7 @@ namespace karri {
                 asserter(asserter),
                 ellipseIntersector(inputGraph, fleet, requestState, routeState),
                 edgesSubset(inputGraph.numEdges()),
-                stopSeen(fleet.size()),
-                ellipsesLogger(LogManager<std::ofstream>::getLogger("ellipses.csv",
-                                                                    "size\n")),
-                ellipseIntersectionLogger(LogManager<std::ofstream>::getLogger("ellipse-intersection.csv",
-                                                                               "size\n")) {}
+                stopSeen(fleet.size()) {}
 
 
         void init() {
@@ -129,10 +125,7 @@ namespace karri {
             tryAssignmentsTime = 0;
             numStopPairs = 0;
             numTransferPoints = 0;
-            numDijkstraSearchesRun = 0;
-            numEdgesRelaxed = 0;
-            numVerticesScanned = 0;
-            searchTime = 0;
+            intersectEllipsesTime = 0;
         }
 
         // Given stop IDs at which a transfer with an ordinary detour (i.e. a detour between two existing stops) may
@@ -153,9 +146,9 @@ namespace karri {
             numCandidateVehiclesDropoffALS += relALSDropoffs.getVehiclesWithRelevantPDLocs().size();
 
             // Calculate transfer points
-            Timer searchTimer;
+            Timer intersectEllipsesTimer;
             ellipseIntersector.computeTransferPoints(pVehStopIds, dVehStopIds, ellipseContainer);
-            searchTime += searchTimer.elapsed<std::chrono::nanoseconds>();
+            intersectEllipsesTime += intersectEllipsesTimer.elapsed<std::chrono::nanoseconds>();
 
             // Run selection phase for many-to-many searches used to find distances from pickups to transfers and from
             // transfers to dropoffs.
@@ -244,10 +237,7 @@ namespace karri {
             stats.tryAssignmentsTime += tryAssignmentsTime;
             stats.numStopPairs += numStopPairs;
             stats.numTransferPoints += numTransferPoints;
-            stats.numDijkstraSearchesRun += numDijkstraSearchesRun;
-            stats.numEdgesRelaxed += numEdgesRelaxed;
-            stats.numVerticesScanned += numVerticesScanned;
-            stats.searchTime += searchTime;
+            stats.intersectEllipsesTime += intersectEllipsesTime;
         }
 
     private:
@@ -258,7 +248,6 @@ namespace karri {
 
             const auto transferPoints = ellipseIntersector.getTransferPoints(pStopId, dStopId);
             numTransferPoints += transferPoints.size();
-            ellipseIntersectionLogger << transferPoints.size() << '\n';
 
             // For fixed transfer indices, try to find possible pickups
             const auto &pVehId = routeState.vehicleIdOf(pStopId);
@@ -885,7 +874,9 @@ namespace karri {
         CostCalculator &calc;
         InsertionAsserterT &asserter;
 
-        EdgeEllipseIntersector<InputGraphT> ellipseIntersector;
+        using EllipseSizeLogger = NullLogger;
+        using EllipseIntersectionSizeLogger = NullLogger;
+        EdgeEllipseIntersector<InputGraphT, EllipseSizeLogger, EllipseIntersectionSizeLogger> ellipseIntersector;
 
         LightweightSubset edgesSubset; // Subset used to deduplicate locations in preparing any-to-any searches
 
@@ -918,13 +909,7 @@ namespace karri {
         // Stats for the transfer search itself
         int64_t numStopPairs;
         int64_t numTransferPoints;
-        int64_t numDijkstraSearchesRun;
-        int64_t numEdgesRelaxed;
-        int64_t numVerticesScanned;
-        int64_t searchTime;
-
-        std::ofstream &ellipsesLogger;
-        std::ofstream &ellipseIntersectionLogger;
+        int64_t intersectEllipsesTime;
 
     };
 }

@@ -64,9 +64,9 @@ namespace karri {
             // Write the stats
             auto &stats = requestState.stats().transferALSDVehStats;
             stats.totalTime = total.elapsed<std::chrono::nanoseconds>();
-            stats.numCandidateVehiclesPickupBNS += numCandidateVehiclesPickupBNS;
-            stats.numCandidateVehiclesPickupORD += numCandidateVehiclesPickupORD;
-            stats.numCandidateVehiclesDropoffALS += numCandidateVehiclesDropoffALS;
+            stats.numCandidateVehiclesPickupBNS += relBNSPickups.getVehiclesWithRelevantPDLocs().size();
+            stats.numCandidateVehiclesPickupORD += relORDPickups.getVehiclesWithRelevantPDLocs().size();
+            stats.numCandidateVehiclesDropoffALS += relALSDropoffs.getVehiclesWithRelevantPDLocs().size();
             stats.numPickups += requestState.numPickups();
             stats.numDropoffs += requestState.numDropoffs();
             stats.numAssignmentsTriedPickupBNS += numAssignmentsTriedPickupBNS;
@@ -75,17 +75,12 @@ namespace karri {
             stats.tryAssignmentsTime += tryAssignmentsTime;
             stats.numTransferPoints += numTransferPoints;
 
-            stats.searchTimeDropoffALS += searchTimeDropoffALS;
             stats.searchTimeLastStopToTransfer += searchTimeLastStopToTransfer;
             stats.searchTimeTransferToDropoff += searchTimeTransferToDropoff;
         }
 
         void init() {
             totalTime = 0;
-
-            numCandidateVehiclesPickupBNS = 0;
-            numCandidateVehiclesPickupORD = 0;
-            numCandidateVehiclesDropoffALS = 0;
 
             numPickups = 0;
             numDropoffs = 0;
@@ -97,7 +92,6 @@ namespace karri {
 
             numTransferPoints = 0;
 
-            searchTimeDropoffALS = 0;
             searchTimeLastStopToTransfer = 0;
             searchTimeTransferToDropoff = 0;
         }
@@ -110,15 +104,9 @@ namespace karri {
                 relBNSPickups.getVehiclesWithRelevantPDLocs().empty())
                 return;
 
-            numCandidateVehiclesPickupBNS += relBNSPickups.getVehiclesWithRelevantPDLocs().size();
-            numCandidateVehiclesPickupORD += relORDPickups.getVehiclesWithRelevantPDLocs().size();
-
             // The vehicle set for the dropoff is the set of vehicles for the ALS dropoff
             // The distance from the last stop to the dropoff is a lower bound for the distance from the last stop to the dropoff via the transfer point
-            Timer searchDropoffALSTimer;
             const auto& dVehIds = relALSDropoffs.getVehiclesWithRelevantPDLocs();
-            searchTimeDropoffALS = searchDropoffALSTimer.elapsed<std::chrono::nanoseconds>();
-            numCandidateVehiclesDropoffALS += dVehIds.size();
 
             if (dVehIds.empty())
                 return;
@@ -426,13 +414,9 @@ namespace karri {
         int64_t totalTime;
 
         // Stats for the PD Locs
-        int64_t numCandidateVehiclesPickupBNS;
-        int64_t numCandidateVehiclesPickupORD;
 
         int64_t numPickups;
         int64_t numDropoffs;
-
-        int64_t numCandidateVehiclesDropoffALS;
 
         // Stats for the tried assignments 
         int64_t numAssignmentsTriedPickupBNS;
@@ -445,7 +429,6 @@ namespace karri {
         // Stats for the transfer search itself
         int64_t numTransferPoints;
 
-        int64_t searchTimeDropoffALS;
         int64_t searchTimeLastStopToTransfer;
         int64_t searchTimeTransferToDropoff;
 

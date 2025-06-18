@@ -98,7 +98,7 @@ namespace karri {
                     allStopIds.push_back(stopId);
                 }
             }
-            const auto ellipseContainer = ellipseReconstructor.computeEllipses(allStopIds);
+            const auto ellipseContainer = ellipseReconstructor.computeEllipses(allStopIds, requestState.stats().ellipseReconstructionStats);
 
             // * TRANSFER AFTER LAST STOP (PVeh)
             transfersALSPVeh.findAssignments(relALSDropoffs, ellipseContainer);

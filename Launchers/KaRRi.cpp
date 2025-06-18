@@ -632,7 +632,7 @@ int main(int argc, char *argv[]) {
             std::cout << "Warning: KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE is ON but -max-num-threads is not set. Queries will execute using 1 thread." << std::endl;
         }
 
-        using EllipseReconstructorImpl = CHEllipseReconstructor<VehicleInputGraph, VehCHEnv, EllipticBucketsEnv, PARALLELIZE_PHAST_DETOUR_ELLIPSES, ELLIPSES_TOP_VERTICES_DIVISOR, TraversalCostAttribute, EllipseReconstructorLabelSet, std::ofstream>;
+        using EllipseReconstructorImpl = CHEllipseReconstructor<VehicleInputGraph, VehCHEnv, EllipticBucketsEnv, PARALLELIZE_PHAST_DETOUR_ELLIPSES, ELLIPSES_TOP_VERTICES_DIVISOR, TraversalCostAttribute, EllipseReconstructorLabelSet>;
         EllipseReconstructorImpl ellipseReconstructor(vehicleInputGraph, *vehChEnv, fleet, ellipticBucketsEnv,
                                                       reqState, routeState);
 #else

@@ -127,9 +127,11 @@ namespace karri {
             KASSERT(asgn.isFinished());
             KASSERT(asgn.pVeh->vehicleId >= 0 && asgn.dVeh->vehicleId >= 0 && asgn.pVeh->vehicleId != asgn.dVeh->vehicleId && asgn.pickup && asgn.dropoff);
             KASSERT(asgn.distToPickup >= 0 && asgn.distFromPickup >= 0 && asgn.distToTransferPVeh >= 0 && asgn.distFromTransferPVeh >= 0 && asgn.distToTransferDVeh >= 0 && asgn.distFromTransferDVeh >= 0 && asgn.distToDropoff >= 0 && asgn.distFromDropoff >= 0);
-            KASSERT(asgn.pickupIdx == asgn.transferIdxPVeh || asgn.distFromPickup > 0 || asgn.pickupType == AFTER_LAST_STOP);
-            KASSERT(asgn.transferIdxDVeh == asgn.dropoffIdx || asgn.distFromTransferDVeh > 0 || asgn.transferTypeDVeh == AFTER_LAST_STOP);
             KASSERT(asgn.pickup->loc != asgn.transfer.loc && asgn.dropoff->loc != asgn.transfer.loc);
+
+            // These assertions do not work due to edges with travel time 0
+//            KASSERT(asgn.pickupIdx == asgn.transferIdxPVeh || asgn.distFromPickup > 0 || asgn.pickupType == AFTER_LAST_STOP);
+//            KASSERT(asgn.transferIdxDVeh == asgn.dropoffIdx || asgn.distFromTransferDVeh > 0 || asgn.transferTypeDVeh == AFTER_LAST_STOP);
 
             KASSERT(cost == calculator.calc(asgn, *this));
 
