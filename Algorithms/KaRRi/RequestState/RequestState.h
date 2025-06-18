@@ -41,14 +41,13 @@ namespace karri {
     // Holds information relating to a specific request like its pickups and dropoffs and the best known assignment.
     struct RequestState {
 
-        RequestState(const CostCalculator &calculator, std::vector<AssignmentWithTransfer> &postponedAssignments)
+        RequestState(const CostCalculator &calculator)
                 : originalRequest(),
                   originalReqDirectDist(-1),
                   minDirectPDDist(-1),
                   pickups(),
                   dropoffs(),
-                  calculator(calculator),
-                  postponedAssignments(postponedAssignments) {}
+                  calculator(calculator) {}
 
 
         ~RequestState() {
@@ -124,34 +123,22 @@ namespace karri {
             return bestAssignmentWithTransfer;
         }
 
-        void tryAssignment(AssignmentWithTransfer &asgn) {
-            assert(asgn.pVeh->vehicleId >= 0 && asgn.dVeh->vehicleId >= 0 && asgn.pVeh->vehicleId != asgn.dVeh->vehicleId && asgn.pickup && asgn.dropoff);
-            assert(asgn.distToPickup >= 0 && asgn.distFromPickup >= 0 && asgn.distToTransferPVeh >= 0 && asgn.distFromTransferPVeh >= 0 && asgn.distToTransferDVeh >= 0 && asgn.distFromTransferDVeh >= 0 && asgn.distToDropoff >= 0 && asgn.distFromDropoff >= 0);
-            assert(!asgn.isFinished() || asgn.pickupIdx == asgn.transferIdxPVeh || asgn.distFromPickup > 0 || asgn.pickupType == AFTER_LAST_STOP);
-            assert(!asgn.isFinished() || asgn.transferIdxDVeh == asgn.dropoffIdx || asgn.distFromTransferDVeh > 0 || asgn.transferTypeDVeh == AFTER_LAST_STOP);
-            assert(asgn.pickup->loc != asgn.transfer.loc && asgn.dropoff->loc != asgn.transfer.loc);
+        void tryFinishedTransferAssignmentWithKnownCost(AssignmentWithTransfer &asgn, const RequestCost& cost) {
+            KASSERT(asgn.isFinished());
+            KASSERT(asgn.pVeh->vehicleId >= 0 && asgn.dVeh->vehicleId >= 0 && asgn.pVeh->vehicleId != asgn.dVeh->vehicleId && asgn.pickup && asgn.dropoff);
+            KASSERT(asgn.distToPickup >= 0 && asgn.distFromPickup >= 0 && asgn.distToTransferPVeh >= 0 && asgn.distFromTransferPVeh >= 0 && asgn.distToTransferDVeh >= 0 && asgn.distFromTransferDVeh >= 0 && asgn.distToDropoff >= 0 && asgn.distFromDropoff >= 0);
+            KASSERT(asgn.pickupIdx == asgn.transferIdxPVeh || asgn.distFromPickup > 0 || asgn.pickupType == AFTER_LAST_STOP);
+            KASSERT(asgn.transferIdxDVeh == asgn.dropoffIdx || asgn.distFromTransferDVeh > 0 || asgn.transferTypeDVeh == AFTER_LAST_STOP);
+            KASSERT(asgn.pickup->loc != asgn.transfer.loc && asgn.dropoff->loc != asgn.transfer.loc);
 
-            // Calculate the cost of the assignment and try to update the best known assignment if the assignment is finished
-            RequestCost cost;
-            if (!asgn.isFinished()) {
-                cost = calculator.calcLowerBound(asgn, *this);
-            } else {
-                calculator.recomputePVeh(asgn, *this);
-                cost = calculator.calc(asgn, *this);
-            }
+            KASSERT(cost == calculator.calc(asgn, *this));
 
-            if (cost.total >= INFTY)
-                return;
-
-            if (asgn.isFinished() && cost.total < bestCostWithTransfer) {
-                asgn.maxDepAtPickup = getMaxDepTimeAtPickup();
+            if (cost.total < bestCostWithTransfer) {
                 bestAssignmentWithTransfer = AssignmentWithTransfer(asgn);
                 bestCostWithTransfer = cost.total;
                 bestCostObjectWT = cost;
                 notUsingVehicleIsBest = false;
                 notUsingVehicleDist = INFTY;
-            } else if (cost.total < bestCostWithTransfer) {
-                postponedAssignments.push_back(asgn);
             }
         }
         
@@ -240,7 +227,6 @@ namespace karri {
             minDirectPDDist = INFTY;
             pickups.clear();
             dropoffs.clear();
-            postponedAssignments.clear();
 
             bestAssignment = Assignment();
             bestAssignmentWithTransfer = AssignmentWithTransfer();
@@ -260,9 +246,6 @@ namespace karri {
         stats::OsmRoadCategoryStats chosenPDLocsRoadCatStats;
 
         const CostCalculator &calculator;
-
-        // Vector for the unsfinished assignments
-        std::vector<AssignmentWithTransfer> &postponedAssignments;
 
         // Information about best known assignment for current request
         Assignment bestAssignment;

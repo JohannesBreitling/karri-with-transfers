@@ -917,7 +917,7 @@ namespace karri {
             const bool dropoffAsNewStop = correctedDropoffIdx != dropoffIdx;
 
             const int schedDepAtTransfer = schedDepTimesDVeh[transferIdxDVeh];
-             // Assert that the arrival at the dropoff is corrent
+             // Assert that the arrival at the dropoff is correct
             const int schedArrAtDropoff = schedArrTimesDVeh[dropoffIdx];
 
             if (!(transferBNS || transferIdxDVeh == asgn.transferIdxDVeh + transferAsNewStop)
@@ -927,7 +927,7 @@ namespace karri {
              || !(schedArrAtDropoff == asgn.arrAtDropoff))
                 return false;
 
-            // Assert that the trip time of the dVeh is corret
+            // Assert that the trip time of the dVeh is correct
             const int waitingTimeAtTransfer = schedDepTimesDVeh[transferIdxDVeh] - asgn.arrAtTransferPoint;
             const int actualTripTime = schedArrTimesDVeh[dropoffIdx] - schedDepTimesDVeh[transferIdxDVeh] + asgn.dropoff->walkingDist + waitingTimeAtTransfer;
             

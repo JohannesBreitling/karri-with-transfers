@@ -48,15 +48,12 @@ namespace karri {
 
         OrdinaryAssignmentsFinder(const RelevantPDLocs &relPickups, const RelevantPDLocs &relDropoffs,
                                   const PDDistancesT &pdDistances, const Fleet &fleet,
-                                  PickupVehicles &pVehs, DropoffVehicles &dVehs,
                                   const CostCalculator &calculator, const RouteState &routeState,
                                   RequestState &requestState)
                 : relPickups(relPickups),
                   relDropoffs(relDropoffs),
                   pdDistances(pdDistances),
                   fleet(fleet),
-                  pVehs(pVehs),
-                  dVehs(dVehs),
                   calculator(calculator),
                   routeState(routeState),
                   requestState(requestState) {}
@@ -66,68 +63,11 @@ namespace karri {
             findOrdinaryPairedAssignments();
         }
 
-        void findPickupAndDropoffVehicles() {
-            findVehiclesForOrdinaryPickup();
-            findVehiclesForOrdinaryDropoff();
-        }
-
         void init() {
             // no op
         }
 
     private:
-
-        void findVehiclesForOrdinaryPickup() {
-            // Loop over all relavant vehicles
-            for (const auto &vehId : relPickups.getVehiclesWithRelevantPDLocs()) {
-                
-                const auto &vehicle = &fleet[vehId];
-                std::vector<Pickup> pickups = std::vector<Pickup>{};
-
-                // Loop over the relevant spots for each vehicle
-                for (const auto &pickupEntry : relPickups.relevantSpotsFor(vehId)) {
-                    // Construct a pickup object for the vehicle and the possible pickup entry
-                    const auto pdLoc = requestState.pickups[pickupEntry.pdId];
-                    Pickup pickup = Pickup(vehicle);
-                    pickup.pdLocId = pickupEntry.pdId;
-                    pickup.type = ORD;
-                    pickup.detourToPD = pickupEntry.distToPDLoc;
-                    pickup.detourFromPD = pickupEntry.distFromPDLocToNextStop;
-                    pickup.pdIdx = pickupEntry.stopIndex;
-                    pickup.walkingDistance = pdLoc.walkingDist;
-
-                    pickups.push_back(pickup);
-                }
-
-                pVehs.pushBack(vehicle, pickups, ORD);
-            }
-        }
-
-        void findVehiclesForOrdinaryDropoff() {
-            // Loop over all relevant vehicles for ordinary dropoff
-            for (const auto &vehId : relDropoffs.getVehiclesWithRelevantPDLocs()) {
-
-                const auto &vehicle = &fleet[vehId];
-                std::vector<Dropoff> dropoffs = std::vector<Dropoff>{};
-
-                // Loop over the relevant spots for each vehicle
-                for (const auto &dropoffEntry : relDropoffs.relevantSpotsFor(vehId)) {
-                    // Construct a dropoff object for the vehicle and the possible dropoff entry 
-                    const auto pdLoc = requestState.dropoffs[dropoffEntry.pdId];
-                    Dropoff dropoff = Dropoff(vehicle);
-                    dropoff.pdLocId = dropoffEntry.pdId;
-                    dropoff.type = ORD;
-                    dropoff.detourToPD = dropoffEntry.distToPDLoc;
-                    dropoff.detourFromPD = dropoffEntry.distFromPDLocToNextStop;
-                    dropoff.pdIdx = dropoffEntry.stopIndex;
-                    dropoff.walkingDistance = pdLoc.walkingDist;
-
-                    dropoffs.push_back(dropoff);
-                }
-
-                dVehs.pushBack(vehicle, dropoffs, ORD);
-            }
-        }
 
         // Try assignments where pickup is inserted at or just after stop i and dropoff is inserted at or just after stop j
         // with j > i. Does not deal with inserting the pickup at or after a last stop. Does not deal with inserting the
@@ -356,8 +296,6 @@ namespace karri {
         const RelevantPDLocs &relDropoffs;
         const PDDistancesT &pdDistances;
         const Fleet &fleet;
-        PickupVehicles &pVehs;
-        DropoffVehicles &dVehs;
         const CostCalculator &calculator;
         const RouteState &routeState;
         RequestState &requestState;

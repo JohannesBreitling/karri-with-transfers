@@ -30,6 +30,7 @@
 #include "Algorithms/KaRRi/LastStopSearches/TentativeLastStopDistances.h"
 
 #include "Algorithms/KaRRi/CostCalculator.h"
+#include "RelevantDropoffsAfterLastStop.h"
 
 namespace karri::Transfers {
 
@@ -37,7 +38,7 @@ namespace karri::Transfers {
             typename CHEnvT,
             typename LastStopBucketsEnvT,
             typename LabelSet>
-    struct TransfersDropoffALSBCHStrategy {
+    class TransfersDropoffALSBCHStrategy {
     private:
 
 
@@ -144,14 +145,9 @@ namespace karri::Transfers {
                          DropoffAfterLastStopPruner(*this, calculator)),
                   lastStopDistances(fleet.size()) {}
 
-        Subset findDropoffsAfterLastStop() {
+        RelevantDropoffsAfterLastStop findDropoffsAfterLastStop() {
             runBchQueries();
-
-            return vehiclesSeenForDropoffs;
-        }
-
-        int getDistanceToDropoff(const int vehId, const unsigned int dropoffId) {
-            return lastStopDistances.getDistance(vehId, dropoffId);
+            return constructResult();
         }
 
     private:
@@ -208,6 +204,26 @@ namespace karri::Transfers {
             totalNumEdgeRelaxations += search.getNumEdgeRelaxations();
             totalNumVerticesSettled += search.getNumVerticesSettled();
             totalNumEntriesScanned += search.getNumEntriesScanned();
+        }
+
+        RelevantDropoffsAfterLastStop constructResult() {
+            RelevantDropoffsAfterLastStop result(fleet.size());
+            for (const auto& vehId : vehiclesSeenForDropoffs) {
+                const auto numBefore = result.relevantSpots.size();
+                for (unsigned int dropoffId = 0; dropoffId < requestState.numDropoffs(); ++dropoffId) {
+                    const auto dist = lastStopDistances.getDistance(vehId, dropoffId);
+                    // TODO: cost based filtering here
+                    if (dist >= INFTY)
+                        continue;
+                    result.relevantSpots.push_back(RelevantDropoffsAfterLastStop::RelevantDropoff(dropoffId, dist));
+                }
+                if (result.relevantSpots.size() == numBefore)
+                    continue;  // No relevant dropoffs for this vehicle
+                result.vehicleToPdLocs[vehId].start = numBefore;
+                result.vehicleToPdLocs[vehId].end = result.relevantSpots.size();
+                result.vehiclesWithRelevantSpots.push_back(vehId);
+            }
+            return result;
         }
 
 

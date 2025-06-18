@@ -37,11 +37,11 @@
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/combinable.h>
 
-namespace karri::TransferPointStrategies {
+namespace karri {
 
     // Computes the set of vertices contained in the detour ellipse between a pair of consecutive stops in a vehicle
     // route using bucket entries and a CH topological downward search.
-    template<typename EllipticBucketsEnvironmentT, typename LabelSet, typename WeightT = TraversalCostAttribute>
+    template<typename EllipticBucketsEnvironmentT, typename LabelSet, int TOP_VERTICES_DIVISOR = 1, typename WeightT = TraversalCostAttribute>
     class CHEllipseReconstructorQuery {
 
         using DistanceLabel = typename LabelSet::DistanceLabel;
@@ -53,24 +53,27 @@ namespace karri::TransferPointStrategies {
         CHEllipseReconstructorQuery(const CH &ch,
                                     const typename CH::SearchGraph &downGraph,
                                     const typename CH::SearchGraph &upGraph,
-                                    const Permutation &topDownRankPermutation,
-                                    const std::vector<int> &firstIdxOfLargeLevels,
+                                    const Permutation &sweepVertexPermutation,
+                                    const std::vector<int>& firstIdxOfLargeLevels,
                                     const EllipticBucketsEnvironmentT &ellipticBucketsEnv,
                                     const RouteState &routeState)
                 : ch(ch),
                   numVertices(downGraph.numVertices()),
                   downGraph(downGraph),
                   upGraph(upGraph),
-                  sweepVertexPermutation(topDownRankPermutation),
+                  sweepVertexPermutation(sweepVertexPermutation),
                   firstIdxOfLargeLevels(firstIdxOfLargeLevels),
                   ellipticBucketsEnv(ellipticBucketsEnv),
                   routeState(routeState),
+                  numVerticesToConsider(numVertices / TOP_VERTICES_DIVISOR),
                   shiftedIndexForAlignment(downGraph.numVertices()),
                   enumerateBucketEntriesSearchSpace(numVertices),
                   distTo(numVertices, INFTY),
                   distFrom(numVertices, INFTY),
                   relevantInToSearch(numVertices),
-                  relevantInFromSearch(numVertices) {
+                  relevantInFromSearch(numVertices) {}
+
+        void init() {
             KASSERT(downGraph.numVertices() == numVertices);
             KASSERT(upGraph.numVertices() == numVertices);
             KASSERT(!firstIdxOfLargeLevels.empty() && firstIdxOfLargeLevels.back() == numVertices);
@@ -102,8 +105,6 @@ namespace karri::TransferPointStrategies {
                 KASSERT(reinterpret_cast<std::uintptr_t>(&distTo[shiftedFirstIdx]) % CACHE_LINE_SIZE == 0);
                 KASSERT(reinterpret_cast<std::uintptr_t>(&distFrom[shiftedFirstIdx]) % CACHE_LINE_SIZE == 0);
             }
-
-
         }
 
         // Runs a topological downward search in the CH graph to find all vertices in the detour ellipse between
@@ -128,15 +129,20 @@ namespace karri::TransferPointStrategies {
             // using a PQ with many costly deleteMin() operations and instead settle every vertex in the graph.
             timer.restart();
 
+
             // Process vertices in all small levels sequentially
             auto &verticesInAnyEllipseForSeq = threadLocalVerticesInEllipse.local();
-            for (int r = 0; r < firstIdxOfLargeLevels.front(); ++r) {
+            const int seqEnd = std::min(firstIdxOfLargeLevels.front(), numVerticesToConsider);
+            for (int r = 0; r < seqEnd; ++r) {
                 settleVertexInTopodownSearch(r, leeways, verticesInAnyEllipseForSeq);
             }
 
             // Process vertices in each large level in parallel
             for (int l = 0; l < firstIdxOfLargeLevels.size() - 1; ++l) {
                 const int firstIdx = firstIdxOfLargeLevels[l];
+                if (firstIdx >= numVerticesToConsider)
+                    break; // Only process levels until numVerticesToConsider is reached
+
                 const int lastIdx = firstIdxOfLargeLevels[l + 1];
                 static constexpr int CHUNK_SIZE = (1 << 2) * CACHE_LINE_SIZE / sizeof(int);
                 // Need to use static_partitioner to ensure that the vertices in localVerticesInEllipse are in
@@ -326,6 +332,7 @@ namespace karri::TransferPointStrategies {
         const std::vector<int> &firstIdxOfLargeLevels; // First index of large levels in top-down rank ordering.
         const EllipticBucketsEnvironmentT &ellipticBucketsEnv;
         const RouteState &routeState;
+        const int numVerticesToConsider; // Number of vertices at top of CH that are considered as ellipse members. Heuristic if < numVertices.
 
         // Offset of each vertex in distTo and distFrom arrays. Used to align the large levels with cache lines to
         // avoid false sharing.

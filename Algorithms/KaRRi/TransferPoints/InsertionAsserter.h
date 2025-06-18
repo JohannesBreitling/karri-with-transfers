@@ -17,8 +17,6 @@ namespace karri {
         
 
         bool assertAssignment(const AssignmentWithTransfer &asgn) {
-            if (asgn.cost.total >= INFTY)
-                return true;
 
             // Assert the distances
             if (!assertPVeh(asgn) || !assertDVeh(asgn))
@@ -36,6 +34,16 @@ namespace karri {
             
             const int lastStop = stopLocations[numStops - 1];
             return getDistanceBetweenLocations(lastStop, loc);
+        }
+
+        // Calculates the distance from the edgeHead of from to the edgeHead of to, using the to edge
+        int getDistanceBetweenLocations(const int from, const int to) {
+            const int sourceRank = vehCh.rank(inputGraph.edgeHead(from));
+            const int targetRank = vehCh.rank(inputGraph.edgeTail(to));
+            const int travelTime = inputGraph.travelTime(to);
+        
+            vehChQuery.run(sourceRank, targetRank);
+            return vehChQuery.getDistance() + travelTime;
         }
 
 
@@ -186,16 +194,6 @@ namespace karri {
             }
 
             return true;
-        }
-
-        // Calculates the distance from the edgeHead of from to the edgeHead of to, using the to edge
-        int getDistanceBetweenLocations(const int from, const int to) {
-            const int sourceRank = vehCh.rank(inputGraph.edgeHead(from));
-            const int targetRank = vehCh.rank(inputGraph.edgeTail(to));
-            const int travelTime = inputGraph.travelTime(to);
-        
-            vehChQuery.run(sourceRank, targetRank);
-            return vehChQuery.getDistance() + travelTime;
         }
 
         using VehCHQuery = typename VehCHEnvT::template FullCHQuery<>;

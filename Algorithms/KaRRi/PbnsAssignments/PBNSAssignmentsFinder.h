@@ -59,7 +59,6 @@ namespace karri {
                               const RelevantPDLocs &relDropoffsBns, const PDDistancesT &pdDistances,
                               CurVehLocToPickupSearchesT &curVehLocToPickupSearches,
                               const Fleet &fleet,
-                              PickupVehicles &pVehs, DropoffVehicles &dVehs,
                               const CostCalculator &calculator,
                               const RouteState &routeState, RequestState &requestState)
                 : relPickupsBNS(relPickupsBns),
@@ -68,16 +67,9 @@ namespace karri {
                   pdDistances(pdDistances),
                   curVehLocToPickupSearches(curVehLocToPickupSearches),
                   fleet(fleet),
-                  pVehs(pVehs),
-                  dVehs(dVehs),
                   calculator(calculator),
                   routeState(routeState),
                   requestState(requestState) {}
-
-        void findPickupAndDropoffVehicles() {
-            findVehiclesForPBNS();
-            findVehiclesForDBNS();
-        }
 
         void findAssignments() {
             numAssignmentsTriedWithPickupBeforeNextStop = 0;
@@ -123,52 +115,6 @@ namespace karri {
         }
 
     private:
-
-        void findVehiclesForPBNS() {
-            for (const auto &vehId: relPickupsBNS.getVehiclesWithRelevantPDLocs()) {
-                
-                const auto vehicle = &fleet[vehId];
-                std::vector<Pickup> pickups = std::vector<Pickup>{}; 
-
-                for (const auto &pickupEntry : relPickupsBNS.relevantSpotsFor(vehId)) {
-                    const auto pdLoc = requestState.pickups[pickupEntry.pdId];
-                    Pickup pickup = Pickup(vehicle);
-                    pickup.pdLocId = pickupEntry.pdId;
-                    pickup.type = BNS;
-                    pickup.detourToPD = pickupEntry.distToPDLoc;
-                    pickup.detourFromPD = pickupEntry.distFromPDLocToNextStop;
-                    pickup.pdIdx = pickupEntry.stopIndex;
-                    pickup.walkingDistance = pdLoc.walkingDist;
-
-                    pickups.push_back(pickup);
-                }
-
-                pVehs.pushBack(vehicle, pickups, BNS);
-            }
-        }
-
-        void findVehiclesForDBNS() {
-            for (const auto &vehId: relDropoffsBNS.getVehiclesWithRelevantPDLocs()) {
-
-                const auto vehicle = &fleet[vehId];
-                std::vector<Dropoff> dropoffs = std::vector<Dropoff>{};
-
-                for (const auto &dropoffEntry : relDropoffsBNS.relevantSpotsFor(vehId)) {
-                    const auto pdLoc = requestState.dropoffs[dropoffEntry.pdId];
-                    Dropoff dropoff = Dropoff(vehicle);
-                    dropoff.pdLocId = dropoffEntry.pdId;
-                    dropoff.type = ORD;
-                    dropoff.detourToPD = dropoffEntry.distToPDLoc;
-                    dropoff.detourFromPD = dropoffEntry.distFromPDLocToNextStop;
-                    dropoff.pdIdx = dropoffEntry.stopIndex;
-                    dropoff.walkingDistance = pdLoc.walkingDist;
-
-                    dropoffs.push_back(dropoff);
-                }
-
-                dVehs.pushBack(vehicle, dropoffs, BNS);
-            }
-        }
 
         // Filters combinations of pickups and dropoffs using a cost lower bound.
         // If a combination is found for a pickup that cannot be filtered, we need the exact distance from the vehicle
@@ -390,8 +336,6 @@ namespace karri {
         const PDDistancesT &pdDistances;
         CurVehLocToPickupSearchesT &curVehLocToPickupSearches;
         const Fleet &fleet;
-        PickupVehicles &pVehs;
-        DropoffVehicles &dVehs;
         const CostCalculator &calculator;
         const RouteState &routeState;
         RequestState &requestState;

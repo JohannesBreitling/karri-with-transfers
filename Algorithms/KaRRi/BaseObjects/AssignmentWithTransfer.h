@@ -43,21 +43,26 @@ namespace karri {
 
     struct AssignmentWithTransfer {
 
-        AssignmentWithTransfer() {
-            cost = RequestCost::INFTY_COST();
-            costPVeh = RequestCost::INFTY_COST();
-        }
+        AssignmentWithTransfer() {}
 
         AssignmentWithTransfer(const Vehicle *pVehArg, const Vehicle *dVehArg, const TransferPoint tpArg) {
             pVeh = pVehArg;
             dVeh = dVehArg;
             transfer = tpArg;
+            distToTransferPVeh = tpArg.distancePVehToTransfer;
+            distFromTransferPVeh = tpArg.distancePVehFromTransfer;
+            distToTransferDVeh = tpArg.distanceDVehToTransfer;
+            distFromTransferDVeh = tpArg.distanceDVehFromTransfer;
         }
 
         AssignmentWithTransfer(const Vehicle &pVehArg, const Vehicle &dVehArg, const TransferPoint tpArg) {
             pVeh = &pVehArg;
             dVeh = &dVehArg;
             transfer = tpArg;
+            distToTransferPVeh = tpArg.distancePVehToTransfer;
+            distFromTransferPVeh = tpArg.distancePVehFromTransfer;
+            distToTransferDVeh = tpArg.distanceDVehToTransfer;
+            distFromTransferDVeh = tpArg.distanceDVehFromTransfer;
         }
 
         AssignmentWithTransfer(const Vehicle *pVehArg, const Vehicle *dVehArg, const TransferPoint tpArg, const PDLoc *pickupPDLoc, int pickupIdxArg, int distToPickupArg, int distFromPickupArg, int tIdxPVeh, int tIdxDVeh) {
@@ -106,8 +111,6 @@ namespace karri {
         TransferPoint transfer;
         const PDLoc *dropoff = nullptr;
 
-        RequestCost cost;
-
         int pickupIdx = INVALID_INDEX;
         int transferIdxPVeh = INVALID_INDEX;
         int transferIdxDVeh = INVALID_INDEX;
@@ -128,7 +131,6 @@ namespace karri {
         int distToDropoff; // distance from previous stop to dropoff (or from transfer point if transferIdxDVeh == dropoffIdx)
         int distFromDropoff; // distance from dropoff to next stop (or 0 if there is no next stop)
 
-        RequestCost costPVeh; // Cost of the trip until the passenger arrives at the transfer point
         int waitTimeAtPickup; // Wait time at pickup
 
         // For statistics
@@ -138,7 +140,6 @@ namespace karri {
         enum INS_TYPES transferTypeDVeh = NOT_SET;
         enum INS_TYPES dropoffType = NOT_SET;
 
-        int tripTimePVeh;
         int tripTimeDVeh;
 
         // Used to test the insertions of the assignments
@@ -149,12 +150,6 @@ namespace karri {
         int arrAtDropoff;
     
         bool transferAtStopPVeh;
-        bool dropoffAtStop;
-        int initalPickupDetour;
-        int initalTransferDetour;
-        int initialDropoffDetour;
-
-        int maxDepAtPickup;
     };
 
 }

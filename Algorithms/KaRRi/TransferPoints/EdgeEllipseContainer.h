@@ -24,40 +24,40 @@
 
 #pragma once
 
-#include "Algorithms/KaRRi/RouteState.h"
-#include "Algorithms/CH/CH.h"
-#include "DataStructures/Labels/BasicLabelSet.h"
-#include "Algorithms/Dijkstra/Dijkstra.h"
+#include <vector>
 #include "VertexInEllipse.h"
-#include "DataStructures/Containers/TimestampedVector.h"
-#include "DataStructures/Containers/FastResetFlagArray.h"
+#include <kassert/kassert.hpp>
 
 namespace karri {
+    struct EdgeEllipseContainer {
 
-        struct CHEllipseReconstructorStats {
-            int numVerticesSettled = 0;
-            int numEdgesRelaxed = 0;
-            int64_t initTime = 0;
-            int64_t topoSearchTime = 0;
-            int64_t postprocessTime = 0;
+        EdgeEllipseContainer() = default;
 
-            void reset() {
-                numVerticesSettled = 0;
-                numEdgesRelaxed = 0;
-                initTime = 0;
-                topoSearchTime = 0;
-                postprocessTime = 0;
-            }
-
-            CHEllipseReconstructorStats& operator+=(const CHEllipseReconstructorStats& other) {
-                numVerticesSettled += other.numVerticesSettled;
-                numEdgesRelaxed += other.numEdgesRelaxed;
-                initTime += other.initTime;
-                topoSearchTime += other.topoSearchTime;
-                postprocessTime += other.postprocessTime;
-                return *this;
-            }
-        };
+        const std::vector<EdgeInEllipse> &getEdgesInEllipse(const int stopId) const {
+            KASSERT(stopId < static_cast<int>(idxOfStop.size()));
+            const auto idx = idxOfStop[stopId];
+            // KASSERT(idx != INVALID_INDEX);
+            if (idx == INVALID_INDEX)
+                return empty;
+            
+            return edgeEllipses[idx];
+        }
 
 
-} // karri
+    private:
+        template<typename, typename, typename, bool, int, typename, typename, typename>
+        friend class CHEllipseReconstructor;
+
+        // Maps a stop ID to an internal index in the vector of stop IDs.
+        std::vector<int> idxOfStop;
+        std::vector<std::vector<EdgeInEllipse>> edgeEllipses;
+
+        std::vector<EdgeInEllipse> empty;
+    };
+
+    struct NoOpEdgeEllipseContainer {
+        std::vector<EdgeInEllipse> getEdgesInEllipse(const int) const {
+            return {};
+        }
+    };
+}

@@ -308,7 +308,7 @@ namespace karri {
             systemStateUpdater.writeBestAssignmentToLogger();
 
             if (asgnFinderResponse.improvementThroughTransfer()) {
-                applyAssignmentWithTransfer(asgnFinderResponse.getBestAssignmentWithTransfer(), reqId);
+                applyAssignmentWithTransfer(asgnFinderResponse.getBestAssignmentWithTransfer(), asgnFinderResponse.getBestCostWithTransfer(), reqId);
             } else {
                 applyAssignment(asgnFinderResponse, reqId, occTime);
             }
@@ -323,7 +323,7 @@ namespace karri {
         }
 
         template<typename AssignmentWithTransferT>
-        void applyAssignmentWithTransfer(const AssignmentWithTransferT &asgn, const int reqId) {
+        void applyAssignmentWithTransfer(const AssignmentWithTransferT &asgn, const int& cost, const int reqId) {
             if (!asgn.dVeh || !asgn.pVeh || !asgn.pickup || !asgn.dropoff) {
                 requestState[reqId] = FINISHED;
                 systemStateUpdater.writePerformanceLogs();
@@ -336,7 +336,7 @@ namespace karri {
             requestState[reqId] = ASSIGNED_TO_PVEH;
             requestData[reqId].walkingTimeToPickup = asgn.pickup->walkingDist;
             requestData[reqId].walkingTimeFromDropoff = asgn.dropoff->walkingDist;
-            requestData[reqId].assignmentCost = asgn.cost.total;
+            requestData[reqId].assignmentCost = cost;
             requestData[reqId].usingTransfer = true;
 
             requestData[reqId].arrAtTransferPoint = asgn.arrAtTransferPoint;
