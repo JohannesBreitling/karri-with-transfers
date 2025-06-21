@@ -102,7 +102,7 @@ namespace karri {
             return result;
         }
 
-        FlatRegular2DDistanceArray caluclateDistancesFromPickupsToAllTransfers(const std::vector<int>& pickupLocs, const std::vector<EdgeInEllipse>& transferPoints) {
+        FlatRegular2DDistanceArray calculateDistancesFromPickupsToAllTransfers(const std::vector<int>& pickupLocs, const std::vector<EdgeInEllipse>& transferPoints) {
             const int numTransferPoints = static_cast<int>(transferPoints.size());
             FlatRegular2DDistanceArray result(pickupLocs.size(), numTransferPoints);
 
@@ -144,7 +144,7 @@ namespace karri {
         }
 
         // Maps: dropoffLoc -> tpLoc -> distance transfer point to dropoff
-        FlatRegular2DDistanceArray caluclateDistancesFromAllTransfersToDropoffs(const std::vector<EdgeInEllipse>& transferPoints, const std::vector<int>& dropoffLocs) {
+        FlatRegular2DDistanceArray calculateDistancesFromAllTransfersToDropoffs(const std::vector<EdgeInEllipse>& transferPoints, const std::vector<int>& dropoffLocs) {
             const int numTransferPoints = static_cast<int>(transferPoints.size());
             FlatRegular2DDistanceArray result(dropoffLocs.size(), numTransferPoints);
 

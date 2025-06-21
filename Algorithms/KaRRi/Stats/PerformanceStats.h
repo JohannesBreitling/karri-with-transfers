@@ -26,6 +26,8 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <sstream>
 
 namespace karri::stats {
 
@@ -463,9 +465,6 @@ namespace karri::stats {
         int64_t numCandidateVehiclesDropoffORD;
         int64_t numCandidateVehiclesDropoffALS;
 
-        int64_t numPickups;
-        int64_t numDropoffs;
-
         // Stats for the tried assignments 
         int64_t numAssignmentsTriedPickupBNS;
         int64_t numAssignmentsTriedPickupORD;
@@ -482,6 +481,7 @@ namespace karri::stats {
         int64_t searchTimePickupALS;
         int64_t searchTimeLastStopToTransfer;
         int64_t searchTimePickupToTransfer;
+        int64_t searchTimeTransferToDropoff;
 
         static constexpr auto LOGGER_NAME = "perf_transf_als_pveh.csv";
         static constexpr auto LOGGER_COLS =
@@ -492,8 +492,6 @@ namespace karri::stats {
                 "num_vehs_pickup_als,"
                 "num_vehs_dropoff_ord,"
                 "num_vehs_dropoff_als,"
-                "num_pickups,"
-                "num_dropoffs,"
                 "num_assignments_pickup_bns,"
                 "num_assignments_pickup_ord,"
                 "num_assignments_pickup_als,"
@@ -503,7 +501,8 @@ namespace karri::stats {
                 "num_transfer_points,"
                 "search_time_pickup_als,"
                 "search_time_last_stop_to_transfer,"
-                "search_time_pickup_to_transfer\n";
+                "search_time_pickup_to_transfer,"
+                "search_time_transfer_to_dropoff\n";
 
         std::string getLoggerRow() const {
             std::stringstream ss;
@@ -514,8 +513,6 @@ namespace karri::stats {
                << numCandidateVehiclesPickupALS << ", "
                << numCandidateVehiclesDropoffORD << ", "
                << numCandidateVehiclesDropoffALS << ", "
-               << numPickups << ", "
-               << numDropoffs << ", "
                << numAssignmentsTriedPickupBNS << ", "
                << numAssignmentsTriedPickupORD << ", "
                << numAssignmentsTriedPickupALS << ", "
@@ -525,7 +522,8 @@ namespace karri::stats {
                << numTransferPoints << ", "
                << searchTimePickupALS << ", "
                << searchTimeLastStopToTransfer << ", "
-               << searchTimePickupToTransfer;
+               << searchTimePickupToTransfer << ", "
+               << searchTimeTransferToDropoff;
             return ss.str();
         }
 
@@ -541,8 +539,6 @@ namespace karri::stats {
             numCandidateVehiclesPickupALS = 0;
             numCandidateVehiclesDropoffORD = 0;
             numCandidateVehiclesDropoffALS = 0;
-            numPickups = 0;
-            numDropoffs = 0;
             numAssignmentsTriedPickupBNS = 0;
             numAssignmentsTriedPickupORD = 0;
             numAssignmentsTriedPickupALS = 0;
@@ -553,6 +549,7 @@ namespace karri::stats {
             searchTimePickupALS = 0;
             searchTimeLastStopToTransfer = 0;
             searchTimePickupToTransfer = 0;
+            searchTimeTransferToDropoff = 0;
         }
     };
 

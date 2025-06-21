@@ -137,13 +137,14 @@ namespace karri {
             innerTimer.restart();
             const auto lastStopToTransfersDistances = strategy.calculateDistancesFromLastStopToAllTransfers(relevantLastStopLocs,
                                                                                                             allTransferEdges);
-            const auto searchTimeTransferToDropoff = innerTimer.elapsed<std::chrono::nanoseconds>();
+            const auto searchTimeLastStopToTransfer = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             innerTimer.restart();
             // transferToDropoffDistances[i][j] stores the distance from i-th dropoff to the j-th edge in transferEdges
-            const auto transferToDropoffDistances = strategy.caluclateDistancesFromAllTransfersToDropoffs(allTransferEdges,
-                                                                                               dropoffLocs);
-            const auto searchTimeLastStopToTransfer = innerTimer.elapsed<std::chrono::nanoseconds>();
+            const auto transferToDropoffDistances = strategy.calculateDistancesFromAllTransfersToDropoffs(
+                    allTransferEdges,
+                    dropoffLocs);
+            const auto searchTimeTransferToDropoff = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             innerTimer.restart();
             findAssignmentsWithDropoffALS(relALSDropoffs, ellipseContainer, lastStopToTransfersDistances, transferToDropoffDistances);
