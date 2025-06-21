@@ -69,7 +69,7 @@ namespace karri {
             calc(calc),
             asserter(asserter),
             relPVehToInternalIdx(fleet.size(), INVALID_INDEX),
-            dVehIdFlags(fleet.size()),
+            dVehStopsFlags(fleet.size()),
             isEdgeRel(inputGraph.numEdges()),
             relEdgesToInternalIdx(inputGraph.numEdges()),
             bestCost(INFTY) {}
@@ -106,17 +106,13 @@ namespace karri {
 
             //* Collect the full ellipses of possible transfer points
             // Collect all stop ids of last stops of potential pickup vehicles (without als, as for pickup als we first have to search to the pickups and the from the pickups)
-            std::vector<int> relevantPVehIds;
-            std::vector<int> relevantDVehIds;
 
-            dVehIdFlags.reset();
             relPVehToInternalIdx.clear(); // Reset all back to INVALID_INDEX
 
             std::vector<int> relevantLastStopLocs;
 
             int numRelPVehs = 0;
             for (const auto pVehId: relORDPickups.getVehiclesWithRelevantPDLocs()) {
-                relevantPVehIds.push_back(pVehId);
                 relPVehToInternalIdx[pVehId] = numRelPVehs++;
 
                 const auto numStops = routeState.numStopsOf(pVehId);
@@ -127,7 +123,6 @@ namespace karri {
             for (const auto pVehId: relBNSPickups.getVehiclesWithRelevantPDLocs()) {
                 if (relPVehToInternalIdx[pVehId] != INVALID_INDEX)
                     continue;
-                relevantPVehIds.push_back(pVehId);
                 relPVehToInternalIdx[pVehId] = numRelPVehs++;
 
                 const auto numStops = routeState.numStopsOf(pVehId);
@@ -135,53 +130,62 @@ namespace karri {
                 relevantLastStopLocs.push_back(lastStopLocs);
             }
 
-            if (relevantPVehIds.empty())
+            if (relevantLastStopLocs.empty())
                 return;
 
+            if (dVehStopsFlags.size() <= routeState.getMaxStopId())
+                dVehStopsFlags.resize(routeState.getMaxStopId() + 1);
+            dVehStopsFlags.reset();
+            allTransferEdges.clear();
+            isEdgeRel.reset();
             for (const auto dVehId: relALSDropoffs.getVehiclesWithRelevantPDLocs()) {
-                if (routeState.numStopsOf(dVehId) <= 1)
+                const auto numStops = routeState.numStopsOf(dVehId);
+                if (numStops <= 1)
                     continue;
 
-                relevantDVehIds.push_back(dVehId);
-                dVehIdFlags.set(dVehId);
+                const auto& stopIds = routeState.stopIdsFor(dVehId);
+                for (int i = 0; i < numStops - 1; i++) {
+                    const auto stopId = stopIds[i];
+                    if (dVehStopsFlags.isSet(stopId))
+                        continue;
+                    dVehStopsFlags.set(stopId);
+                    const auto &ellipse = ellipseContainer.getEdgesInEllipse(stopId);
+                    for (const auto &e: ellipse) {
+                        if (isEdgeRel.isSet(e.edge))
+                            continue;
+                        relEdgesToInternalIdx[e.edge] = static_cast<int>(allTransferEdges.size());
+                        isEdgeRel.set(e.edge);
+                        allTransferEdges.push_back(e);
+                    }
+                }
             }
 
             for (const auto dVehId: relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
-                if (!dVehIdFlags.isSet(dVehId) && routeState.numStopsOf(dVehId) > 1) {
-                    relevantDVehIds.push_back(dVehId);
-                    dVehIdFlags.set(dVehId);
-                }
-            }
-
-            if (relevantDVehIds.empty())
-                return;
-
-            // Get all stop ids of the dropoff vehicles
-            std::vector<int> stopIdsDVehs;
-            for (const auto dVehId: relevantDVehIds) {
                 const auto numStops = routeState.numStopsOf(dVehId);
-                KASSERT(numStops > 1);
+                if (numStops <= 1)
+                    continue;
 
-                const auto stopIds = routeState.stopIdsFor(dVehId);
-
-                for (int i = 0; i < numStops - 1; i++) {
-                    stopIdsDVehs.push_back(stopIds[i]);
-                }
-            }
-
-            // Combine all potential locations from the ellipses
-            allTransferEdges.clear();
-            isEdgeRel.reset();
-            for (const int stopId: stopIdsDVehs) {
-                const auto &ellipse = ellipseContainer.getEdgesInEllipse(stopId);
-                for (const auto& e : ellipse) {
-                    if (isEdgeRel.isSet(e.edge))
+                const auto& rel = relORDDropoffs.relevantSpotsFor(dVehId);
+                const int latestRelevantStopIdx = std::min(numStops - 2, rel[rel.size() - 1].stopIndex);
+                const auto& stopIds = routeState.stopIdsFor(dVehId);
+                for (int i = 0; i <= latestRelevantStopIdx; ++i) {
+                    const auto stopId = stopIds[i];
+                    if (dVehStopsFlags.isSet(stopId))
                         continue;
-                    relEdgesToInternalIdx[e.edge] = static_cast<int>(allTransferEdges.size());
-                    isEdgeRel.set(e.edge);
-                    allTransferEdges.push_back(e);
+                    dVehStopsFlags.set(stopId);
+                    const auto &ellipse = ellipseContainer.getEdgesInEllipse(stopId);
+                    for (const auto &e: ellipse) {
+                        if (isEdgeRel.isSet(e.edge))
+                            continue;
+                        relEdgesToInternalIdx[e.edge] = static_cast<int>(allTransferEdges.size());
+                        isEdgeRel.set(e.edge);
+                        allTransferEdges.push_back(e);
+                    }
                 }
             }
+
+            if (allTransferEdges.empty())
+                return;
 
             const auto initTime = innerTimer.elapsed<std::chrono::nanoseconds>();
 
@@ -196,12 +200,12 @@ namespace karri {
             const auto searchTimePickupALS = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             std::vector<int> pickupLocs;
-            for (const auto& pickup: requestState.pickups) {
+            for (const auto &pickup: requestState.pickups) {
                 pickupLocs.push_back(pickup.loc);
             }
 
             std::vector<int> dropoffLocs;
-            for (const auto& dropoff: requestState.dropoffs) {
+            for (const auto &dropoff: requestState.dropoffs) {
                 dropoffLocs.push_back(dropoff.loc);
             }
 
@@ -226,10 +230,12 @@ namespace karri {
             numCandidateVehiclesDropoffALS += relALSDropoffs.getVehiclesWithRelevantPDLocs().size();
 
             innerTimer.restart();
-            findAssignmentsWithPickupBNS(relALSDropoffs, lastStopToTransfersDistances, transfersToDropoffsDistances, ellipseContainer);
-            findAssignmentsWithPickupORD(relALSDropoffs, lastStopToTransfersDistances, transfersToDropoffsDistances, ellipseContainer);
-            findAssignmentsWithPickupALS(pVehIdsALS, relALSDropoffs, pickupToTransfersDistances, transfersToDropoffsDistances, ellipseContainer);
-//            finishAssignmentsWithDropoffPairedLowerBound(postponedAssignments);
+            findAssignmentsWithPickupBNS(relALSDropoffs, lastStopToTransfersDistances, transfersToDropoffsDistances,
+                                         ellipseContainer);
+            findAssignmentsWithPickupORD(relALSDropoffs, lastStopToTransfersDistances, transfersToDropoffsDistances,
+                                         ellipseContainer);
+            findAssignmentsWithPickupALS(pVehIdsALS, relALSDropoffs, pickupToTransfersDistances,
+                                         transfersToDropoffsDistances, ellipseContainer);
             const auto tryAssignmentsTime = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             KASSERT(bestCost >= INFTY || asserter.assertAssignment(bestAssignment));
@@ -274,7 +280,7 @@ namespace karri {
             std::vector<AssignmentWithTransfer> placeholder;
             for (const auto pVehId: relORDPickups.getVehiclesWithRelevantPDLocs()) {
                 const auto *pVeh = &fleet[pVehId];
-                const auto& thisLastStopToTransfersDistances = lastStopToTransfersDistances[relPVehToInternalIdx[pVehId]];
+                const auto &thisLastStopToTransfersDistances = lastStopToTransfersDistances[relPVehToInternalIdx[pVehId]];
 
                 for (const auto &pickup: relORDPickups.relevantSpotsFor(pVehId)) {
                     tryDropoffORD(pVeh, &pickup, placeholder, thisLastStopToTransfersDistances,
@@ -299,7 +305,7 @@ namespace karri {
             for (const auto pVehId: relBNSPickups.getVehiclesWithRelevantPDLocs()) {
                 postponedAssignments.clear();
                 auto *pVeh = &fleet[pVehId];
-                const auto& thisLastStopToTransfersDistances = lastStopToTransfersDistances[relPVehToInternalIdx[pVehId]];
+                const auto &thisLastStopToTransfersDistances = lastStopToTransfersDistances[relPVehToInternalIdx[pVehId]];
 
                 for (const auto &pickup: relORDPickups.relevantSpotsFor(pVehId)) {
                     tryDropoffORD(pVeh, &pickup, postponedAssignments, thisLastStopToTransfersDistances,
@@ -329,8 +335,10 @@ namespace karri {
                     KASSERT(!relALSDropoffs.getVehiclesWithRelevantPDLocs().empty() ||
                             !relORDDropoffs.getVehiclesWithRelevantPDLocs().empty());
                     const auto &thisPickupToTransfersDistances = pickupToTransfersDistances[pickup.id];
-                    tryDropoffORDForPickupALS(pVeh, &pickup, distanceToPickup, thisPickupToTransfersDistances, transfersToDropoffsDistances, ellipseContainer);
-                    tryDropoffALSForPickupALS(pVeh, &pickup, distanceToPickup, thisPickupToTransfersDistances, relALSDropoffs, ellipseContainer);
+                    tryDropoffORDForPickupALS(pVeh, &pickup, distanceToPickup, thisPickupToTransfersDistances,
+                                              transfersToDropoffsDistances, ellipseContainer);
+                    tryDropoffALSForPickupALS(pVeh, &pickup, distanceToPickup, thisPickupToTransfersDistances,
+                                              relALSDropoffs, ellipseContainer);
                 }
             }
         }
@@ -338,7 +346,7 @@ namespace karri {
 
         void tryDropoffORDForPickupALS(const Vehicle *pVeh, const PDLoc *pickup, const int distanceToPickup,
                                        const auto &thisPickupToTransfersDistances,
-                                       const auto& transfersToDropoffsDistances,
+                                       const auto &transfersToDropoffsDistances,
                                        const EdgeEllipseContainer &ellipseContainer) {
             const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
 
@@ -362,7 +370,7 @@ namespace karri {
                         continue;
 
                     const auto *dropoff = &requestState.dropoffs[relDropoff.pdId];
-                    const auto& transfersToThisDropoffDistances = transfersToDropoffsDistances[relDropoff.pdId];
+                    const auto &transfersToThisDropoffDistances = transfersToDropoffsDistances[relDropoff.pdId];
 
                     for (int i = relDropoff.stopIndex; i > 0; i--) {
                         if (i >= numStopsDVeh - 1)
@@ -521,7 +529,7 @@ namespace karri {
         void tryDropoffORD(const Vehicle *pVeh, const RelevantPDLoc *pickup,
                            std::vector<AssignmentWithTransfer> &postponedAssignments,
                            const auto &thisLastStopToTransfersDistances,
-                           const auto& transfersToDropoffsDistances,
+                           const auto &transfersToDropoffsDistances,
                            const EdgeEllipseContainer &ellipseContainer) {
             const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
             const auto *pickupPDLoc = &requestState.pickups[pickup->pdId];
@@ -549,7 +557,7 @@ namespace karri {
 
                 for (const auto &dropoff: relORDDropoffs.relevantSpotsFor(dVehId)) {
                     const auto *dropoffPDLoc = &requestState.dropoffs[dropoff.pdId];
-                    const auto& transfersToThisDropoffDistances = transfersToDropoffsDistances[dropoff.pdId];
+                    const auto &transfersToThisDropoffDistances = transfersToDropoffsDistances[dropoff.pdId];
 
                     if (dropoff.stopIndex == numStopsDVeh - 1)
                         continue;
@@ -1000,7 +1008,7 @@ namespace karri {
         std::vector<EdgeInEllipse> allTransferEdges;
 
         TimestampedVector<int> relPVehToInternalIdx; // Maps vehicle IDs of relevant pVehs to consecutive indices
-        FastResetFlagArray <> dVehIdFlags; // Helper to deduplicate dropoff vehicles
+        FastResetFlagArray<> dVehStopsFlags; // Helper to deduplicate stops of dropoff vehicles
         FastResetFlagArray<> isEdgeRel; // Helper structure to deduplicate transfer edges
         std::vector<int> relEdgesToInternalIdx; // Maps transfer edges to consecutive indices
 

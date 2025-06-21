@@ -163,9 +163,6 @@ namespace karri {
             stats.numCandidateVehiclesDropoffORD += numCandidateVehiclesDropoffORD;
             stats.numCandidateVehiclesDropoffALS += numCandidateVehiclesDropoffALS;
 
-            stats.numPickups += requestState.numPickups();
-            stats.numDropoffs += requestState.numDropoffs();
-
             stats.numAssignmentsTriedPickupBNS += numAssignmentsTriedPickupBNS;
             stats.numAssignmentsTriedPickupORD += numAssignmentsTriedPickupORD;
             stats.numAssignmentsTriedPickupALS += numAssignmentsTriedPickupALS;

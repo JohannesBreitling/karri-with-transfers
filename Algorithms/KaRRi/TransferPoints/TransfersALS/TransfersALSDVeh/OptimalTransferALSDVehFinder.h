@@ -56,7 +56,7 @@ namespace karri {
             routeState(routeState),
             requestState(requestState),
             calc(routeState),
-            pVehFlags(fleet.size()),
+            pVehStopsFlags(fleet.size()),
             isEdgeRel(inputGraph.numEdges()),
             relEdgesToInternalIdx(inputGraph.numEdges()),
             asserter(asserter) {}
@@ -84,16 +84,21 @@ namespace karri {
             }
 
             // Collect the relevant transfer locs
+            if (pVehStopsFlags.size() <= routeState.getMaxStopId())
+                pVehStopsFlags.resize(routeState.getMaxStopId() + 1);
+            pVehStopsFlags.reset();
             allTransferEdges.clear();
-            pVehFlags.reset();
             isEdgeRel.reset();
             for (const int pVehId: relORDPickups.getVehiclesWithRelevantPDLocs()) {
                 const int numStops = routeState.numStopsOf(pVehId);
                 const auto stopIds = routeState.stopIdsFor(pVehId);
-                pVehFlags.set(pVehId);
-
-                for (int i = 1; i < numStops - 1; i++) {
-                    const auto &ellipse = ellipseContainer.getEdgesInEllipse(stopIds[i]);
+                const int earliestRelevantStopIdx = relORDPickups.relevantSpotsFor(pVehId)[0].stopIndex;
+                for (int i = earliestRelevantStopIdx; i < numStops - 1; ++i) {
+                    const auto stopId = stopIds[i];
+                    if (pVehStopsFlags.isSet(stopId))
+                        continue;
+                    pVehStopsFlags.set(stopId);
+                    const auto &ellipse = ellipseContainer.getEdgesInEllipse(stopId);
                     for (const auto& e : ellipse) {
                         if (isEdgeRel.isSet(e.edge))
                             continue;
@@ -105,14 +110,14 @@ namespace karri {
             }
 
             for (const int pVehId: relBNSPickups.getVehiclesWithRelevantPDLocs()) {
-                if (pVehFlags.isSet(pVehId))
-                    continue;
-
                 const int numStops = routeState.numStopsOf(pVehId);
                 const auto stopIds = routeState.stopIdsFor(pVehId);
 
-                for (int i = 1; i < numStops - 1; i++) {
-                    const auto &ellipse = ellipseContainer.getEdgesInEllipse(stopIds[i]);
+                for (int i = 1; i < numStops - 1; i++) {const auto stopId = stopIds[i];
+                    if (pVehStopsFlags.isSet(stopId))
+                        continue;
+                    pVehStopsFlags.set(stopId);
+                    const auto &ellipse = ellipseContainer.getEdgesInEllipse(stopId);
                     for (const auto& e : ellipse) {
                         if (isEdgeRel.isSet(e.edge))
                             continue;
@@ -142,8 +147,7 @@ namespace karri {
             innerTimer.restart();
             // transferToDropoffDistances[i][j] stores the distance from i-th dropoff to the j-th edge in transferEdges
             const auto transferToDropoffDistances = strategy.calculateDistancesFromAllTransfersToDropoffs(
-                    allTransferEdges,
-                    dropoffLocs);
+                    allTransferEdges, dropoffLocs);
             const auto searchTimeTransferToDropoff = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             innerTimer.restart();
@@ -566,7 +570,7 @@ namespace karri {
 
         std::vector<EdgeInEllipse> allTransferEdges;
 
-        FastResetFlagArray<> pVehFlags; // Helper structure to deduplicate vehicles
+        FastResetFlagArray<> pVehStopsFlags; // Helper structure to deduplicate stops of pickup vehicles
 
         FastResetFlagArray<> isEdgeRel; // Helper structure to deduplicate transfer edges
         std::vector<int> relEdgesToInternalIdx; // Maps transfer edges to consecutive indices
