@@ -40,14 +40,33 @@ namespace karri {
             fullSelection.subGraph.permuteVertices(perm);
         }
 
-        // Maps: lastStopLoc -> tpLoc -> distance last stop to transfer
-        std::map<int, std::map<int, int>> calculateDistancesFromLastStopToAllTransfers(const std::vector<int>& lastStopLocs, const std::vector<EdgeInEllipse>& transferPoints) {
-            std::map<int, std::map<int, int>> result;
+        struct FlatRegular2DDistanceArray {
 
-            if (lastStopLocs.size() == 0 || transferPoints.size() == 0)
+            ConstantVectorRange<int> operator[](const int row) const {
+                KASSERT(row >= 0 && (width == 0 || row < distances.size() / width));
+                return {distances.begin() + row * width, distances.begin() + (row + 1) * width};
+            }
+
+        private:
+
+            friend OptimalPHASTStrategyALS;
+
+            // Constructs a 2D distance array with numRows rows and rowWidth distances per row.
+            // No initialization of values takes place.
+            FlatRegular2DDistanceArray(const int numRows, const int rowWidth) : width(rowWidth), distances(numRows * rowWidth) {}
+
+
+            int width; // Number of distances per row
+            std::vector<int> distances;
+        };
+
+        FlatRegular2DDistanceArray calculateDistancesFromLastStopToAllTransfers(const std::vector<int>& lastStopLocs, const std::vector<EdgeInEllipse>& transferPoints) {
+            const int numTransferPoints = static_cast<int>(transferPoints.size());
+            FlatRegular2DDistanceArray result(lastStopLocs.size(), numTransferPoints);
+
+            if (lastStopLocs.empty() || transferPoints.empty())
                 return result;
 
-            
             // Build selection with all transfer points
             std::vector<int> targetRanks;
             for (const auto edgeInEllipse : transferPoints) {
@@ -59,37 +78,33 @@ namespace karri {
 
             RPHASTSelection transferSelection = targetsSelection.run(targetRanks);
             
-            for (const int lastStopLoc : lastStopLocs) {
+            for (int i = 0; i < lastStopLocs.size(); i++) {
+                const int lastStopLoc = lastStopLocs[i];
                 const auto lastStopVertex = inputGraph.edgeHead(lastStopLoc);
                 const auto lastStopRank = vehCh.rank(lastStopVertex);
                 
                 forwardQuery.run(transferSelection, lastStopRank);
-                
-                // std::vector<int> distances;
-                for (int i = 0; i < transferPoints.size(); i++) {
+
+                const int idxOffset = i * result.width;
+                for (int j = 0; j < transferPoints.size(); j++) {
                     // Get the rank of the transfer point
-                    const int tpLoc = transferPoints[i].edge;
+                    const int tpLoc = transferPoints[j].edge;
                     const int tpTail = inputGraph.edgeTail(tpLoc); 
                     const int tpRank = vehCh.rank(tpTail);
                     const int tpRankSelection = transferSelection.fullToSubMapping[tpRank];
                     const int distance = forwardQuery.getDistance(tpRankSelection);
                     const int offset = inputGraph.travelTime(tpLoc);
-                    
-                    result[lastStopLoc][tpLoc] = distance + offset;
-                    // distances.push_back();
+
+                    result.distances[idxOffset + j] = distance + offset;
                 }
-                
-                // KASSERT(distances.size() == transferPoints.size());
-                // result[lastStopId] = distances;
             }
 
             return result;
         }
 
-
-        // Maps: pickupLoc -> tpLoc -> distance pickup to transfer point
-        std::map<int, std::map<int, int>> caluclateDistancesFromPickupsToAllTransfers(const std::vector<int>& pickupLocs, const std::vector<EdgeInEllipse>& transferPoints) {
-            std::map<int, std::map<int, int>> result;
+        FlatRegular2DDistanceArray caluclateDistancesFromPickupsToAllTransfers(const std::vector<int>& pickupLocs, const std::vector<EdgeInEllipse>& transferPoints) {
+            const int numTransferPoints = static_cast<int>(transferPoints.size());
+            FlatRegular2DDistanceArray result(pickupLocs.size(), numTransferPoints);
 
             if (pickupLocs.empty() || transferPoints.empty())
                 return result;
@@ -105,35 +120,35 @@ namespace karri {
             RPHASTSelection transferSelection = targetsSelection.run(targetRanks);
             
 
-            for (const int pickupLoc : pickupLocs) {
+            for (auto i = 0; i < pickupLocs.size(); ++i) {
+                const int pickupLoc = pickupLocs[i];
                 const auto pickupVertex = inputGraph.edgeHead(pickupLoc);
                 const auto pickupRank = vehCh.rank(pickupVertex);
                 
                 forwardQuery.run(transferSelection, pickupRank);
-                
-                std::vector<int> distances;
-                for (int i = 0; i < transferPoints.size(); i++) {
-                    const int tpLoc = transferPoints[i].edge;
+
+                const int idxOffset = i * result.width;
+                for (int j = 0; j < transferPoints.size(); j++) {
+                    const int tpLoc = transferPoints[j].edge;
                     const int tpTail = inputGraph.edgeTail(tpLoc);
                     const int tpRank = vehCh.rank(tpTail);
                     const int tpRankInSelection = transferSelection.fullToSubMapping[tpRank];
                     const int distance = forwardQuery.getDistance(tpRankInSelection);
                     const int offset = inputGraph.travelTime(tpLoc);
-                    
-                    result[pickupLoc][tpLoc] = distance + offset;
-                }
 
-                // result[pickupLoc] = distances;                
+                    result.distances[idxOffset + j] = distance + offset;
+                }
             }
 
             return result;
         }
 
         // Maps: dropoffLoc -> tpLoc -> distance transfer point to dropoff
-        std::map<int, std::map<int, int>> caluclateDistancesFromAllTransfersToDropoffs(const std::vector<EdgeInEllipse>& transferPoints, const std::vector<int>& dropoffLocs) {
-            std::map<int, std::map<int, int>> result;
+        FlatRegular2DDistanceArray caluclateDistancesFromAllTransfersToDropoffs(const std::vector<EdgeInEllipse>& transferPoints, const std::vector<int>& dropoffLocs) {
+            const int numTransferPoints = static_cast<int>(transferPoints.size());
+            FlatRegular2DDistanceArray result(dropoffLocs.size(), numTransferPoints);
 
-            if (dropoffLocs.size() == 0 || transferPoints.size() == 0)
+            if (dropoffLocs.empty() || transferPoints.empty())
                 return result;
 
             std::vector<int> sourceRanks;
@@ -146,33 +161,27 @@ namespace karri {
 
             RPHASTSelection transferSelection = sourcesSelection.run(sourceRanks);
 
-            for (const int dropoffLoc : dropoffLocs) {
+            for (auto i = 0; i < dropoffLocs.size(); ++i) {
+                const int dropoffLoc = dropoffLocs[i];
                 const auto dropoffVertex = inputGraph.edgeTail(dropoffLoc);
                 const auto dropoffRank = vehCh.rank(dropoffVertex);
                 const auto dropoffOffset = inputGraph.travelTime(dropoffLoc);
                 
                 reverseQuery.run(transferSelection, dropoffRank);
-                
-                for (int i = 0; i < transferPoints.size(); i++) {
-                    const int tpLoc = transferPoints[i].edge;
+
+                const int idxOffset = i * result.width;
+                for (int j = 0; j < transferPoints.size(); j++) {
+                    const int tpLoc = transferPoints[j].edge;
                     const int tpHead = inputGraph.edgeHead(tpLoc);
                     const int tpRank = vehCh.rank(tpHead);
                     const int tpRankInSelection = transferSelection.fullToSubMapping[tpRank];
                     const int distance = reverseQuery.getDistance(tpRankInSelection);
-                    
-                    result[dropoffLoc][tpLoc] = distance + dropoffOffset;
+
+                    result.distances[idxOffset + j] = distance + dropoffOffset;
                 }
             }
 
             return result;
-        }
-
-        int64_t getNumSearchesRun() {
-            return numSearchesRun;
-        }
-
-        int64_t getSearchTime() {
-            return searchTime;
         }
             
 
@@ -195,15 +204,6 @@ namespace karri {
         using Query = PHASTQuery<CH::SearchGraph, CH::Weight, BasicLabelSet<0, ParentInfo::NO_PARENT_INFO>, dij::NoCriterion>;
         Query forwardQuery;
         Query reverseQuery;
-        
-        // VehCHQuery vehChQuery;
-
-        
-
-        int64_t numSearchesRun;
-        int64_t searchTime;
-        // int64_t numEdgesRelaxed;
-        // int64_t numVerticesScanned;
     
     };
 

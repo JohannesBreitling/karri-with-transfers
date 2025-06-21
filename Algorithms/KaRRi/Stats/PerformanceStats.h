@@ -453,6 +453,7 @@ namespace karri::stats {
     struct AssignmentsWithTransferALSPVehPerformanceStats {
         // Overall stats
         int64_t totalTime;
+        int64_t initTime;
 
         // Stats for the PD Locs
         int64_t numCandidateVehiclesPickupBNS;
@@ -485,6 +486,7 @@ namespace karri::stats {
         static constexpr auto LOGGER_NAME = "perf_transf_als_pveh.csv";
         static constexpr auto LOGGER_COLS =
                 "total_time,"
+                "init_time,"
                 "num_vehs_pickup_bns,"
                 "num_vehs_pickup_ord,"
                 "num_vehs_pickup_als,"
@@ -506,6 +508,7 @@ namespace karri::stats {
         std::string getLoggerRow() const {
             std::stringstream ss;
             ss << totalTime << ", "
+                << initTime << ","
                << numCandidateVehiclesPickupBNS << ", "
                << numCandidateVehiclesPickupORD << ", "
                << numCandidateVehiclesPickupALS << ", "
@@ -532,6 +535,7 @@ namespace karri::stats {
 
         void clear() {
             totalTime = 0;
+            initTime = 0;
             numCandidateVehiclesPickupBNS = 0;
             numCandidateVehiclesPickupORD = 0;
             numCandidateVehiclesPickupALS = 0;
@@ -556,6 +560,7 @@ namespace karri::stats {
 
         // Overall stats
         int64_t totalTime;
+        int64_t initTime;
 
         // Stats for the PD Locs
         int64_t numCandidateVehiclesPickupBNS;
@@ -582,6 +587,7 @@ namespace karri::stats {
         static constexpr auto LOGGER_NAME = "perf_transf_als_dveh.csv";
         static constexpr auto LOGGER_COLS =
                 "total_time,"
+                "init_time,"
                 "num_vehs_pickup_bns,"
                 "num_vehs_pickup_ord,"
                 "num_vehs_dropoff_als,"
@@ -598,6 +604,7 @@ namespace karri::stats {
         std::string getLoggerRow() const {
             std::stringstream ss;
             ss << totalTime << ", "
+                << initTime << ", "
                << numCandidateVehiclesPickupBNS << ", "
                << numCandidateVehiclesPickupORD << ", "
                << numCandidateVehiclesDropoffALS << ", "
@@ -622,6 +629,7 @@ namespace karri::stats {
 
         void clear() {
             totalTime = 0;
+            initTime = 0;
             numCandidateVehiclesPickupBNS = 0;
             numCandidateVehiclesPickupORD = 0;
             numCandidateVehiclesDropoffALS = 0;
