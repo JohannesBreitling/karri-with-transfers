@@ -42,9 +42,14 @@ namespace karri {
 
         struct FlatRegular2DDistanceArray {
 
-            ConstantVectorRange<int> operator[](const int row) const {
+            ConstantVectorRange<int> getDistancesFor(const int row) const {
                 KASSERT(row >= 0 && (width == 0 || row < distances.size() / width));
                 return {distances.begin() + row * width, distances.begin() + (row + 1) * width};
+            }
+
+            int getMinDistanceFor(const int row) const {
+                KASSERT(row >= 0 && row < minDistancePerRow.size());
+                return minDistancePerRow[row];
             }
 
         private:
@@ -53,11 +58,12 @@ namespace karri {
 
             // Constructs a 2D distance array with numRows rows and rowWidth distances per row.
             // No initialization of values takes place.
-            FlatRegular2DDistanceArray(const int numRows, const int rowWidth) : width(rowWidth), distances(numRows * rowWidth) {}
+            FlatRegular2DDistanceArray(const int numRows, const int rowWidth) : width(rowWidth), distances(numRows * rowWidth), minDistancePerRow(numRows, INFTY) {}
 
 
             int width; // Number of distances per row
             std::vector<int> distances;
+            std::vector<int> minDistancePerRow;
         };
 
         FlatRegular2DDistanceArray calculateDistancesFromLastStopToAllTransfers(const std::vector<int>& lastStopLocs, const std::vector<EdgeInEllipse>& transferPoints) {
@@ -86,17 +92,19 @@ namespace karri {
                 forwardQuery.run(transferSelection, lastStopRank);
 
                 const int idxOffset = i * result.width;
+                int minDistanceInRow = INFTY;
                 for (int j = 0; j < transferPoints.size(); j++) {
                     // Get the rank of the transfer point
                     const int tpLoc = transferPoints[j].edge;
                     const int tpTail = inputGraph.edgeTail(tpLoc); 
                     const int tpRank = vehCh.rank(tpTail);
                     const int tpRankSelection = transferSelection.fullToSubMapping[tpRank];
-                    const int distance = forwardQuery.getDistance(tpRankSelection);
-                    const int offset = inputGraph.travelTime(tpLoc);
+                    const int distance = forwardQuery.getDistance(tpRankSelection) + inputGraph.travelTime(tpLoc);
 
-                    result.distances[idxOffset + j] = distance + offset;
+                    result.distances[idxOffset + j] = distance;
+                    minDistanceInRow = std::min(minDistanceInRow, distance);
                 }
+                result.minDistancePerRow[i] = minDistanceInRow;
             }
 
             return result;
@@ -128,16 +136,18 @@ namespace karri {
                 forwardQuery.run(transferSelection, pickupRank);
 
                 const int idxOffset = i * result.width;
+                int minDistanceInRow = INFTY;
                 for (int j = 0; j < transferPoints.size(); j++) {
                     const int tpLoc = transferPoints[j].edge;
                     const int tpTail = inputGraph.edgeTail(tpLoc);
                     const int tpRank = vehCh.rank(tpTail);
                     const int tpRankInSelection = transferSelection.fullToSubMapping[tpRank];
-                    const int distance = forwardQuery.getDistance(tpRankInSelection);
-                    const int offset = inputGraph.travelTime(tpLoc);
+                    const int distance = forwardQuery.getDistance(tpRankInSelection) + inputGraph.travelTime(tpLoc);
 
-                    result.distances[idxOffset + j] = distance + offset;
+                    result.distances[idxOffset + j] = distance;
+                    minDistanceInRow = std::min(minDistanceInRow, distance);
                 }
+                result.minDistancePerRow[i] = minDistanceInRow;
             }
 
             return result;
@@ -170,15 +180,18 @@ namespace karri {
                 reverseQuery.run(transferSelection, dropoffRank);
 
                 const int idxOffset = i * result.width;
+                int minDistanceInRow = INFTY;
                 for (int j = 0; j < transferPoints.size(); j++) {
                     const int tpLoc = transferPoints[j].edge;
                     const int tpHead = inputGraph.edgeHead(tpLoc);
                     const int tpRank = vehCh.rank(tpHead);
                     const int tpRankInSelection = transferSelection.fullToSubMapping[tpRank];
-                    const int distance = reverseQuery.getDistance(tpRankInSelection);
+                    const int distance = reverseQuery.getDistance(tpRankInSelection) + dropoffOffset;
 
-                    result.distances[idxOffset + j] = distance + dropoffOffset;
+                    result.distances[idxOffset + j] = distance;
+                    minDistanceInRow = std::min(minDistanceInRow, distance);
                 }
+                result.minDistancePerRow[i] = minDistanceInRow;
             }
 
             return result;
@@ -186,7 +199,6 @@ namespace karri {
             
 
     private:
-        // using VehCHQuery = typename VehCHEnvT::template FullCHQuery<>;
 
         const RouteState &routeState;
         const Fleet &fleet;

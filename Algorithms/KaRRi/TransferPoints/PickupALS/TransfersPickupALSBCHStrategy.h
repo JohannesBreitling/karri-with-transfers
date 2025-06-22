@@ -173,7 +173,7 @@ namespace karri::Transfers {
 
         Subset findPickupsAfterLastStop() {
             runBchSearches();
-
+            filterVehiclesBasedOnParetoDominance();
             return vehiclesSeenForPickups;
         }
 
@@ -230,6 +230,89 @@ namespace karri::Transfers {
             // totalNumEdgeRelaxations += search.getNumEdgeRelaxations();
             // totalNumVerticesSettled += search.getNumVerticesSettled();
             // totalNumEntriesScanned += search.getNumEntriesScanned();
+        }
+
+
+        bool dominates(const int vehId1, const int vehId2) {
+
+            const int stopIdx1 = routeState.numStopsOf(vehId1) - 1;
+            const int stopIdx2 = routeState.numStopsOf(vehId2) - 1;
+
+            using namespace time_utils;
+            using F = CostCalculator::CostFunction;
+            for (const auto& pickup : requestState.pickups) {
+                const auto distToPickup1 = getDistanceToPickup(vehId1, pickup.id);
+                const auto distToPickup2 = getDistanceToPickup(vehId2, pickup.id);
+                const auto depTimeAtPickup1 = getActualDepTimeAtPickup(vehId1, stopIdx1, distToPickup1, pickup,
+                                                                       requestState, routeState);
+                const auto depTimeAtPickup2 = getActualDepTimeAtPickup(vehId2, stopIdx2, distToPickup2, pickup,
+                                                                       requestState, routeState);
+                const auto vehTimeTillDepAtPickup1 =
+                        depTimeAtPickup1 - getVehDepTimeAtStopForRequest(vehId1, stopIdx1, requestState, routeState);
+                const auto vehTimeTillDepAtPickup2 =
+                        depTimeAtPickup2 - getVehDepTimeAtStopForRequest(vehId2, stopIdx2, requestState, routeState);
+                const auto psgTimeTillDepAtPickup1 = depTimeAtPickup1 - requestState.originalRequest.requestTime;
+                const auto psgTimeTillDepAtPickup2 = depTimeAtPickup2 - requestState.originalRequest.requestTime;
+
+                const auto detourDiff = vehTimeTillDepAtPickup1 - vehTimeTillDepAtPickup2;
+                const auto tripTimeDiff = psgTimeTillDepAtPickup1 - psgTimeTillDepAtPickup2;
+                const auto waitVioDiff = F::calcWaitViolationCost(depTimeAtPickup1, requestState) -
+                                         F::calcWaitViolationCost(depTimeAtPickup2, requestState);
+                const auto maxTripVioDiff = F::TRIP_VIO_WEIGHT * std::max(tripTimeDiff, 0);
+
+                const auto maxCostDiff = F::VEH_WEIGHT * detourDiff +
+                                         F::PSG_WEIGHT * tripTimeDiff +
+                        waitVioDiff + maxTripVioDiff;
+                if (maxCostDiff >= 0)
+                    return false; // vehId1 does not dominate vehId2 for this pickup
+            }
+
+            return true;
+        }
+
+        void filterVehiclesBasedOnParetoDominance() {
+            if (vehiclesSeenForPickups.empty())
+                return;
+
+            std::vector<int> indicesToKeep;
+            indicesToKeep.push_back(0);
+
+            for (int i = 1; i < vehiclesSeenForPickups.size(); ++i) {
+                const int vehId1 = *(vehiclesSeenForPickups.begin() + i);
+                bool isDominated = false;
+                for (const int idxOfVeh2 : indicesToKeep) {
+                    const int vehId2 = *(vehiclesSeenForPickups.begin() + idxOfVeh2);
+                    if (dominates(vehId2, vehId1)) {
+                        isDominated = true;
+                        break; // vehId1 is dominated by vehId2
+                    }
+                }
+                if (isDominated)
+                    continue;
+
+                // vehId1 is not dominated by any of the vehicles in indicesToKeep, so we keep it. Check if vehId1
+                // dominates any of the vehicles in indicesToKeep and if so remove them
+                indicesToKeep.push_back(i);
+                for (int j = 0; j < indicesToKeep.size();) {
+                    const int vehId2 = *(vehiclesSeenForPickups.begin() + indicesToKeep[j]);
+                    if (dominates(vehId1, vehId2)) {
+                        std::swap(indicesToKeep[j], indicesToKeep.back());
+                        indicesToKeep.pop_back();
+                        continue;
+                    }
+                    ++j;
+                }
+            }
+
+            // Remove all vehicles that are not in indicesToKeep from vehiclesSeenForPickups
+            for (auto& idx : indicesToKeep) {
+                idx = *(vehiclesSeenForPickups.begin() + idx);
+            }
+            vehiclesSeenForPickups.clear();
+            for (const auto &idx : indicesToKeep) {
+                vehiclesSeenForPickups.insert(idx);
+            }
+
         }
 
         const InputGraphT &inputGraph;

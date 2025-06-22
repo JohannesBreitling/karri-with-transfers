@@ -205,7 +205,7 @@ namespace karri {
                 const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
                 // const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
 
-                const auto& dVehDistancesToTransfer = lastStopToTransfersDistances[dVehIdxInSet];
+                const auto& dVehDistancesToTransfer = lastStopToTransfersDistances.getDistancesFor(dVehIdxInSet);
 
                 // Pickup BNS
                 for (const auto pVehId: relBNSPickups.getVehiclesWithRelevantPDLocs()) {
@@ -221,7 +221,7 @@ namespace karri {
 
                     for (const auto &dropoff: requestState.dropoffs) {
 
-                        const auto& distancesToDropoff = transferToDropoffDistances[dropoff.id];
+                        const auto& distancesToDropoff = transferToDropoffDistances.getDistancesFor(dropoff.id);
 
                         for (const auto &pickup: relBNSPickups.relevantSpotsFor(pVehId)) {
                             assert(pickup.stopIndex == 0);
@@ -332,7 +332,7 @@ namespace karri {
 
                     for (const auto &dropoff: requestState.dropoffs) {
 
-                        const auto& distancesToDropoff = transferToDropoffDistances[dropoff.id];
+                        const auto& distancesToDropoff = transferToDropoffDistances.getDistancesFor(dropoff.id);
 
                         //* Calculate the distances from the stops of the pVeh to the possible dropoffs
                         for (const auto &pickup: relORDPickups.relevantSpotsFor(pVehId)) {
