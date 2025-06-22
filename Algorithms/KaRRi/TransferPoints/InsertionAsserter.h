@@ -33,6 +33,10 @@ namespace karri {
             const auto stopLocations = routeState.stopLocationsFor(vehId);
             
             const int lastStop = stopLocations[numStops - 1];
+            if (lastStop == loc) {
+                // If the last stop is the same as the location, the distance is 0
+                return 0;
+            }
             return getDistanceBetweenLocations(lastStop, loc);
         }
 
