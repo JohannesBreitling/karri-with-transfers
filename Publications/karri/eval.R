@@ -70,22 +70,58 @@ quality <- function(file_base) {
 # Given the paths to the result files of two KaRRi runs, this functions checks
 # whether all assignments are the same in both runs.
 compareBestAssignments <- function(file1, file2) {
-  bestins1 <- read.csv(paste0(file1, ".bestassignments.csv"))
-  bestins2 <- read.csv(paste0(file2, ".bestassignments.csv"))
-    
-  bestins1 <- bestins1[order(bestins1$request_id),]
-  bestins2 <- bestins2[order(bestins2$request_id),]
+  overall1 <- read.csv(paste0(file1, ".bestassignmentsoverall.csv"))
+  overall2 <- read.csv(paste0(file2, ".bestassignmentsoverall.csv"))
   
-  # Get smallest row index where at least one value differs
-  idx <- match(TRUE, rowSums(bestins1 != bestins2) > 0)
-  if (is.na(idx)) {
-    print("All best insertions are equal.")
-  } else {
-    print(bestins1[idx, "request_id"])
-    row1 <- bestins1[idx,]
-    row2 <- bestins2[idx,]
-    View(rbind(row1, row2))
+  zerolegs1 <- read.csv(paste0(file1, ".bestassignmentswithoutvehicle.csv"))
+  zerolegs2 <- read.csv(paste0(file2, ".bestassignmentswithoutvehicle.csv"))
+  
+  oneleg1 <- read.csv(paste0(file1, ".bestassignmentswithouttransfer.csv"))
+  oneleg2 <- read.csv(paste0(file2, ".bestassignmentswithouttransfer.csv"))
+  
+  twolegs1 <- read.csv(paste0(file1, ".bestassignmentswithtransfer.csv"))
+  twolegs2 <- read.csv(paste0(file2, ".bestassignmentswithtransfer.csv"))
+  
+  for (i in 1:(nrow(overall1))) {
+    numlegs1 <- overall1$number_of_legs[i]
+    numlegs2 <- overall2$number_of_legs[i]
+    
+    if (numlegs1 != numlegs2) {
+      print(paste0(i, ": Number of legs 1: ", numlegs1, ", Number of legs 2: ", numlegs2))
+      return()
+    }
+    
+    if (numlegs1 == 0) {
+      row1 <- zerolegs1[i,]
+      row2 <- zerolegs2[i,]
+      if (rowSums(row1 != row2) > 0) {
+        print(zerolegs1[i, "request_id"])
+        View(rbind(row1, row2))
+        return()
+      }
+    }
+    
+    if (numlegs1 == 1) {
+      row1 <- oneleg1[i,]
+      row2 <- oneleg2[i,]
+      if (rowSums(row1 != row2) > 0) {
+        print(oneleg1[i, "request_id"])
+        View(rbind(row1, row2))
+        return()
+      }
+    }
+    
+    if (numlegs1 == 2) {
+      row1 <- twolegs1[i,]
+      row2 <- twolegs2[i,]
+      if (rowSums(row1 != row2) > 0) {
+        print(twolegs1[i, "request_id"])
+        View(rbind(row1, row2))
+        return()
+      }
+    }
   }
+  print("All best insertions are equal.")
 }
 
 compareBestAssignmentsWithTransfer <- function(file1, file2) {

@@ -202,7 +202,7 @@ namespace karri {
                 asgn.distFromDropoff = dropoffEntry.distFromPDLocToNextStop;
                 const auto cost = calculator.calc(asgn, requestState);
                 if (cost.total < requestState.getBestCost() || (cost.total == requestState.getBestCost() &&
-                                                          breakCostTie(asgn, requestState.getBestAssignment()))) {
+                                                          breakCostTie(asgn, requestState.getBestAssignmentWithoutTransfer()))) {
                     // Lower bound is better than best known cost => We need the exact distance to pickup.
                     // Return and postpone remaining combinations.
                     return dropoffIt;
@@ -246,7 +246,7 @@ namespace karri {
 
                 const auto cost = calculator.calc(asgn, requestState);
                 if (cost.total < requestState.getBestCost() || (cost.total == requestState.getBestCost() &&
-                                                          breakCostTie(asgn, requestState.getBestAssignment()))) {
+                                                          breakCostTie(asgn, requestState.getBestAssignmentWithoutTransfer()))) {
                     // Lower bound is better than best known cost => We need the exact distance to pickup.
                     // Return and postpone remaining combinations.
                     return dropoffIt;

@@ -404,7 +404,7 @@ namespace karri {
             requestEvents.deleteMin(id, key); // event for walking arrival at dest inserted at dropoff
             assert(id == reqId && key == occTime);
 
-            const auto &bestAsgn = asgnFinderResponse.getBestAssignment();
+            const auto &bestAsgn = asgnFinderResponse.getBestAssignmentWithoutTransfer();
             if (!bestAsgn.vehicle || !bestAsgn.pickup || !bestAsgn.dropoff) {
                 requestState[reqId] = FINISHED;
                 systemStateUpdater.writePerformanceLogs();

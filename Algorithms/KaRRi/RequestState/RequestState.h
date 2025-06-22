@@ -41,6 +41,13 @@ namespace karri {
     // Holds information relating to a specific request like its pickups and dropoffs and the best known assignment.
     struct RequestState {
 
+        enum BestAsgnType {
+            NOT_USING_VEHICLE,
+            ONE_LEG,
+            TWO_LEGS,
+            INVALID
+        };
+
         RequestState(const CostCalculator &calculator)
                 : originalRequest(),
                   originalReqDirectDist(-1),
@@ -115,12 +122,12 @@ namespace karri {
             return asgn.arrAtTransferPoint + std::max(0, delta);
         }
 
-        const Assignment &getBestAssignment() const {
-            return bestAssignment;
+        const Assignment &getBestAssignmentWithoutTransfer() const {
+            return bestAssignmentOneLeg;
         }
 
         const AssignmentWithTransfer &getBestAssignmentWithTransfer() const {
-            return bestAssignmentWithTransfer;
+            return bestAssignmentTwoLegs;
         }
 
         void tryFinishedTransferAssignmentWithKnownCost(AssignmentWithTransfer &asgn, const RequestCost& cost) {
@@ -135,37 +142,52 @@ namespace karri {
 
             KASSERT(cost == calculator.calc(asgn, *this));
 
-            if (cost.total < bestCostWithTransfer) {
-                bestAssignmentWithTransfer = AssignmentWithTransfer(asgn);
-                bestCostWithTransfer = cost.total;
-                bestCostObjectWT = cost;
-                notUsingVehicleIsBest = false;
-                notUsingVehicleDist = INFTY;
+            if (cost.total < bestCostTwoLegs) {
+                bestAssignmentTwoLegs = AssignmentWithTransfer(asgn);
+                bestCostTwoLegs = cost.total;
+                bestCostObjectTwoLegs = cost;
+
+                if (cost.total < bestCostOverall) {
+                    bestCostOverall = cost.total;
+                    bestAsgnOverallType = TWO_LEGS;
+                }
             }
         }
         
         bool improvementThroughTransfer() const {
-            return bestCostWithTransfer < bestCost;
+            return bestAsgnOverallType == TWO_LEGS;
         }
 
-        const RequestCost getCostObjectWithoutTransfer() const {
-            return bestCostObjectWOT;
+        const RequestCost &getCostObjectWithoutTransfer() const {
+            return bestCostObjectOneLeg;
         }
 
-        const RequestCost getCostObjectWithTransfer() const {
-            return bestCostObjectWT;
+        const RequestCost &getCostObjectWithTransfer() const {
+            return bestCostObjectTwoLegs;
+        }
+
+        const int &getBestCostWithoutUsingVehicle() const {
+            return bestCostZeroLegs;
+        }
+
+        const int &getBestCostWithoutTransfer() const {
+            return bestCostOneLeg;
         }
 
         const int &getBestCostWithTransfer() const {
-            return bestCostWithTransfer;
+            return bestCostTwoLegs;
         }
 
         int getBestCost() const {
-            return std::min(bestCost, bestCostWithTransfer);
+            return bestCostOverall;
+        }
+
+        BestAsgnType getBestAsgnType() const {
+            return bestAsgnOverallType;
         }
 
         bool isNotUsingVehicleBest() const {
-            return notUsingVehicleIsBest;
+            return bestAsgnOverallType == NOT_USING_VEHICLE;
         }
 
         const int &getNotUsingVehicleDist() const {
@@ -180,15 +202,18 @@ namespace karri {
         bool tryAssignmentWithKnownCost(const Assignment &asgn, const RequestCost cost) {
             assert(calculator.calc(asgn, *this).total == cost.total);
 
-            if (cost.total < INFTY && (cost.total < bestCost || (cost.total == bestCost &&
-                                    breakCostTie(asgn, bestAssignment)))) {
+            if (cost.total < INFTY && (cost.total < bestCostOneLeg || (cost.total == bestCostOneLeg &&
+                                    breakCostTie(asgn, bestAssignmentOneLeg)))) {
 
-                
-                bestAssignment = asgn;
-                bestCost = cost.total;
-                bestCostObjectWOT = cost;
-                notUsingVehicleIsBest = false;
-                notUsingVehicleDist = INFTY;
+                bestAssignmentOneLeg = asgn;
+                bestCostOneLeg = cost.total;
+                bestCostObjectOneLeg = cost;
+
+                if (cost.total < bestCostOverall) {
+                    bestCostOverall = cost.total;
+                    bestAsgnOverallType = ONE_LEG;
+                }
+
                 return true;
             }
             
@@ -197,11 +222,13 @@ namespace karri {
 
         void tryNotUsingVehicleAssignment(const int notUsingVehDist, const int travelTimeOfDestEdge) {
             const int cost = CostCalculator::calcCostForNotUsingVehicle(notUsingVehDist, travelTimeOfDestEdge, *this);
-            if (cost < bestCost) {
-                bestAssignment = Assignment();
-                bestCost = cost;
-                notUsingVehicleIsBest = true;
+            if (cost < bestCostZeroLegs) {
+                bestCostZeroLegs = cost;
                 notUsingVehicleDist = notUsingVehDist;
+                if (cost < bestCostOverall) {
+                    bestCostOverall = cost;
+                    bestAsgnOverallType = NOT_USING_VEHICLE;
+                }
             }
         }
 
@@ -230,15 +257,18 @@ namespace karri {
             pickups.clear();
             dropoffs.clear();
 
-            bestAssignment = Assignment();
-            bestAssignmentWithTransfer = AssignmentWithTransfer();
-            bestCost = INFTY;
-            bestCostWithTransfer = INFTY;
-            notUsingVehicleIsBest = false;
+            bestCostOverall = INFTY;
+            bestAsgnOverallType = INVALID;
+
+            bestAssignmentOneLeg = Assignment();
+            bestAssignmentTwoLegs = AssignmentWithTransfer();
+            bestCostZeroLegs = INFTY;
+            bestCostOneLeg = INFTY;
+            bestCostTwoLegs = INFTY;
             notUsingVehicleDist = INFTY;
 
-            bestCostObjectWOT = RequestCost::INFTY_COST();
-            bestCostObjectWT = RequestCost::INFTY_COST();
+            bestCostObjectOneLeg = RequestCost::INFTY_COST();
+            bestCostObjectTwoLegs = RequestCost::INFTY_COST();
         }
 
     private:
@@ -250,16 +280,19 @@ namespace karri {
         const CostCalculator &calculator;
 
         // Information about best known assignment for current request
-        Assignment bestAssignment;
-        AssignmentWithTransfer bestAssignmentWithTransfer;
+        int bestCostOverall;
+        BestAsgnType bestAsgnOverallType;
 
-        int bestCost;
-        int bestCostWithTransfer;
+        Assignment bestAssignmentOneLeg;
+        AssignmentWithTransfer bestAssignmentTwoLegs;
 
-        RequestCost bestCostObjectWT;
-        RequestCost bestCostObjectWOT;
+        int bestCostZeroLegs;
+        int bestCostOneLeg;
+        int bestCostTwoLegs;
 
-        bool notUsingVehicleIsBest;
+        RequestCost bestCostObjectOneLeg;
+        RequestCost bestCostObjectTwoLegs;
+
         int notUsingVehicleDist;
     };
 }

@@ -56,7 +56,18 @@ namespace karri {
                   routeState(routeState),
                   ellipticBucketsEnv(ellipticBucketsEnv),
                   lastStopBucketsEnv(lastStopBucketsEnv),
-                  bestAssignmentsLogger(LogManager<LoggerT>::getLogger("bestassignments.csv",
+                  bestAssignmentsOverallLogger(LogManager<LoggerT>::getLogger("bestassignmentsoverall.csv",
+                                                                              "request_id,"
+                                                                              "request_time,"
+                                                                              "direct_od_dist,"
+                                                                              "number_of_legs,"
+                                                                              "cost\n")),
+                  bestAssignmentsWithoutUsingVehicleLogger(LogManager<LoggerT>::getLogger("bestassignmentswithoutvehicle.csv",
+                                                                                          "request_id,"
+                                                                                          "request_time,"
+                                                                                          "direct_walking_dist,"
+                                                                                          "cost\n")),
+                  bestAssignmentsWithoutTransferLogger(LogManager<LoggerT>::getLogger("bestassignmentswithouttransfer.csv",
                                                                        "request_id,"
                                                                        "request_time,"
                                                                        "direct_od_dist,"
@@ -74,7 +85,6 @@ namespace karri {
                                                                        "num_stops,"
                                                                        "veh_dep_time_at_stop_before_pickup,"
                                                                        "veh_dep_time_at_stop_before_dropoff,"
-                                                                       "not_using_vehicle,"
                                                                        "cost\n")),
                   bestAssignmentsWithTransferLogger(LogManager<LoggerT>::getLogger("bestassignmentswithtransfer.csv",
                                                                                    "request_id,"
@@ -265,7 +275,7 @@ namespace karri {
                 return;
             }
 
-            const auto &asgn = requestState.getBestAssignment();
+            const auto &asgn = requestState.getBestAssignmentWithoutTransfer();
             requestState.chosenPDLocsRoadCategoryStats().incCountForCat(inputGraph.osmRoadCategory(asgn.pickup->loc));
             requestState.chosenPDLocsRoadCategoryStats().incCountForCat(inputGraph.osmRoadCategory(asgn.dropoff->loc));
             assert(asgn.vehicle != nullptr);
@@ -328,7 +338,32 @@ namespace karri {
 
         void writeBestAssignmentToLogger() {
             // Set up the best assignment for logging
-            bestAssignmentsLogger
+            int numLegs = -1;
+            switch (requestState.getBestAsgnType()) {
+                case RequestState::BestAsgnType::NOT_USING_VEHICLE:
+                    numLegs = 0; // Nothing to log
+                    break;
+                case RequestState::BestAsgnType::ONE_LEG:
+                    numLegs = 1;
+                    break;
+                case RequestState::BestAsgnType::TWO_LEGS:
+                    numLegs = 2;
+                    break;
+                default:
+                    numLegs = 0;
+            };
+            bestAssignmentsOverallLogger
+                    << requestState.originalRequest.requestId << ", "
+                    << requestState.originalRequest.requestTime << ", "
+                    << requestState.originalReqDirectDist << ", "
+                    << numLegs << ", "
+                    << requestState.getBestCost() << "\n";
+
+            bestAssignmentsWithoutUsingVehicleLogger
+                    << requestState.originalRequest.requestId << ", "
+                    << requestState.originalRequest.requestTime << ", ";
+
+            bestAssignmentsWithoutTransferLogger
                     << requestState.originalRequest.requestId << ", "
                     << requestState.originalRequest.requestTime << ", "
                     << requestState.originalReqDirectDist << ", ";
@@ -342,19 +377,16 @@ namespace karri {
             assignmentsCostLogger << requestState.originalRequest.requestId << ", "
                                   << requestState.stats().costStats.getLoggerRow() << "\n";
 
-            if (requestState.isNotUsingVehicleBest()) {
-                bestAssignmentsLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, true, "
-                                      << requestState.getBestCost() << "\n";
-                bestAssignmentsWithTransferLogger
-                        << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
-                return;
+            const int costWithoutVehicle = requestState.getBestCostWithoutUsingVehicle();
+            const int costWOT = requestState.getCostObjectWithoutTransfer().total;
+            const int costWT = requestState.getCostObjectWithTransfer().total;
+
+            if (costWithoutVehicle >= INFTY) {
+                bestAssignmentsWithoutUsingVehicleLogger << "-1,inf\n";
             }
 
-            const int costWT = requestState.getCostObjectWithTransfer().total;
-            const int costWOT = requestState.getCostObjectWithoutTransfer().total;
-
             if (costWOT >= INFTY) {
-                bestAssignmentsLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
+                bestAssignmentsWithoutTransferLogger << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,inf\n";
             }
 
             if (costWT >= INFTY) {
@@ -363,8 +395,13 @@ namespace karri {
             }
 
             using time_utils::getVehDepTimeAtStopForRequest;
+            if (costWithoutVehicle < INFTY) {
+                bestAssignmentsWithoutUsingVehicleLogger << requestState.getNotUsingVehicleDist() << ", "
+                                                         << requestState.getBestCostWithoutUsingVehicle() << "\n";
+            }
+
             if (costWOT < INFTY) {
-                const auto &bestAsgn = requestState.getBestAssignment();
+                const auto &bestAsgn = requestState.getBestAssignmentWithoutTransfer();
 
                 const auto &vehId = bestAsgn.vehicle->vehicleId;
                 const auto &numStops = routeState.numStopsOf(vehId);
@@ -372,7 +409,7 @@ namespace karri {
                                                                                    requestState, routeState);
                 const auto &vehDepTimeBeforeDropoff = getVehDepTimeAtStopForRequest(vehId, bestAsgn.dropoffStopIdx,
                                                                                     requestState, routeState);
-                bestAssignmentsLogger
+                bestAssignmentsWithoutTransferLogger
                         << vehId << ", "
                         << bestAsgn.pickupStopIdx << ", "
                         << bestAsgn.dropoffStopIdx << ", "
@@ -387,8 +424,7 @@ namespace karri {
                         << numStops << ", "
                         << vehDepTimeBeforePickup << ", "
                         << vehDepTimeBeforeDropoff << ", "
-                        << "false, "
-                        << requestState.getBestCost() << "\n";
+                        << requestState.getBestCostWithoutTransfer() << "\n";
             }
 
             if (costWT < INFTY) {
@@ -730,7 +766,9 @@ namespace karri {
         LastStopBucketsEnvT &lastStopBucketsEnv;
 
         // Performance Loggers
-        LoggerT &bestAssignmentsLogger;
+        LoggerT &bestAssignmentsOverallLogger;
+        LoggerT &bestAssignmentsWithoutUsingVehicleLogger;
+        LoggerT &bestAssignmentsWithoutTransferLogger;
         LoggerT &bestAssignmentsWithTransferLogger;
         LoggerT &overallPerfLogger;
         LoggerT &initializationPerfLogger;
