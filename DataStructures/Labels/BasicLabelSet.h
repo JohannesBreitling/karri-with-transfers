@@ -112,6 +112,12 @@ public:
             return isMarked[i];
         }
 
+        void set(const int i, const bool val) {
+            assert(i >= 0);
+            assert(i < K);
+            isMarked[i] = val;
+        }
+
         std::array<int, K> toIntArray() const {
             std::array<int, K> arr;
             for (int i = 0; i < K; ++i) {

@@ -296,7 +296,7 @@ namespace karri {
                     calcLengthOfLegStartingAt(transferIdx, vehId, routeState);
             KASSERT(minTransferDetour >= 0);
             const int minResDetour = std::max(0, minTransferDetour - vehWaitTimeFromTransferToEndOfRoute);
-            int minTripTime = e.distFromHead;
+            int minTripTime = transferIdx == earliestDropoffIdx? 0 : e.distFromHead;
             int minAddedTripTime = 0;
             if (transferIdx < earliestDropoffIdx) {
                 const int minArrStopBeforeDropoff =
@@ -394,10 +394,12 @@ namespace karri {
                 for (const auto &pickup: requestState.pickups) {
                     // Get the distance from the last stop of the pVeh to the pickup
                     const int distanceToPickup = pickupALSStrategy.getDistanceToPickup(pVehId, pickup.id);
-                    KASSERT(distanceToPickup < INFTY);
+                    if (distanceToPickup >= INFTY)
+                        continue; // Pickup is not reachable
 
                     const int minDistToTransfer = pickupToTransfersDistances.getMinDistanceFor(pickup.id);
-                    KASSERT(minDistToTransfer < INFTY);
+                    if (minDistToTransfer >= INFTY)
+                        continue; // No transfer is reachable from this pickup
 
                     // Prune if lower bound for cost of pickup vehicle with this pickup is worse than best known cost
                     using namespace time_utils;
@@ -472,11 +474,11 @@ namespace karri {
                             const auto edge = transferEdges[tpIdx];
                             const int transferLoc = edge.edge;
                             KASSERT(isEdgeRel.isSet(transferLoc));
+                            const int edgeOffset = inputGraph.travelTime(transferLoc);
 
                             if (minDVehCostForTransferEdge[relEdgesToInternalIdx[transferLoc]] >= requestState.getBestCost())
                                 continue;
 
-                            const int edgeOffset = inputGraph.travelTime(transferLoc);
                             const int distancePVehToTransfer = thisPickupToTransfersDistances[relEdgesToInternalIdx[transferLoc]];
                             // KASSERT(distancePVehToTransfer == asserter.getDistanceBetweenLocations(pickup->loc, transferLoc));
 

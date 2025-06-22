@@ -106,7 +106,7 @@ namespace karri::Transfers {
             }
 
             LabelMask
-            isWorseThanBestKnownVehicleDependent(const int vehId , const DistanceLabel &distancesToPickups) {
+            isWorseThanBestKnownVehicleDependent(const int vehId, const DistanceLabel &distancesToPickups) {
                 if (strat.upperBoundCost >= INFTY) {
                     // If current best is INFTY, only indices i with distancesToDropoffs[i] >= INFTY are worse than
                     // the current best.
@@ -122,7 +122,8 @@ namespace karri::Transfers {
                 depTimeAtPickups.max(strat.curPassengerArrTimesAtPickups);
                 const auto tripTimeTillDepAtPickup = depTimeAtPickups - strat.requestState.originalRequest.requestTime;
                 DistanceLabel costLowerBound = calc.template calcLowerBoundCostForKPairedPickupAndTransferAssignmentsAfterLastStop<LabelSetT>(
-                        detourTillDepAtPickup, tripTimeTillDepAtPickup, strat.requestState.minDirectPDDist, strat.currentPickupWalkingDists,
+                        detourTillDepAtPickup, tripTimeTillDepAtPickup, strat.requestState.minDirectPDDist,
+                        strat.currentPickupWalkingDists,
                         strat.requestState);
 
                 costLowerBound.setIf(INFTY, ~(distancesToPickups < INFTY));
@@ -158,6 +159,7 @@ namespace karri::Transfers {
                   fleet(fleet),
                   calculator(calculator),
                   pdDistances(pdDistances),
+                  lastStopBucketsEnv(lastStopBucketsEnv),
                   routeState(routeState),
                   requestState(requestState),
                   distances(fleet.size()),
@@ -186,21 +188,10 @@ namespace karri::Transfers {
             initPickupSearches();
             for (int i = 0; i < requestState.numPickups(); i += K)
                 runSearchesForPickupBatch(i);
-
-            // const auto searchTime = timer.elapsed<std::chrono::nanoseconds>();
-            // requestState.stats().palsAssignmentsStats.searchTime += searchTime;
-            // requestState.stats().palsAssignmentsStats.numEdgeRelaxationsInSearchGraph += totalNumEdgeRelaxations;
-            // requestState.stats().palsAssignmentsStats.numVerticesOrLabelsSettled += totalNumVerticesSettled;
-            // requestState.stats().palsAssignmentsStats.numEntriesOrLastStopsScanned += totalNumEntriesScanned;
-            // requestState.stats().palsAssignmentsStats.numCandidateVehicles += vehiclesSeenForPickups.size();
         }
 
 
         void initPickupSearches() {
-            // totalNumEdgeRelaxations = 0;
-            // totalNumVerticesSettled = 0;
-            // otalNumEntriesScanned = 0;
-
             upperBoundCost = requestState.getBestCost();
             vehiclesSeenForPickups.clear();
             const int numPickupBatches = requestState.numPickups() / K + (requestState.numPickups() % K != 0);
@@ -210,6 +201,7 @@ namespace karri::Transfers {
         void runSearchesForPickupBatch(const int firstPickupId) {
             assert(firstPickupId % K == 0 && firstPickupId < requestState.numPickups());
 
+            distances.setCurBatchIdx(firstPickupId / K);
 
             std::array<int, K> pickupTails;
             std::array<int, K> travelTimes;
@@ -222,14 +214,21 @@ namespace karri::Transfers {
                 currentPickupWalkingDists[i] = pickup.walkingDist;
                 curPassengerArrTimesAtPickups[i] = requestState.getPassengerArrAtPickup(pickup.id);
                 curDistancesToDest[i] = pdDistances.getDirectDistance(pickup.id, 0);
+
+                // Initialize distance to 0 for every last stop coinciding with the pickup
+                const int head = inputGraph.edgeHead(pickup.loc);
+                for (const auto &vehId: lastStopBucketsEnv.vehiclesWithLastStopAt(head)) {
+                    const auto numStops = routeState.numStopsOf(vehId);
+                    if (routeState.stopLocationsFor(vehId)[numStops - 1] != pickup.loc)
+                        continue;
+                    LabelMask pickupMask = false;
+                    pickupMask.set(i, true);
+                    distances.setDistancesForCurBatchIf(vehId, 0, pickupMask);
+                    vehiclesSeenForPickups.insert(vehId);
+                }
             }
 
-            distances.setCurBatchIdx(firstPickupId / K);
             search.run(pickupTails, travelTimes);
-
-            // totalNumEdgeRelaxations += search.getNumEdgeRelaxations();
-            // totalNumVerticesSettled += search.getNumVerticesSettled();
-            // totalNumEntriesScanned += search.getNumEntriesScanned();
         }
 
 
@@ -240,9 +239,11 @@ namespace karri::Transfers {
 
             using namespace time_utils;
             using F = CostCalculator::CostFunction;
-            for (const auto& pickup : requestState.pickups) {
+            for (const auto &pickup: requestState.pickups) {
                 const auto distToPickup1 = getDistanceToPickup(vehId1, pickup.id);
                 const auto distToPickup2 = getDistanceToPickup(vehId2, pickup.id);
+                if (distToPickup1 == INFTY && distToPickup2 == INFTY)
+                    continue; // Both vehicles cannot reach the pickup, so they are equal
                 const auto depTimeAtPickup1 = getActualDepTimeAtPickup(vehId1, stopIdx1, distToPickup1, pickup,
                                                                        requestState, routeState);
                 const auto depTimeAtPickup2 = getActualDepTimeAtPickup(vehId2, stopIdx2, distToPickup2, pickup,
@@ -255,14 +256,18 @@ namespace karri::Transfers {
                 const auto psgTimeTillDepAtPickup2 = depTimeAtPickup2 - requestState.originalRequest.requestTime;
 
                 const auto detourDiff = vehTimeTillDepAtPickup1 - vehTimeTillDepAtPickup2;
-                const auto tripTimeDiff = psgTimeTillDepAtPickup1 - psgTimeTillDepAtPickup2;
                 const auto waitVioDiff = F::calcWaitViolationCost(depTimeAtPickup1, requestState) -
                                          F::calcWaitViolationCost(depTimeAtPickup2, requestState);
-                const auto maxTripVioDiff = F::TRIP_VIO_WEIGHT * std::max(tripTimeDiff, 0);
+
+                // Upper bound for how much smaller the trip time of vehId2 can be compared to vehId1.
+                // We need to max with 0 since the dropoff vehicle may arrive at the transfer later than the pickup
+                // vehicle, which may dominate the trip time, negating a possible advantage of vehId1.
+                const auto maxTripTimeDiff = std::max(psgTimeTillDepAtPickup1 - psgTimeTillDepAtPickup2, 0);
+                const auto maxTripVioDiff = F::TRIP_VIO_WEIGHT * maxTripTimeDiff;
 
                 const auto maxCostDiff = F::VEH_WEIGHT * detourDiff +
-                                         F::PSG_WEIGHT * tripTimeDiff +
-                        waitVioDiff + maxTripVioDiff;
+                                         F::PSG_WEIGHT * maxTripTimeDiff +
+                                         waitVioDiff + maxTripVioDiff;
                 if (maxCostDiff >= 0)
                     return false; // vehId1 does not dominate vehId2 for this pickup
             }
@@ -275,12 +280,11 @@ namespace karri::Transfers {
                 return;
 
             std::vector<int> indicesToKeep;
-            indicesToKeep.push_back(0);
-
-            for (int i = 1; i < vehiclesSeenForPickups.size(); ++i) {
+            for (int i = 0; i < vehiclesSeenForPickups.size(); ++i) {
                 const int vehId1 = *(vehiclesSeenForPickups.begin() + i);
+
                 bool isDominated = false;
-                for (const int idxOfVeh2 : indicesToKeep) {
+                for (const int idxOfVeh2: indicesToKeep) {
                     const int vehId2 = *(vehiclesSeenForPickups.begin() + idxOfVeh2);
                     if (dominates(vehId2, vehId1)) {
                         isDominated = true;
@@ -305,11 +309,11 @@ namespace karri::Transfers {
             }
 
             // Remove all vehicles that are not in indicesToKeep from vehiclesSeenForPickups
-            for (auto& idx : indicesToKeep) {
+            for (auto &idx: indicesToKeep) {
                 idx = *(vehiclesSeenForPickups.begin() + idx);
             }
             vehiclesSeenForPickups.clear();
-            for (const auto &idx : indicesToKeep) {
+            for (const auto &idx: indicesToKeep) {
                 vehiclesSeenForPickups.insert(idx);
             }
 
@@ -319,6 +323,7 @@ namespace karri::Transfers {
         const Fleet &fleet;
         const CostCalculator &calculator;
         const PDDistancesT &pdDistances;
+        const LastStopBucketsEnvT &lastStopBucketsEnv;
         const RouteState &routeState;
         RequestState &requestState;
 
@@ -332,10 +337,6 @@ namespace karri::Transfers {
         DistanceLabel currentPickupWalkingDists;
         DistanceLabel curPassengerArrTimesAtPickups;
         DistanceLabel curDistancesToDest;
-
-        // int totalNumEdgeRelaxations;
-        // int totalNumVerticesSettled;
-        // int totalNumEntriesScanned;
 
     };
 

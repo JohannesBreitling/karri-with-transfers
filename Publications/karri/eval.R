@@ -88,6 +88,18 @@ compareBestAssignments <- function(file1, file2) {
     
     if (numlegs1 != numlegs2) {
       print(paste0(i, ": Number of legs 1: ", numlegs1, ", Number of legs 2: ", numlegs2))
+      if (numlegs1 == 0)
+        View(zerolegs1[i, ])
+      else if (numlegs1 == 1)
+        View(oneleg1[i,  ])
+      else
+        View(twolegs1[i, ])
+      if (numlegs2 == 0)
+        View(zerolegs2[i, ])
+      else if (numlegs2 == 1)
+        View(oneleg2[i, ])
+      else
+        View(twolegs2[i, ])
       return()
     }
     

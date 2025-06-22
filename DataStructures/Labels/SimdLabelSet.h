@@ -129,6 +129,12 @@ public:
             return isMarked[i / VECTOR_SIZE][i % VECTOR_SIZE];
         }
 
+        void set(const int i, const bool val) {
+            assert(i >= 0);
+            assert(i < K);
+            isMarked[i / VECTOR_SIZE][i % VECTOR_SIZE] = val;
+        }
+
         std::array<int, K> toIntArray() const {
             std::array<int, K> arr;
             for (int i = 0; i < NUM_VECTORS; ++i) {
