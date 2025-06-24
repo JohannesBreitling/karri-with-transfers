@@ -1347,5 +1347,22 @@ namespace karri {
         std::stack<int, std::vector<int>> unusedStopIds;
         int nextUnusedStopId;
         int maxStopId;
+
+
+        // Information on dependencies between routes introduced by transfers.
+
+        // For a stop s at which a transfer to another vehicle happens,
+        // forwardDependenciesStopIds[forwardDependenciesPos[s].start ... forwardDependenciesPos[s].end]
+        // defines the IDs of the stops of other vehicles to which a rider transfers.
+        // Updates to the scheduled arrival/departure time of s need to be propagated (forwards) to every such stop.
+        std::vector<ValueBlockPosition> forwardDependenciesPos;
+        std::vector<int> forwardDependenciesStopIds;
+
+        // For a stop s at which a rider transfers to this vehicle from another vehicle,
+        // backwardDependenciesStopIds[backwardDependenciesPos[s].start ... backwardDependenciesPos[s].end]
+        // defines the IDs of the stops of other vehicles from which a rider transfers.
+        // Updates to the maximum arrival time of s need to be propagated (backwards) to every such stop.
+        std::vector<ValueBlockPosition> backwardDependenciesPos;
+        std::vector<int> backwardDependenciesStopIds;
     };
 }

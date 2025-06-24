@@ -142,7 +142,7 @@ namespace karri {
             const int vehId = asgn.dVeh->vehicleId;
             const auto numStops = routeState.numStopsOf(vehId);
 
-            const auto actualDepTimeAtTransfer = getActualDepTimeAtTranfer(asgn, context, routeState);
+            const auto actualDepTimeAtTransfer = getActualDepTimeAtTransfer(asgn, context, routeState);
             asgn.depAtTransfer = actualDepTimeAtTransfer;
             const auto initialTransferDetour = calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context,
                                                                              routeState);
@@ -209,7 +209,7 @@ namespace karri {
             const int vehId = asgn.dVeh->vehicleId;
             const auto numStops = routeState.numStopsOf(vehId);
 
-            const auto actualDepTimeAtTransfer = getActualDepTimeAtTranfer(asgn, context, routeState);
+            const auto actualDepTimeAtTransfer = getActualDepTimeAtTransfer(asgn, context, routeState);
             const auto initialTransferDetour = std::max(
                     calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context, routeState), 0);
 
