@@ -73,7 +73,7 @@ namespace karri::PickupAfterLastStopStrategies {
         MinCostPairAfterLastStopQuery(const InputGraphT &inputGraph, const Fleet &fleet,
                                       const CHEnvT &chEnv,
                                       const RouteState &routeState, DirectSearchesT &directSearches,
-                                      const CostCalculator &calculator,
+                                      CostCalculator &calculator,
                                       const LastStopBucketsEnvT &lastStopBucketsEnv,
                                       const RequestState &requestState)
                 : inputGraph(inputGraph),
@@ -657,7 +657,7 @@ namespace karri::PickupAfterLastStopStrategies {
         const CH::SearchGraph &oppositeGraph;
         const Fleet &fleet;
         const RouteState &routeState;
-        const CostCalculator &calculator;
+        CostCalculator &calculator;
         const typename LastStopBucketsEnvT::BucketContainer &lastStopBuckets;
         DirectSearchesT &directSearches;
         const RequestState &requestState;

@@ -104,10 +104,10 @@ namespace karri {
                 const int newArrTime = detourComputer.newArrTimes[stopId];
                 const int newDepTime = detourComputer.newDepTimes[stopId];
                 const int stopIdx = routeState.stopPositionOf(stopId);
-                KASSERT(stopIdx > 0);
                 const int stopVehId = routeState.vehicleIdOf(stopId);
                 const int schedArrTime = routeState.schedArrTimesFor(stopVehId)[stopIdx];
                 if (newArrTime > schedArrTime) {
+                    KASSERT(stopIdx > 0);
                     const auto numDropoffsPs = routeState.numDropoffsPrefixSumFor(stopVehId);
                     const int numDropoffs = numDropoffsPs[stopIdx] - numDropoffsPs[stopIdx - 1];
                     addedTripTime += (newArrTime - schedArrTime) * numDropoffs;
@@ -161,7 +161,7 @@ namespace karri {
         }
 
         template<typename RequestContext>
-        RequestCost calc(AssignmentWithTransfer &asgn, RequestContext &context) const {
+        RequestCost calc(AssignmentWithTransfer &asgn, RequestContext &context) {
             return calcBase<true>(asgn, context);
         }
 
@@ -173,7 +173,6 @@ namespace karri {
         template<bool checkHardConstraints, typename RequestContext>
         RequestCost calcBase(AssignmentWithTransfer &asgn, const RequestContext &context) {
             using namespace time_utils;
-            KASSERT(asgn.isFinished());
 
             if (!asgn.pVeh || !asgn.dVeh || !asgn.pickup || !asgn.dropoff)
                 return RequestCost::INFTY_COST();
@@ -218,10 +217,10 @@ namespace karri {
                 const int newArrTime = detourComputer.newArrTimes[stopId];
                 const int newDepTime = detourComputer.newDepTimes[stopId];
                 const int stopIdx = routeState.stopPositionOf(stopId);
-                KASSERT(stopIdx > 0);
                 const int stopVehId = routeState.vehicleIdOf(stopId);
                 const int schedArrTime = routeState.schedArrTimesFor(stopVehId)[stopIdx];
                 if (newArrTime > schedArrTime) {
+                    KASSERT(stopIdx > 0);
                     const auto numDropoffsPs = routeState.numDropoffsPrefixSumFor(stopVehId);
                     const int numDropoffs = numDropoffsPs[stopIdx] - numDropoffsPs[stopIdx - 1];
                     addedTripTime += (newArrTime - schedArrTime) * numDropoffs;
@@ -281,8 +280,10 @@ namespace karri {
 
             // Compute trip time of new rider
             const int riderArrTimeAtTransfer = computeRiderArrTimeAtTransfer(asgn, actualDepTimeAtPickup,
-                                                                             transferPVehAtExistingStop);
-            const int depTimeAtTransfer = computeDVehDepTimeAtTransfer(asgn, riderArrTimeAtTransfer, context);
+                                                                             transferPVehAtExistingStop, detourComputer,
+                                                                             routeState);
+            const int depTimeAtTransfer = computeDVehDepTimeAtTransfer(asgn, riderArrTimeAtTransfer, detourComputer,
+                                                                       routeState, context);
             const int arrTimeAtDropoff = computeArrTimeAtDropoffAfterTransfer(
                     asgn, depTimeAtTransfer, detourComputer, routeState);
 

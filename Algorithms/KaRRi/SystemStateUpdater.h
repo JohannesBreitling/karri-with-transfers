@@ -229,8 +229,14 @@ namespace karri {
                                                                               detourComputer, routeState);
             timer.restart();
 
-            auto [pIdxPVeh, dIdxPVeh] = routeState.insertPVeh(asgn, arrTimeAtTransferPoint, requestState);
+//            auto [pIdxPVeh, dIdxPVeh] = routeState.insertPVehStops(asgn, arrTimeAtTransferPoint, requestState);
+//            auto [pIdxDVeh, dIdxDVeh] = routeState.insertDVehStops(asgn, depTimeAtPickup, arrTimeAtTransferPoint, requestState);
+
+            auto [pIdxPVeh, dIdxPVeh, pIdxDVeh, dIdxDVeh] =
+                    routeState.insert(asgn, depTimeAtPickup, arrTimeAtTransferPoint, requestState);
+
             updateBucketStatePVeh(asgn, pIdxPVeh, dIdxPVeh, depTimeAtLastStopBeforePVeh);
+            updateBucketStateDVeh(asgn, pIdxDVeh, dIdxDVeh, depTimeAtLastStopBeforeDVeh);
 
             // If the vehicle has to be rerouted at its current location for a PBNS assignment, we introduce an
             // intermediate stop at its current location representing the rerouting.
@@ -244,12 +250,6 @@ namespace karri {
                 ++dIdxPVeh;
             }
 
-            assert(routeState.assertRoutePVeh(asgn, requestState.originalRequest.requestTime, depTimeAtPickup,
-                                              transferAtStopPVeh, arrTimeAtTransferPoint));
-
-            auto [pIdxDVeh, dIdxDVeh] = routeState.insertDVeh(asgn, depTimeAtPickup, arrTimeAtTransferPoint, requestState);
-            updateBucketStateDVeh(asgn, pIdxDVeh, dIdxDVeh, depTimeAtLastStopBeforeDVeh);
-
             if (asgn.transferIdxDVeh == 0 && numStopsBeforeDVeh > 1 &&
                 routeState.schedDepTimesFor(dVehId)[0] < requestState.originalRequest.requestTime) {
                 createIntermediateStopStopAtCurrentLocationForReroute(*asgn.dVeh,
@@ -260,6 +260,8 @@ namespace karri {
                 ++dIdxDVeh;
             }
 
+            assert(routeState.assertRoutePVeh(asgn, requestState.originalRequest.requestTime, depTimeAtPickup,
+                                              transferAtStopPVeh, arrTimeAtTransferPoint));
             assert(routeState.assertRouteDVeh(asgn, requestState.originalRequest.requestTime, arrTimeAtTransferPoint,
                                               depTimeAtTransferPoint, arrTimeAtDropoff));
 

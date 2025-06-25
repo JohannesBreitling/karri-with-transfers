@@ -50,7 +50,7 @@ namespace karri {
             fleet(fleet),
             routeState(routeState),
             requestState(requestState),
-            calc(routeState),
+            calc(routeState, fleet),
             distancesToTransfer(),
             distancesToDropoff(),
             asserter(asserter) {}

@@ -59,19 +59,17 @@ namespace karri {
         // Stores information about assignment and departure time of a request needed for logging on arrival of the
         // request.
         struct RequestData {
-            int depTime; // Departure at pickup
-            int walkingTimeToPickup;
-            int walkingTimeFromDropoff;
-            int assignmentCost;
+            int depTimeAtPickup = INFTY;
+            int walkingTimeToPickup = INFTY;
+            int walkingTimeFromDropoff = INFTY;
+            int assignmentCost = INFTY;
 
             // Indicate if the request is satisfied using assignment with transfer
-            bool usingTransfer;
+            bool usingTransfer = false;
             
             // Arrival and departure at transfer
-            int arrAtTransferPoint;
-            int depTimeAtTransfer;
-            int arrAtDropoff;
-            int depTimeAtPickup;
+            int arrAtTransferPoint = INFTY;
+            int depTimeAtTransfer = INFTY;
         };
 
     public:
@@ -255,7 +253,7 @@ namespace karri {
                 const auto &reqData = requestData[reqId];
 
                 if (requestState[reqId] == ASSIGNED_TO_PVEH) {
-                    handleArrivalAtTransferPoint(reqId, occTime);
+                    requestData[reqId].arrAtTransferPoint = occTime;
                     requestState[reqId] = ASSIGNED_TO_DVEH;
                 } else {
                     requestState[reqId] = WALKING_TO_DEST;
@@ -282,9 +280,18 @@ namespace karri {
             } else {
                 // Remember departure time for all requests picked up at this stop:
                 const auto curStop = scheduledStops.getCurrentOrPrevScheduledStop(vehId);
+
+                // TODO: Need to make sure that the dropoff at transfer is processed before the pickup at transfer.
+
                 for (const auto &reqId: curStop.requestsPickedUpHere) {
-                    if (!requestData[reqId].usingTransfer) {
-                        requestData[reqId].depTime = occTime;
+                    // If this is the pickup vehicle of a rider, mark their departure time.
+                    if (requestState[reqId] == ASSIGNED_TO_VEH || requestState[reqId] == ASSIGNED_TO_PVEH) {
+                        requestData[reqId].depTimeAtPickup = occTime;
+                    }
+
+                    // If this is the dropoff vehicle of a rider, mark their departure time at the transfer point.
+                    if (requestState[reqId] == ASSIGNED_TO_DVEH) {
+                        requestData[reqId].depTimeAtTransfer = occTime;
                     }
                 }
                 vehicleState[vehId] = DRIVING;
@@ -317,11 +324,6 @@ namespace karri {
             eventSimulationStatsLogger << occTime << ",RequestReceipt," << time << '\n';
         }
 
-        void handleArrivalAtTransferPoint(const int reqId, const int occTime) {
-            unused(reqId, occTime);
-            assert(requestState[reqId] == ASSIGNED_TO_PVEH);
-        }
-
         template<typename AssignmentWithTransferT>
         void applyAssignmentWithTransfer(const AssignmentWithTransferT &asgn, const int& cost, const int reqId) {
             if (!asgn.dVeh || !asgn.pVeh || !asgn.pickup || !asgn.dropoff) {
@@ -338,11 +340,6 @@ namespace karri {
             requestData[reqId].walkingTimeFromDropoff = asgn.dropoff->walkingDist;
             requestData[reqId].assignmentCost = cost;
             requestData[reqId].usingTransfer = true;
-
-            requestData[reqId].arrAtTransferPoint = asgn.arrAtTransferPoint;
-            requestData[reqId].depTimeAtTransfer = asgn.depAtTransfer;
-            requestData[reqId].depTimeAtPickup = asgn.depAtPickup;
-            requestData[reqId].arrAtDropoff = asgn.arrAtDropoff;
             
             int pickupStopId, transferStopIdPVeh, transferStopIdDVeh, dropoffStopId; 
             systemStateUpdater.insertBestAssignmentWithTransfer(asgn, pickupStopId, transferStopIdPVeh, transferStopIdDVeh, dropoffStopId);
@@ -389,12 +386,12 @@ namespace karri {
             if (asgnFinderResponse.isNotUsingVehicleBest()) {
                 requestState[reqId] = WALKING_TO_DEST;
                 requestData[reqId].assignmentCost = asgnFinderResponse.getBestCost();
-                requestData[reqId].depTime = occTime;
+                requestData[reqId].depTimeAtPickup = occTime;
                 requestData[reqId].walkingTimeToPickup = 0;
                 requestData[reqId].walkingTimeFromDropoff = asgnFinderResponse.getNotUsingVehicleDist();
                 requestData[reqId].usingTransfer = false;
-                requestData[reqId].arrAtTransferPoint = -1;
-                requestData[reqId].depTimeAtTransfer = -1;
+                requestData[reqId].arrAtTransferPoint = INFTY;
+                requestData[reqId].depTimeAtTransfer = INFTY;
                 requestEvents.increaseKey(reqId, occTime + asgnFinderResponse.getNotUsingVehicleDist());
                 systemStateUpdater.writePerformanceLogs();
                 return;
@@ -443,7 +440,7 @@ namespace karri {
             assert(requestState[reqId] == WALKING_TO_DEST);
             Timer timer;
 
-            const auto &reqData = requestData[reqId];
+            const RequestData &reqData = requestData[reqId];
             requestState[reqId] = FINISHED;
             int id, key;
             requestEvents.deleteMin(id, key);
@@ -456,11 +453,11 @@ namespace karri {
             if (!reqData.usingTransfer) {
                 arrTime = occTime;
                 tripTime = arrTime - requests[reqId].requestTime;
-                waitTime = reqData.depTime - requests[reqId].requestTime;
-                rideTime = occTime - reqData.walkingTimeFromDropoff - reqData.depTime;
+                waitTime = reqData.depTimeAtPickup - requests[reqId].requestTime;
+                rideTime = occTime - reqData.walkingTimeFromDropoff - reqData.depTimeAtPickup;
             } else {
                 // Calculate the values if the assignment consists of two vehicles
-                arrTime = reqData.arrAtDropoff + reqData.walkingTimeFromDropoff;
+                arrTime = occTime;
                 tripTime = arrTime - requests[reqId].requestTime;
                 int waitAtTransfer = reqData.depTimeAtTransfer - reqData.arrAtTransferPoint;
                 assert(waitAtTransfer >= 0);

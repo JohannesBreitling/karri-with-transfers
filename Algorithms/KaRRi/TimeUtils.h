@@ -108,17 +108,17 @@ namespace karri::time_utils {
         return std::max(minVehicleDepTimeAtPickup, context.getPassengerArrAtPickup(pickup.id));
     }
 
-    template<typename RequestContext>
-    static INLINE int getActualDepTimeAtTransfer(const AssignmentWithTransfer &asgn, const RequestContext &context,
-                                                 const RouteState &routeState) {
-        const bool atStop = isTransferAtExistingStopDVeh(asgn, context.originalRequest.requestTime, routeState);
-
-        const auto minVehicleDepTimeAtTransfer =
-                getVehDepTimeAtStopForRequest(asgn.dVeh->vehicleId, asgn.transferIdxDVeh, context, routeState) +
-                !atStop * (asgn.distToTransferDVeh + InputConfig::getInstance().stopTime);
-
-        return std::max(minVehicleDepTimeAtTransfer, asgn.arrAtTransferPoint);
-    }
+//    template<typename RequestContext>
+//    static INLINE int getActualDepTimeAtTransfer(const AssignmentWithTransfer &asgn, const RequestContext &context,
+//                                                 const RouteState &routeState) {
+//        const bool atStop = isTransferAtExistingStopDVeh(asgn, context.originalRequest.requestTime, routeState);
+//
+//        const auto minVehicleDepTimeAtTransfer =
+//                getVehDepTimeAtStopForRequest(asgn.dVeh->vehicleId, asgn.transferIdxDVeh, context, routeState) +
+//                !atStop * (asgn.distToTransferDVeh + InputConfig::getInstance().stopTime);
+//
+//        return std::max(minVehicleDepTimeAtTransfer, asgn.arrAtTransferPoint);
+//    }
 
     template<typename RequestContext>
     static INLINE int
@@ -731,31 +731,31 @@ namespace karri::time_utils {
         return false;
     }
 
-    template<typename RequestContext>
-    static INLINE bool
-    isAnyHardConstraintViolatedPVeh(const AssignmentWithTransfer &asgn, const RequestContext &context,
-                                    const int initalPickupDetour, const int detourRightAfterTransfer,
-                                    const int residualDetourAtEndPVeh,
-                                    const bool transferAtExistingStop,
-                                    const RouteState &routeState) {
-
-        return isAnyHardConstraintViolated(*asgn.pVeh, asgn.pickupIdx, asgn.transferIdxPVeh, context,
-                                           initalPickupDetour, detourRightAfterTransfer, residualDetourAtEndPVeh,
-                                           transferAtExistingStop, routeState);
-    }
-
-    template<typename RequestContext>
-    static INLINE bool
-    isAnyHardConstraintViolatedDVeh(const AssignmentWithTransfer &asgn, const RequestContext &context,
-                                    const int initalTransferDetour,
-                                    const int detourRightAfterDropoff, const int residualDetourAtEnd,
-                                    const bool dropoffAtExistingStop, const RouteState &routeState) {
-
-        return isAnyHardConstraintViolated(asgn.arrAtTransferPoint, *asgn.dVeh, asgn.transferIdxDVeh, asgn.dropoffIdx,
-                                           context,
-                                           initalTransferDetour, detourRightAfterDropoff, residualDetourAtEnd,
-                                           dropoffAtExistingStop, routeState);
-    }
+//    template<typename RequestContext>
+//    static INLINE bool
+//    isAnyHardConstraintViolatedPVeh(const AssignmentWithTransfer &asgn, const RequestContext &context,
+//                                    const int initalPickupDetour, const int detourRightAfterTransfer,
+//                                    const int residualDetourAtEndPVeh,
+//                                    const bool transferAtExistingStop,
+//                                    const RouteState &routeState) {
+//
+//        return isAnyHardConstraintViolated(*asgn.pVeh, asgn.pickupIdx, asgn.transferIdxPVeh, context,
+//                                           initalPickupDetour, detourRightAfterTransfer, residualDetourAtEndPVeh,
+//                                           transferAtExistingStop, routeState);
+//    }
+//
+//    template<typename RequestContext>
+//    static INLINE bool
+//    isAnyHardConstraintViolatedDVeh(const AssignmentWithTransfer &asgn, const RequestContext &context,
+//                                    const int initalTransferDetour,
+//                                    const int detourRightAfterDropoff, const int residualDetourAtEnd,
+//                                    const bool dropoffAtExistingStop, const RouteState &routeState) {
+//
+//        return isAnyHardConstraintViolated(asgn.arrAtTransferPoint, *asgn.dVeh, asgn.transferIdxDVeh, asgn.dropoffIdx,
+//                                           context,
+//                                           initalTransferDetour, detourRightAfterDropoff, residualDetourAtEnd,
+//                                           dropoffAtExistingStop, routeState);
+//    }
 
     template<typename RequestContext>
     static INLINE bool
@@ -983,13 +983,13 @@ namespace karri::time_utils {
                 auto stopId = firstStopIdsInRoutesToProcess.back();
                 firstStopIdsInRoutesToProcess.pop_back();
                 const auto vehId = routeState.vehicleIdOf(stopId);
-                const auto stopIndex = routeState.stopPositionOf(stopId);
+                const auto initialStopIdx = routeState.stopPositionOf(stopId);
                 const auto numStops = routeState.numStopsOf(vehId);
                 const auto stopIds = routeState.stopIdsFor(vehId);
                 const auto schedDepTimes = routeState.schedDepTimesFor(vehId);
                 const auto schedArrTimes = routeState.schedArrTimesFor(vehId);
 
-                for (int i = stopIndex; i < numStops; ++i) {
+                for (int i = initialStopIdx; i < numStops; ++i) {
                     stopId = stopIds[i];
                     stopIdsSeen.insert(stopId);
                     const auto depTimeAtStop = newDepTimes[stopId];
@@ -1003,7 +1003,7 @@ namespace karri::time_utils {
                         firstStopIdsInRoutesToProcess.push_back(dependentStopId);
                     }
 
-                    if (stopIndex == numStops - 1)
+                    if (i == numStops - 1)
                         break;
 
                     const auto nextStopId = stopIds[i + 1];
