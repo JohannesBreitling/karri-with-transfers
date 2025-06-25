@@ -67,6 +67,41 @@ quality <- function(file_base) {
   print(df)
 }
 
+
+asgnTypeStatsNoTransfer <- function(file) {
+  df <- read.csv(paste0(file, ".bestassignments.csv"))
+  
+  numnoveh <- sum(df$not_using_vehicle == " true")
+  numord <- sum((df$pickup_insertion_point > 0) & (df$pickup_insertion_point < df$num_stops - 1) & (df$dropoff_insertion_point < df$num_stops - 1))
+  numpbns <- sum((df$pickup_insertion_point == 0) & (df$pickup_insertion_point < df$num_stops - 1) & (df$dropoff_insertion_point < df$num_stops - 1))
+  numpals <- sum(df$pickup_insertion_point == df$num_stops - 1)
+  numdals <- sum((df$pickup_insertion_point < df$num_stops - 1) & (df$dropoff_insertion_point == df$num_stops - 1))
+  
+  print(paste0("NoVeh: ", numnoveh))
+  print(paste0("ORD: ", numord))
+  print(paste0("PBNS: ", numpbns))
+  print(paste0("PALS: ", numpals))
+  print(paste0("DALS: ", numdals))
+  print(paste0("Sum: ", numnoveh + numord + numpbns + numpals + numdals))
+}
+
+asgnTypeStats <- function(file) {
+  df <- read.csv(paste0(file, ".bestassignmentswithouttransfer.csv"))
+  
+  numnoveh <- sum(df$not_using_vehicle == " true")
+  numord <- sum((df$pickup_insertion_point > 0) & (df$pickup_insertion_point < df$num_stops - 1) & (df$dropoff_insertion_point < df$num_stops - 1))
+  numpbns <- sum((df$pickup_insertion_point == 0) & (df$pickup_insertion_point < df$num_stops - 1) & (df$dropoff_insertion_point < df$num_stops - 1))
+  numpals <- sum(df$pickup_insertion_point == df$num_stops - 1)
+  numdals <- sum((df$pickup_insertion_point < df$num_stops - 1) & (df$dropoff_insertion_point == df$num_stops - 1))
+  
+  print(paste0("NoVeh: ", numnoveh))
+  print(paste0("ORD: ", numord))
+  print(paste0("PBNS: ", numpbns))
+  print(paste0("PALS: ", numpals))
+  print(paste0("DALS: ", numdals))
+  print(paste0("Sum: ", numnoveh + numord + numpbns + numpals + numdals))
+}
+
 # Given the paths to the result files of two KaRRi runs, this functions checks
 # whether all assignments are the same in both runs.
 compareBestAssignments <- function(file1, file2) {
