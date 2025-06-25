@@ -53,6 +53,7 @@ namespace karri {
                   requestState(requestState),
                   curVehLocs(curVehLocs),
                   pathTracker(pathTracker),
+                  detourComputer(routeState),
                   routeState(routeState),
                   ellipticBucketsEnv(ellipticBucketsEnv),
                   lastStopBucketsEnv(lastStopBucketsEnv),
@@ -62,30 +63,32 @@ namespace karri {
                                                                               "direct_od_dist,"
                                                                               "number_of_legs,"
                                                                               "cost\n")),
-                  bestAssignmentsWithoutUsingVehicleLogger(LogManager<LoggerT>::getLogger("bestassignmentswithoutvehicle.csv",
-                                                                                          "request_id,"
-                                                                                          "request_time,"
-                                                                                          "direct_walking_dist,"
-                                                                                          "cost\n")),
-                  bestAssignmentsWithoutTransferLogger(LogManager<LoggerT>::getLogger("bestassignmentswithouttransfer.csv",
-                                                                       "request_id,"
-                                                                       "request_time,"
-                                                                       "direct_od_dist,"
-                                                                       "vehicle_id,"
-                                                                       "pickup_insertion_point,"
-                                                                       "dropoff_insertion_point,"
-                                                                       "dist_to_pickup,"
-                                                                       "dist_from_pickup,"
-                                                                       "dist_to_dropoff,"
-                                                                       "dist_from_dropoff,"
-                                                                       "pickup_id,"
-                                                                       "pickup_walking_dist,"
-                                                                       "dropoff_id,"
-                                                                       "dropoff_walking_dist,"
-                                                                       "num_stops,"
-                                                                       "veh_dep_time_at_stop_before_pickup,"
-                                                                       "veh_dep_time_at_stop_before_dropoff,"
-                                                                       "cost\n")),
+                  bestAssignmentsWithoutUsingVehicleLogger(
+                          LogManager<LoggerT>::getLogger("bestassignmentswithoutvehicle.csv",
+                                                         "request_id,"
+                                                         "request_time,"
+                                                         "direct_walking_dist,"
+                                                         "cost\n")),
+                  bestAssignmentsWithoutTransferLogger(
+                          LogManager<LoggerT>::getLogger("bestassignmentswithouttransfer.csv",
+                                                         "request_id,"
+                                                         "request_time,"
+                                                         "direct_od_dist,"
+                                                         "vehicle_id,"
+                                                         "pickup_insertion_point,"
+                                                         "dropoff_insertion_point,"
+                                                         "dist_to_pickup,"
+                                                         "dist_from_pickup,"
+                                                         "dist_to_dropoff,"
+                                                         "dist_from_dropoff,"
+                                                         "pickup_id,"
+                                                         "pickup_walking_dist,"
+                                                         "dropoff_id,"
+                                                         "dropoff_walking_dist,"
+                                                         "num_stops,"
+                                                         "veh_dep_time_at_stop_before_pickup,"
+                                                         "veh_dep_time_at_stop_before_dropoff,"
+                                                         "cost\n")),
                   bestAssignmentsWithTransferLogger(LogManager<LoggerT>::getLogger("bestassignmentswithtransfer.csv",
                                                                                    "request_id,"
                                                                                    "request_time,"
@@ -214,9 +217,19 @@ namespace karri {
             const auto depTimeAtLastStopBeforePVeh = routeState.schedDepTimesFor(pVehId)[numStopsBeforePVeh - 1];
             const auto depTimeAtLastStopBeforeDVeh = routeState.schedDepTimesFor(dVehId)[numStopsBeforeDVeh - 1];
 
+            using namespace time_utils;
+            detourComputer.computeDetours(asgn, requestState);
+            const int depTimeAtPickup = getActualDepTimeAtPickup(asgn, requestState, routeState);
+            const bool transferAtStopPVeh = isTransferAtExistingStopPVeh(asgn, routeState);
+            const int arrTimeAtTransferPoint = computeRiderArrTimeAtTransfer(asgn, depTimeAtPickup, transferAtStopPVeh,
+                                                                             detourComputer, routeState);
+            const int depTimeAtTransferPoint = computeDVehDepTimeAtTransfer(asgn, arrTimeAtTransferPoint,
+                                                                            detourComputer, routeState, requestState);
+            const int arrTimeAtDropoff = computeArrTimeAtDropoffAfterTransfer(asgn, depTimeAtTransferPoint,
+                                                                              detourComputer, routeState);
             timer.restart();
 
-            auto [pIdxPVeh, dIdxPVeh] = routeState.insertPVeh(asgn, requestState);
+            auto [pIdxPVeh, dIdxPVeh] = routeState.insertPVeh(asgn, arrTimeAtTransferPoint, requestState);
             updateBucketStatePVeh(asgn, pIdxPVeh, dIdxPVeh, depTimeAtLastStopBeforePVeh);
 
             // If the vehicle has to be rerouted at its current location for a PBNS assignment, we introduce an
@@ -231,9 +244,10 @@ namespace karri {
                 ++dIdxPVeh;
             }
 
-            assert(routeState.assertRoutePVeh(asgn));
+            assert(routeState.assertRoutePVeh(asgn, requestState.originalRequest.requestTime, depTimeAtPickup,
+                                              transferAtStopPVeh, arrTimeAtTransferPoint));
 
-            auto [pIdxDVeh, dIdxDVeh] = routeState.insertDVeh(asgn, requestState);
+            auto [pIdxDVeh, dIdxDVeh] = routeState.insertDVeh(asgn, depTimeAtPickup, arrTimeAtTransferPoint, requestState);
             updateBucketStateDVeh(asgn, pIdxDVeh, dIdxDVeh, depTimeAtLastStopBeforeDVeh);
 
             if (asgn.transferIdxDVeh == 0 && numStopsBeforeDVeh > 1 &&
@@ -246,7 +260,8 @@ namespace karri {
                 ++dIdxDVeh;
             }
 
-            assert(routeState.assertRouteDVeh(asgn));
+            assert(routeState.assertRouteDVeh(asgn, requestState.originalRequest.requestTime, arrTimeAtTransferPoint,
+                                              depTimeAtTransferPoint, arrTimeAtDropoff));
 
             const auto routeUpdateTime = timer.elapsed<std::chrono::nanoseconds>();
             requestState.stats().updateStats.updateRoutesTime += routeUpdateTime;
@@ -255,6 +270,8 @@ namespace karri {
             transferStopIdPVeh = routeState.stopIdsFor(pVehId)[dIdxPVeh];
             transferStopIdDVeh = routeState.stopIdsFor(dVehId)[pIdxDVeh];
             dropoffStopId = routeState.stopIdsFor(dVehId)[dIdxDVeh];
+
+            routeState.addTransferDependency(transferStopIdPVeh, transferStopIdDVeh);
 
             assert(routeState.vehicleIdOf(pickupStopId) == pVehId);
             assert(routeState.vehicleIdOf(transferStopIdPVeh) == pVehId);
@@ -757,6 +774,7 @@ namespace karri {
         RequestState &requestState;
         const CurVehLocsT &curVehLocs;
         PathTrackerT &pathTracker;
+        time_utils::DetourComputer detourComputer;
 
         // Route state
         RouteState &routeState;

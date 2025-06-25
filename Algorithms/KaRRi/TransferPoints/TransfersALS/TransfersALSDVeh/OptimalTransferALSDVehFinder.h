@@ -44,6 +44,7 @@ namespace karri {
                 const Fleet &fleet,
                 const RouteState &routeState,
                 RequestState &requestState,
+                CostCalculator& costCalculator,
                 InsertionAsserterT &asserter
         ) : inputGraph(inputGraph),
             vehCh(vehChEnv.getCH()),
@@ -55,7 +56,7 @@ namespace karri {
             fleet(fleet),
             routeState(routeState),
             requestState(requestState),
-            calc(routeState),
+            calc(costCalculator),
             pVehStopsFlags(fleet.size()),
             isEdgeRel(inputGraph.numEdges()),
             relEdgesToInternalIdx(inputGraph.numEdges()),
@@ -475,7 +476,8 @@ namespace karri {
                 return;
 
             if (!asgn.isFinished()) {
-                const auto cost = calc.calcLowerBound(asgn, requestState);
+//                const auto cost = calc.calcLowerBound(asgn, requestState);
+                const auto cost = calc.calc(asgn, requestState);
                 if (cost.total <= requestState.getBestCost()) {
                     postponedAssignments.push_back(asgn);
                 }
@@ -566,7 +568,7 @@ namespace karri {
         const Fleet &fleet;
         const RouteState &routeState;
         RequestState &requestState;
-        CostCalculator calc;
+        CostCalculator& calc;
 
         std::vector<EdgeInEllipse> allTransferEdges;
 

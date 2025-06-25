@@ -1019,7 +1019,8 @@ namespace karri {
                 return;
 
             if (!asgn.isFinished()) {
-                const auto lowerBound = calc.calcLowerBound(asgn, requestState);
+//                const auto lowerBound = calc.calcLowerBound(asgn, requestState);
+                const auto lowerBound = calc.calc(asgn, requestState);
                 if (lowerBound.total >= requestState.getBestCost())
                     return;
 

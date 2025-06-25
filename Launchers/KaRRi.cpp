@@ -452,7 +452,7 @@ int main(int argc, char *argv[]) {
         using VehicleLocatorImpl = VehicleLocator<VehicleInputGraph, VehCHEnv>;
         VehicleLocatorImpl locator(vehicleInputGraph, *vehChEnv, routeState);
 
-        CostCalculator calc(routeState);
+        CostCalculator calc(routeState, fleet);
 
         RequestState reqState(calc);
 

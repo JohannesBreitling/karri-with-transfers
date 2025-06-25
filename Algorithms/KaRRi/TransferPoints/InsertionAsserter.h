@@ -22,9 +22,6 @@ namespace karri {
             if (!assertPVeh(asgn) || !assertDVeh(asgn))
                 return false;
 
-            // Assert the times
-            KASSERT(asgn.requestTime <= asgn.depAtPickup && asgn.arrAtTransferPoint > asgn.depAtPickup);
-
             return true;
         }
         

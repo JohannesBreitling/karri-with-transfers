@@ -330,9 +330,8 @@ namespace karri {
         tryPartialAssignment(AssignmentWithTransfer &asgn, std::vector<AssignmentWithTransfer> &promisingPartials) {
             const bool unfinished = asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed;
             // Check the cost of the partial assignment with transfer where pickup vehicle, dropoff vehicle, pickup and transfer point (therefore also both transfer stop indices) are set
-            RequestCost pickupVehCost;
 
-            assert(asgn.pVeh && asgn.pickup);
+            KASSERT(asgn.pVeh && asgn.pickup);
             if (asgn.distToPickup == INFTY || asgn.distFromPickup == INFTY || asgn.distToTransferPVeh == INFTY ||
                 asgn.distFromTransferPVeh == INFTY)
                 return;
@@ -345,15 +344,16 @@ namespace karri {
                     ++numPartialsTriedPickupORD;
                     break;
                 default:
-                    assert(false);
+                    KASSERT(false);
             }
 
+            const auto pickupVehCost = calc.calc(asgn, requestState);
 
-            if (unfinished) {
-                pickupVehCost = calc.calcPartialCostForPVehLowerBound<true>(asgn, requestState);
-            } else {
-                pickupVehCost = calc.calcPartialCostForPVeh<true>(asgn, requestState);
-            }
+//            if (unfinished) {
+//                pickupVehCost = calc.calcPartialCostForPVehLowerBound<true>(asgn, requestState);
+//            } else {
+//                pickupVehCost = calc.calcPartialCostForPVeh<true>(asgn, requestState);
+//            }
 
             if (pickupVehCost.total >= requestState.getBestCost())
                 return;
@@ -485,7 +485,8 @@ namespace karri {
                 asgn.pickupBNSLowerBoundUsed = false;
 
                 if (!asgn.isFinished()) {
-                    total = calc.calcBaseLowerBound<true>(asgn, requestState);
+//                    total = calc.calcBaseLowerBound<true>(asgn, requestState);
+                    total = calc.calc(asgn, requestState);
 
                     if (total.total > requestState.getBestCost())
                         continue;
@@ -519,7 +520,8 @@ namespace karri {
 
                     // Try the assignments with the calculated distances
                     if (!asgn.isFinished()) {
-                        total = calc.calcBaseLowerBound<true>(asgn, requestState);
+//                        total = calc.calcBaseLowerBound<true>(asgn, requestState);
+                        total = calc.calc(asgn, requestState);
 
                         if (total.total > requestState.getBestCost())
                             continue;
@@ -565,7 +567,8 @@ namespace karri {
                 asgn.dropoffBNSLowerBoundUsed = false;
 
                 if (!asgn.isFinished()) {
-                    total = calc.calcBaseLowerBound<true>(asgn, requestState);
+//                    total = calc.calcBaseLowerBound<true>(asgn, requestState);
+                    total = calc.calc(asgn, requestState);
 
                     if (total.total > requestState.getBestCost())
                         continue;
@@ -770,7 +773,8 @@ namespace karri {
 
             Timer time;
             if (!asgn.isFinished()) {
-                const auto cost = calc.calcLowerBound(asgn, requestState);
+//                const auto cost = calc.calcLowerBound(asgn, requestState);
+                const auto cost = calc.calc(asgn, requestState);
                 if (cost.total <= requestState.getBestCost()) {
                     postponedAssignments.push_back(asgn);
                 }
