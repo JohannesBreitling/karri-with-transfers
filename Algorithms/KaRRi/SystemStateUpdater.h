@@ -228,6 +228,7 @@ namespace karri {
                                                                             detourComputer, routeState, requestState);
             const int arrTimeAtDropoff = computeArrTimeAtDropoffAfterTransfer(asgn, depTimeAtTransferPoint,
                                                                               detourComputer, routeState);
+            unused(arrTimeAtDropoff);
             timer.restart();
 
 //            auto [pIdxPVeh, dIdxPVeh] = routeState.insertPVehStops(asgn, arrTimeAtTransferPoint, requestState);

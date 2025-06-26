@@ -634,7 +634,7 @@ int main(int argc, char *argv[]) {
 
         using EllipseReconstructorImpl = CHEllipseReconstructor<VehicleInputGraph, VehCHEnv, EllipticBucketsEnv, PARALLELIZE_PHAST_DETOUR_ELLIPSES, ELLIPSES_TOP_VERTICES_DIVISOR, TraversalCostAttribute, EllipseReconstructorLabelSet>;
         EllipseReconstructorImpl ellipseReconstructor(vehicleInputGraph, *vehChEnv, fleet, ellipticBucketsEnv,
-                                                      reqState, routeState);
+                                                      reqState, routeState, calc);
 #else
         using EllipseReconstructorImpl = NoOpEllipseReconstructor;
         EllipseReconstructorImpl ellipseReconstructor;
@@ -651,7 +651,7 @@ int main(int argc, char *argv[]) {
         DirectTransferDistancesFinder transferToDropoffDistancesFinder(vehicleInputGraph.numVertices(), *vehChEnv,
                                                                        PDLocType::DROPOFF);
 
-        using OrdinaryTransferInsertionsImpl = OrdinaryTransferFinder<VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, TransferAsserterImpl, DirectTransferDistancesFinder>;
+        using OrdinaryTransferInsertionsImpl = OrdinaryTransferFinder<VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, InsertionAsserterImpl, DirectTransferDistancesFinder>;
         OrdinaryTransferInsertionsImpl ordinaryTransferInsertions = OrdinaryTransferInsertionsImpl(
                 vehicleInputGraph,
                 *vehChEnv,
@@ -691,7 +691,7 @@ int main(int argc, char *argv[]) {
         OptimalTransferStrategyALSImpl optimalTransferALSStrategy(routeState, fleet, vehicleInputGraph, *vehChEnv,
                                                                   rphastEnv);
 
-        using TransferALSPVehFinderImpl = OptimalTransferALSPVehFinder<VehicleInputGraph, VehCHEnv, OptimalTransferStrategyALSImpl, TransfersPickupALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
+        using TransferALSPVehFinderImpl = OptimalTransferALSPVehFinder<VehicleInputGraph, VehCHEnv, OptimalTransferStrategyALSImpl, TransfersPickupALSStrategy, CurVehLocToPickupSearchesImpl, InsertionAsserterImpl>;
         TransferALSPVehFinderImpl transferALSPVehInsertions(vehicleInputGraph,
                                                             *vehChEnv,
                                                             optimalTransferALSStrategy,
@@ -703,7 +703,7 @@ int main(int argc, char *argv[]) {
                                                             routeState, reqState, calc,
                                                             asserter);
 
-        using TransferALSDVehFinderImpl = OptimalTransferALSDVehFinder<VehicleInputGraph, VehCHEnv, OptimalTransferStrategyALSImpl, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
+        using TransferALSDVehFinderImpl = OptimalTransferALSDVehFinder<VehicleInputGraph, VehCHEnv, OptimalTransferStrategyALSImpl, CurVehLocToPickupSearchesImpl, InsertionAsserterImpl>;
         TransferALSDVehFinderImpl transferALSDVehInsertions(vehicleInputGraph,
                                                             *vehChEnv,
                                                             optimalTransferALSStrategy,
@@ -712,6 +712,7 @@ int main(int argc, char *argv[]) {
                                                             relPickupsBeforeNextStop,
                                                             fleet,
                                                             routeState, reqState,
+                                                            calc,
                                                             asserter);
 #else
 

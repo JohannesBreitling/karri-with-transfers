@@ -46,12 +46,13 @@ namespace karri {
         EdgeEllipseIntersector(const InputGraphT &inputGraph,
                                 const Fleet &fleet,
                                 const RequestState &requestState,
-                                const RouteState &routeState)
+                                const RouteState &routeState,
+                                CostCalculator &calc)
                 : inputGraph(inputGraph),
                   fleet(fleet),
                   requestState(requestState),
                   routeState(routeState),
-                  calc(routeState),
+                  calc(calc),
                   ellipsesSizeLogger(LogManager<EllipseSizeLoggerT>::getLogger("ellipses.csv",
                                                                                "size\n")),
                   ellipseIntersectionSizeLogger(LogManager<EllipseIntersectionSizeLoggerT>::getLogger("ellipse-intersection.csv",
@@ -240,7 +241,7 @@ namespace karri {
         const Fleet &fleet;
         const RequestState &requestState;
         const RouteState &routeState;
-        const CostCalculator calc;
+        CostCalculator& calc;
 
         int numStopsPVeh;
         int numStopsDVeh;

@@ -103,7 +103,7 @@ namespace karri {
                 requestState(requestState),
                 calc(calc),
                 asserter(asserter),
-                ellipseIntersector(inputGraph, fleet, requestState, routeState),
+                ellipseIntersector(inputGraph, fleet, requestState, routeState, calc),
                 edgesSubset(inputGraph.numEdges()),
                 stopSeen(fleet.size()) {}
 
@@ -328,7 +328,6 @@ namespace karri {
 
         void
         tryPartialAssignment(AssignmentWithTransfer &asgn, std::vector<AssignmentWithTransfer> &promisingPartials) {
-            const bool unfinished = asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed;
             // Check the cost of the partial assignment with transfer where pickup vehicle, dropoff vehicle, pickup and transfer point (therefore also both transfer stop indices) are set
 
             KASSERT(asgn.pVeh && asgn.pickup);

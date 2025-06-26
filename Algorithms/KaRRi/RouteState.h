@@ -438,10 +438,6 @@ namespace karri {
         insert(const AssignmentWithTransfer &asgn, const int depTimeAtPickup, const int arrTimeAtTransferPoint,
                const RequestStateT &requestState) {
 
-            if (requestState.originalRequest.requestId == 5277) {
-                std::cout << "";
-            }
-
             const auto [pickupIdx, transferIdxPVeh] = insertPVehStops(asgn, requestState);
             const auto [transferIdxDVeh, dropoffIdx] = insertDVehStops(asgn, depTimeAtPickup, arrTimeAtTransferPoint,
                                                                        requestState);
