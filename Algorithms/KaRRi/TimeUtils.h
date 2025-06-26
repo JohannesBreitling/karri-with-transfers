@@ -1006,6 +1006,13 @@ namespace karri::time_utils {
                     }
 
                     for (const auto &dependentStopId: routeState.getForwardDependencies(stopId)) {
+
+                        // If the dependent stop has already been processed with an equal or later departure time,
+                        // skip it. This avoids loops in the transfer dependency graph where one or more riders switch
+                        // in both directions at a transfer.
+                        if (newDepTimes[dependentStopId] >= depTimeAtStop)
+                            continue;
+
                         newDepTimes[dependentStopId] = depTimeAtStop;
                         firstStopIdsInRoutesToProcess.push_back(dependentStopId);
                     }
