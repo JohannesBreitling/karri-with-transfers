@@ -50,6 +50,7 @@ namespace karri {
                            LastStopBucketsEnvT &lastStopBucketsEnv)
                 : inputGraph(inputGraph),
                   vehCh(vehCh),
+                  chQuery(vehCh),
                   requestState(requestState),
                   curVehLocs(curVehLocs),
                   pathTracker(pathTracker),
@@ -240,6 +241,7 @@ namespace karri {
 
             // If the vehicle has to be rerouted at its current location for a PBNS assignment, we introduce an
             // intermediate stop at its current location representing the rerouting.
+            bool intermediateInsertedPVeh = false;
             if (asgn.pickupIdx == 0 && numStopsBeforePVeh > 1 &&
                 routeState.schedDepTimesFor(pVehId)[0] < requestState.originalRequest.requestTime) {
                 createIntermediateStopStopAtCurrentLocationForReroute(*asgn.pVeh,
@@ -248,8 +250,10 @@ namespace karri {
 
                 ++pIdxPVeh;
                 ++dIdxPVeh;
+                intermediateInsertedPVeh = true;
             }
 
+            bool intermediateInsertedDVeh = false;
             if (asgn.transferIdxDVeh == 0 && numStopsBeforeDVeh > 1 &&
                 routeState.schedDepTimesFor(dVehId)[0] < requestState.originalRequest.requestTime) {
                 createIntermediateStopStopAtCurrentLocationForReroute(*asgn.dVeh,
@@ -258,12 +262,16 @@ namespace karri {
 
                 ++pIdxDVeh;
                 ++dIdxDVeh;
+                intermediateInsertedDVeh = true;
             }
 
+            KASSERT(validateRouteDistances(pVehId, intermediateInsertedPVeh? 1 : 0));
+            KASSERT(validateRouteDistances(dVehId, intermediateInsertedDVeh? 1 : 0));
             assert(routeState.assertRoutePVeh(asgn, requestState.originalRequest.requestTime, depTimeAtPickup,
                                               transferAtStopPVeh, arrTimeAtTransferPoint));
             assert(routeState.assertRouteDVeh(asgn, requestState.originalRequest.requestTime, arrTimeAtTransferPoint,
                                               depTimeAtTransferPoint, arrTimeAtDropoff));
+
 
             const auto routeUpdateTime = timer.elapsed<std::chrono::nanoseconds>();
             requestState.stats().updateStats.updateRoutesTime += routeUpdateTime;
@@ -312,13 +320,17 @@ namespace karri {
 
             // If the vehicle has to be rerouted at its current location for a PBNS assignment, we introduce an
             // intermediate stop at its current location representing the rerouting.
+            bool intermediateInserted = false;
             if (asgn.pickupStopIdx == 0 && numStopsBefore > 1 && routeState.schedDepTimesFor(vehId)[0] <
                                                                  requestState.originalRequest.requestTime) {
                 createIntermediateStopStopAtCurrentLocationForReroute(*asgn.vehicle,
                                                                       requestState.originalRequest.requestTime);
                 ++pickupIndex;
                 ++dropoffIndex;
+                intermediateInserted = true;
             }
+
+            KASSERT(validateRouteDistances(vehId, intermediateInserted? 1 : 0));
 
             pickupStopId = routeState.stopIdsFor(vehId)[pickupIndex];
             dropoffStopId = routeState.stopIdsFor(vehId)[dropoffIndex];
@@ -771,8 +783,45 @@ namespace karri {
             lastStopBucketsEnv.generateNonIdleBucketEntries(*asgn.vehicle);
         }
 
+
+        bool validateRouteDistances(const int vehId, const int startIdx) {
+            const auto numStops = routeState.numStopsOf(vehId);
+            if (numStops <= 1)
+                return true;
+
+            const auto schedArrTimes = routeState.schedArrTimesFor(vehId);
+            const auto schedDepTimes = routeState.schedDepTimesFor(vehId);
+            const auto stopLocations = routeState.stopLocationsFor(vehId);
+
+            for (auto i = startIdx; i < numStops - 1; ++i) {
+                const auto distSchedule = schedArrTimes[i + 1] - schedDepTimes[i];
+                if (stopLocations[i] == stopLocations[i + 1]) {
+                    if (distSchedule != 0) {
+                        KASSERT(false);
+                        return false;
+                    }
+                    continue;
+                }
+
+                const auto source = inputGraph.edgeHead(stopLocations[i]);
+                const auto target = inputGraph.edgeTail(stopLocations[i + 1]);
+                const auto offset = inputGraph.travelTime(stopLocations[i + 1]);
+                chQuery.run(vehCh.rank(source), vehCh.rank(target));
+                const auto distRecomputed = chQuery.getDistance() + offset;
+
+                if (distSchedule != distRecomputed) {
+                    KASSERT(false);
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+
         const InputGraphT &inputGraph;
         const CH &vehCh;
+        CHQuery<BasicLabelSet<0, ParentInfo::NO_PARENT_INFO>> chQuery;
         RequestState &requestState;
         const CurVehLocsT &curVehLocs;
         PathTrackerT &pathTracker;

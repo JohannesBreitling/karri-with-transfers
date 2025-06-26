@@ -606,8 +606,8 @@ int main(int argc, char *argv[]) {
         RequestStateInitializerImpl requestStateInitializer(vehicleInputGraph, psgInputGraph, *vehChEnv, *psgChEnv,
                                                             reqState, vehicleToPdLocQuery);
 
-        using TransferAsserterImpl = InsertionAsserter<VehicleInputGraph, VehCHEnv>;
-        TransferAsserterImpl asserter(routeState, vehicleInputGraph, *vehChEnv);
+        using InsertionAsserterImpl = InsertionAsserter<VehicleInputGraph, VehCHEnv>;
+        InsertionAsserterImpl asserter(routeState, vehicleInputGraph, *vehChEnv);
 
 #if KARRI_TRANSFER_HEURISTIC_LEVEL == 0 && KARRI_TRANSFER_USE_DIJKSTRA_ELLIPSE_RECONSTRUCTION
         using TransferPointsLabelSet = BasicLabelSet<1, ParentInfo::NO_PARENT_INFO>;
@@ -723,7 +723,7 @@ int main(int argc, char *argv[]) {
         TransferStrategyALSImpl transferALSStrategy = CHStrategyALS(routeState, fleet, vehicleInputGraph, *vehChEnv);
 #endif
 
-        using TransferALSPVehFinderImpl = TransferALSPVehFinder<TransferStrategyALSImpl, TransfersPickupALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
+        using TransferALSPVehFinderImpl = TransferALSPVehFinder<TransferStrategyALSImpl, TransfersPickupALSStrategy, CurVehLocToPickupSearchesImpl, InsertionAsserterImpl>;
         TransferALSPVehFinderImpl transferALSPVehInsertions(transferALSStrategy,
                                                                                         transferPickupALSStrategy,
                                                                                         curVehLocToPickupSearches,
@@ -733,7 +733,7 @@ int main(int argc, char *argv[]) {
                                                                                         routeState, reqState, calc,
                                                                                         asserter);
 
-        using TransferALSDVehFinderImpl = TransferALSDVehFinder<TransferStrategyALSImpl, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
+        using TransferALSDVehFinderImpl = TransferALSDVehFinder<TransferStrategyALSImpl, CurVehLocToPickupSearchesImpl, InsertionAsserterImpl>;
         TransferALSDVehFinderImpl transferALSDVehInsertions = TransferALSDVehFinderImpl(transferALSStrategy,
                                                                                         curVehLocToPickupSearches,
                                                                                         relOrdinaryPickups,
@@ -747,7 +747,7 @@ int main(int argc, char *argv[]) {
                 TransferALSDVehFinderImpl,
                 TransfersDropoffALSStrategy,
                 EllipseReconstructorImpl,
-                TransferAsserterImpl>;
+                InsertionAsserterImpl>;
         AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(ordinaryTransferInsertions,
                                                                        transferALSPVehInsertions,
                                                                        transferALSDVehInsertions,
@@ -763,14 +763,15 @@ int main(int argc, char *argv[]) {
                 PALSInsertionsFinderImpl,
                 DALSInsertionsFinderImpl,
                 RelevantPDLocsFilterImpl,
-                AssignmentsWithTransferFinderImpl
+                AssignmentsWithTransferFinderImpl,
+                InsertionAsserterImpl
         >;
         InsertionFinderImpl insertionFinder(reqState, requestStateInitializer, ellipticSearches, pdDistanceQuery,
                                             ordinaryInsertionsFinder, pbnsInsertionsFinder, palsInsertionsFinder,
                                             dalsInsertionsFinder, relevantPdLocsFilter,
                                             relOrdinaryPickups, relPickupsBeforeNextStop,
                                             relOrdinaryDropoffs, relDropoffsBeforeNextStop,
-                                            insertionsWithTransferFinder);
+                                            insertionsWithTransferFinder, asserter);
 
 
 #if KARRI_OUTPUT_VEHICLE_PATHS

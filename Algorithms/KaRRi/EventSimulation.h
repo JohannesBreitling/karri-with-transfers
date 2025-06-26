@@ -66,7 +66,7 @@ namespace karri {
 
             // Indicate if the request is satisfied using assignment with transfer
             bool usingTransfer = false;
-            
+
             // Arrival and departure at transfer
             int arrAtTransferPoint = INFTY;
             int depTimeAtTransfer = INFTY;
@@ -85,8 +85,12 @@ namespace karri {
                   assignmentFinder(assignmentFinder),
                   systemStateUpdater(systemStateUpdater),
                   scheduledStops(scheduledStops),
-                  vehicleEvents(fleet.size()),
                   requestEvents(requests.size()),
+//                  vehicleEvents(fleet.size()),
+                  vehicleStartEvents(fleet.size()),
+                  vehicleShutdownEvents(fleet.size()),
+                  vehicleArrivalEvents(fleet.size()),
+                  vehicleDepartureEvents(fleet.size()),
                   vehicleState(fleet.size(), OUT_OF_SERVICE),
                   requestState(requests.size(), NOT_RECEIVED),
                   requestData(requests.size(), RequestData()),
@@ -95,15 +99,15 @@ namespace karri {
                                                                                   "type,"
                                                                                   "running_time\n")),
                   assignmentQualityStatsLogger(LogManager<std::ofstream>::getLogger("assignmentquality.csv",
-                                                                              "request_id,"
-                                                                              "using_transfer,"
-                                                                              "arr_time,"
-                                                                              "wait_time,"
-                                                                              "ride_time,"
-                                                                              "trip_time,"
-                                                                              "walk_to_pickup_time,"
-                                                                              "walk_to_dropoff_time,"
-                                                                              "cost\n")),
+                                                                                    "request_id,"
+                                                                                    "using_transfer,"
+                                                                                    "arr_time,"
+                                                                                    "wait_time,"
+                                                                                    "ride_time,"
+                                                                                    "trip_time,"
+                                                                                    "walk_to_pickup_time,"
+                                                                                    "walk_to_dropoff_time,"
+                                                                                    "cost\n")),
                   legStatsLogger(LogManager<std::ofstream>::getLogger("legstats.csv",
                                                                       "vehicle_id,"
                                                                       "stop_time,"
@@ -114,33 +118,58 @@ namespace karri {
                   progressBar(requests.size(), verbose) {
             progressBar.setDotOutputInterval(1);
             progressBar.setPercentageOutputInterval(5);
-            for (const auto &veh: fleet)
-                vehicleEvents.insert(veh.vehicleId, veh.startOfServiceTime);
+            for (const auto &veh: fleet) {
+//                vehicleEvents.insert(veh.vehicleId, veh.startOfServiceTime);
+                vehicleStartEvents.insert(veh.vehicleId, veh.startOfServiceTime);
+            }
             for (const auto &req: requests)
                 requestEvents.insert(req.requestId, req.requestTime);
         }
 
         void run() {
 
-            while (!(vehicleEvents.empty() && requestEvents.empty())) {
+            bool vehicleEventsEmpty = vehicleStartEvents.empty() && vehicleShutdownEvents.empty()
+                                      && vehicleArrivalEvents.empty() && vehicleDepartureEvents.empty();
+            while (!(vehicleEventsEmpty && requestEvents.empty())) {
                 // Pop next event from either queue. Request event has precedence if at the same time as vehicle event.
                 int id, occTime;
 
+
                 if (requestEvents.empty()) {
-                    vehicleEvents.min(id, occTime);
-                    handleVehicleEvent(id, occTime);
+                    handleVehicleEvent();
+//                    vehicleEvents.min(id, occTime);
+//                    handleVehicleEvent(id, occTime);
+                    vehicleEventsEmpty = vehicleStartEvents.empty() && vehicleShutdownEvents.empty()
+                                         && vehicleArrivalEvents.empty() && vehicleDepartureEvents.empty();
                     continue;
                 }
 
-                if (vehicleEvents.empty()) {
+                if (vehicleEventsEmpty) {
                     requestEvents.min(id, occTime);
                     handleRequestEvent(id, occTime);
                     continue;
                 }
 
-                if (vehicleEvents.minKey() < requestEvents.minKey()) {
-                    vehicleEvents.min(id, occTime);
-                    handleVehicleEvent(id, occTime);
+                const int nextStartupTime = vehicleStartEvents.empty() ? INFTY : vehicleStartEvents.minKey();
+                const int nextShutdownTime = vehicleShutdownEvents.empty() ? INFTY : vehicleShutdownEvents.minKey();
+                const int nextArrivalTime = vehicleArrivalEvents.empty() ? INFTY : vehicleArrivalEvents.minKey();
+                const int nextDepartureTime = vehicleDepartureEvents.empty() ? INFTY : vehicleDepartureEvents.minKey();
+                const int nextVehicleTime = std::min(nextStartupTime,
+                                                     std::min(nextShutdownTime,
+                                                              std::min(nextArrivalTime,
+                                                                       nextDepartureTime)));
+
+                // In the case of a tie, a vehicle startup, shutdown, or arrival take precedence over requests but a
+                // request takes precedence over a vehicle departure.
+                const int nextRequestTime = requestEvents.minKey();
+                if (nextVehicleTime < nextRequestTime || nextStartupTime == nextRequestTime ||
+                    nextShutdownTime == nextRequestTime || nextArrivalTime == nextRequestTime) {
+                    KASSERT(nextVehicleTime <= nextRequestTime);
+//                    vehicleEvents.min(id, occTime);
+//                    handleVehicleEvent(id, occTime);
+                    handleVehicleEvent();
+                    vehicleEventsEmpty = vehicleStartEvents.empty() && vehicleShutdownEvents.empty()
+                                         && vehicleArrivalEvents.empty() && vehicleDepartureEvents.empty();
                     continue;
                 }
 
@@ -151,23 +180,60 @@ namespace karri {
 
     private:
 
-        void handleVehicleEvent(const int vehId, const int occTime) {
-            switch (vehicleState[vehId]) {
-                case OUT_OF_SERVICE:
-                    handleVehicleStartup(vehId, occTime);
-                    break;
-                case IDLING:
-                    handleVehicleShutdown(vehId, occTime);
-                    break;
-                case DRIVING:
-                    handleVehicleArrivalAtStop(vehId, occTime);
-                    break;
-                case STOPPING:
-                    handleVehicleDepartureFromStop(vehId, occTime);
-                    break;
-                default:
-                    break;
+//        void handleVehicleEvent(const int vehId, const int occTime) {
+//            switch (vehicleState[vehId]) {
+//                case OUT_OF_SERVICE:
+//                    handleVehicleStartup(vehId, occTime);
+//                    break;
+//                case IDLING:
+//                    handleVehicleShutdown(vehId, occTime);
+//                    break;
+//                case DRIVING:
+//                    handleVehicleArrivalAtStop(vehId, occTime);
+//                    break;
+//                case STOPPING:
+//                    handleVehicleDepartureFromStop(vehId, occTime);
+//                    break;
+//                default:
+//                    break;
+//            }
+//        }
+
+        void handleVehicleEvent() {
+            int id, occTime;
+
+            const int nextStartupTime = vehicleStartEvents.empty() ? INFTY : vehicleStartEvents.minKey();
+            const int nextShutdownTime = vehicleShutdownEvents.empty() ? INFTY : vehicleShutdownEvents.minKey();
+            const int nextArrivalTime = vehicleArrivalEvents.empty() ? INFTY : vehicleArrivalEvents.minKey();
+            const int nextDepartureTime = vehicleDepartureEvents.empty() ? INFTY : vehicleDepartureEvents.minKey();
+
+            if (nextStartupTime <= nextShutdownTime && nextStartupTime <= nextArrivalTime &&
+                nextStartupTime <= nextDepartureTime) {
+                vehicleStartEvents.deleteMin(id, occTime);
+                handleVehicleStartup(id, occTime);
+                return;
             }
+
+            if (nextArrivalTime < nextStartupTime && nextArrivalTime <= nextDepartureTime &&
+                nextArrivalTime <= nextShutdownTime) {
+                vehicleArrivalEvents.deleteMin(id, occTime);
+                handleVehicleArrivalAtStop(id, occTime);
+                return;
+            }
+
+            if (nextDepartureTime < nextStartupTime && nextDepartureTime < nextArrivalTime &&
+                nextDepartureTime <= nextShutdownTime) {
+                vehicleDepartureEvents.deleteMin(id, occTime);
+                handleVehicleDepartureFromStop(id, occTime);
+                return;
+            }
+
+            KASSERT(nextShutdownTime < nextStartupTime && nextShutdownTime < nextArrivalTime &&
+                    nextShutdownTime < nextDepartureTime);
+            vehicleShutdownEvents.deleteMin(id, occTime);
+            KASSERT(!vehicleStartEvents.contains(id) && !vehicleArrivalEvents.contains(id) &&
+                    !vehicleDepartureEvents.contains(id));
+            handleVehicleShutdown(id, occTime);
         }
 
         void handleRequestEvent(const int reqId, const int occTime) {
@@ -175,7 +241,7 @@ namespace karri {
                 case NOT_RECEIVED:
                     handleRequestReceipt(reqId, occTime);
                     break;
-                
+
                 case ASSIGNED_TO_VEH:
                 case ASSIGNED_TO_DVEH:
                 case ASSIGNED_TO_PVEH:
@@ -200,13 +266,18 @@ namespace karri {
             unused(occTime);
             Timer timer;
 
+            // Every vehicle gets an event in vehicleShutdownEvents.
+            vehicleShutdownEvents.insert(vehId, fleet[vehId].endOfServiceTime);
+
             // Vehicle may have already been assigned stops. In this case it will start driving right away:
             if (scheduledStops.hasNextScheduledStop(vehId)) {
                 vehicleState[vehId] = DRIVING;
-                vehicleEvents.increaseKey(vehId, scheduledStops.getNextScheduledStop(vehId).arrTime);
+                vehicleArrivalEvents.insert(vehId, scheduledStops.getNextScheduledStop(vehId).arrTime);
+//                vehicleEvents.increaseKey(vehId, scheduledStops.getNextScheduledStop(vehId).arrTime);
             } else {
+                // An idling vehicle has no events other than its shutdown event.
                 vehicleState[vehId] = IDLING;
-                vehicleEvents.increaseKey(vehId, fleet[vehId].endOfServiceTime);
+//                vehicleEvents.increaseKey(vehId, fleet[vehId].endOfServiceTime);
             }
 
             const auto time = timer.elapsed<std::chrono::nanoseconds>();
@@ -222,9 +293,9 @@ namespace karri {
 
             vehicleState[vehId] = OUT_OF_SERVICE;
 
-            int id, key;
-            vehicleEvents.deleteMin(id, key);
-            assert(id == vehId && key == occTime);
+//            int id, key;
+////            vehicleEvents.deleteMin(id, key);
+//            assert(id == vehId && key == occTime);
             systemStateUpdater.notifyVehicleReachedEndOfServiceTime(fleet[vehId]);
 
             const auto time = timer.elapsed<std::chrono::nanoseconds>();
@@ -262,7 +333,8 @@ namespace karri {
             }
 
             // Next event for this vehicle is the departure at this stop:
-            vehicleEvents.increaseKey(vehId, reachedStop.depTime);
+//            vehicleEvents.increaseKey(vehId, reachedStop.depTime);
+            vehicleDepartureEvents.insert(vehId, reachedStop.depTime);
             systemStateUpdater.notifyStopStarted(fleet[vehId]);
 
             const auto time = timer.elapsed<std::chrono::nanoseconds>();
@@ -276,12 +348,11 @@ namespace karri {
 
             if (!scheduledStops.hasNextScheduledStop(vehId)) {
                 vehicleState[vehId] = IDLING;
-                vehicleEvents.increaseKey(vehId, fleet[vehId].endOfServiceTime);
+//                vehicleEvents.increaseKey(vehId, fleet[vehId].endOfServiceTime);
+//                vehicleShutdownEvents.insert(vehId, fleet[vehId].endOfServiceTime);
             } else {
                 // Remember departure time for all requests picked up at this stop:
                 const auto curStop = scheduledStops.getCurrentOrPrevScheduledStop(vehId);
-
-                // TODO: Need to make sure that the dropoff at transfer is processed before the pickup at transfer.
 
                 for (const auto &reqId: curStop.requestsPickedUpHere) {
                     // If this is the pickup vehicle of a rider, mark their departure time.
@@ -295,7 +366,8 @@ namespace karri {
                     }
                 }
                 vehicleState[vehId] = DRIVING;
-                vehicleEvents.increaseKey(vehId, scheduledStops.getNextScheduledStop(vehId).arrTime);
+//                vehicleEvents.increaseKey(vehId, scheduledStops.getNextScheduledStop(vehId).arrTime);
+                vehicleArrivalEvents.insert(vehId, scheduledStops.getNextScheduledStop(vehId).arrTime);
             }
 
             systemStateUpdater.notifyStopCompleted(fleet[vehId]);
@@ -315,7 +387,8 @@ namespace karri {
             systemStateUpdater.writeBestAssignmentToLogger();
 
             if (asgnFinderResponse.improvementThroughTransfer()) {
-                applyAssignmentWithTransfer(asgnFinderResponse.getBestAssignmentWithTransfer(), asgnFinderResponse.getBestCostWithTransfer(), reqId);
+                applyAssignmentWithTransfer(asgnFinderResponse.getBestAssignmentWithTransfer(),
+                                            asgnFinderResponse.getBestCostWithTransfer(), reqId);
             } else {
                 applyAssignment(asgnFinderResponse, reqId, occTime);
             }
@@ -325,7 +398,7 @@ namespace karri {
         }
 
         template<typename AssignmentWithTransferT>
-        void applyAssignmentWithTransfer(const AssignmentWithTransferT &asgn, const int& cost, const int reqId) {
+        void applyAssignmentWithTransfer(const AssignmentWithTransferT &asgn, const int &cost, const int reqId) {
             if (!asgn.dVeh || !asgn.pVeh || !asgn.pickup || !asgn.dropoff) {
                 requestState[reqId] = FINISHED;
                 systemStateUpdater.writePerformanceLogs();
@@ -340,9 +413,10 @@ namespace karri {
             requestData[reqId].walkingTimeFromDropoff = asgn.dropoff->walkingDist;
             requestData[reqId].assignmentCost = cost;
             requestData[reqId].usingTransfer = true;
-            
-            int pickupStopId, transferStopIdPVeh, transferStopIdDVeh, dropoffStopId; 
-            systemStateUpdater.insertBestAssignmentWithTransfer(asgn, pickupStopId, transferStopIdPVeh, transferStopIdDVeh, dropoffStopId);
+
+            int pickupStopId, transferStopIdPVeh, transferStopIdDVeh, dropoffStopId;
+            systemStateUpdater.insertBestAssignmentWithTransfer(asgn, pickupStopId, transferStopIdPVeh,
+                                                                transferStopIdDVeh, dropoffStopId);
             systemStateUpdater.writePerformanceLogs();
 
             const auto pVehId = asgn.pVeh->vehicleId;
@@ -351,15 +425,20 @@ namespace karri {
             switch (vehicleState[pVehId]) {
                 case STOPPING:
                     // Update event time to departure time at current stop since it may have changed
-                    vehicleEvents.updateKey(pVehId, scheduledStops.getCurrentOrPrevScheduledStop(pVehId).depTime);
+//                    vehicleEvents.updateKey(pVehId, scheduledStops.getCurrentOrPrevScheduledStop(pVehId).depTime);
+                    vehicleDepartureEvents.updateKey(pVehId,
+                                                     scheduledStops.getCurrentOrPrevScheduledStop(pVehId).depTime);
                     break;
                 case IDLING:
+                    // If vehicle was idling it is now driving and gets an arrival event at the next stop.
                     vehicleState[pVehId] = VehicleState::DRIVING;
-                    [[fallthrough]];
+                    vehicleArrivalEvents.insert(pVehId, scheduledStops.getNextScheduledStop(pVehId).arrTime);
+                    break;
                 case DRIVING:
-                    // Update event time to arrival time at next stop since it may have changed (also for case of idling).
-                    vehicleEvents.updateKey(pVehId, scheduledStops.getNextScheduledStop(pVehId).arrTime);
-                    [[fallthrough]];
+                    // Update event time to arrival time at next stop since it may have changed.
+//                    vehicleEvents.updateKey(pVehId, scheduledStops.getNextScheduledStop(pVehId).arrTime);
+                    vehicleArrivalEvents.updateKey(pVehId, scheduledStops.getNextScheduledStop(pVehId).arrTime);
+                    break;
                 default:
                     break;
             }
@@ -367,15 +446,19 @@ namespace karri {
             switch (vehicleState[dVehId]) {
                 case STOPPING:
                     // Update event time to departure time at current stop since it may have changed
-                    vehicleEvents.updateKey(dVehId, scheduledStops.getCurrentOrPrevScheduledStop(dVehId).depTime);
+//                    vehicleEvents.updateKey(dVehId, scheduledStops.getCurrentOrPrevScheduledStop(dVehId).depTime);
+                    vehicleDepartureEvents.updateKey(dVehId,
+                                                     scheduledStops.getCurrentOrPrevScheduledStop(dVehId).depTime);
                     break;
                 case IDLING:
                     vehicleState[dVehId] = VehicleState::DRIVING;
-                    [[fallthrough]];
+                    vehicleArrivalEvents.insert(dVehId, scheduledStops.getNextScheduledStop(dVehId).arrTime);
+                    break;
                 case DRIVING:
-                    // Update event time to arrival time at next stop since it may have changed (also for case of idling).
-                    vehicleEvents.updateKey(dVehId, scheduledStops.getNextScheduledStop(dVehId).arrTime);
-                    [[fallthrough]];
+                    // Update event time to arrival time at next stop since it may have changed.
+//                    vehicleEvents.updateKey(dVehId, scheduledStops.getNextScheduledStop(dVehId).arrTime);
+                    vehicleArrivalEvents.updateKey(dVehId, scheduledStops.getNextScheduledStop(dVehId).arrTime);
+                    break;
                 default:
                     break;
             }
@@ -422,15 +505,19 @@ namespace karri {
             switch (vehicleState[vehId]) {
                 case STOPPING:
                     // Update event time to departure time at current stop since it may have changed
-                    vehicleEvents.updateKey(vehId, scheduledStops.getCurrentOrPrevScheduledStop(vehId).depTime);
+//                    vehicleEvents.updateKey(vehId, scheduledStops.getCurrentOrPrevScheduledStop(vehId).depTime);
+                    vehicleDepartureEvents.updateKey(vehId,
+                                                     scheduledStops.getCurrentOrPrevScheduledStop(vehId).depTime);
                     break;
                 case IDLING:
+                    // If vehicle was idling it is now driving and gets an arrival event at the next stop.
                     vehicleState[vehId] = VehicleState::DRIVING;
-                    [[fallthrough]];
+                    vehicleArrivalEvents.insert(vehId, scheduledStops.getNextScheduledStop(vehId).arrTime);
+                    break;
                 case DRIVING:
-                    // Update event time to arrival time at next stop since it may have changed (also for case of idling).
-                    vehicleEvents.updateKey(vehId, scheduledStops.getNextScheduledStop(vehId).arrTime);
-                    [[fallthrough]];
+                    // Update event time to arrival time at next stop since it may have changed.
+                    vehicleArrivalEvents.updateKey(vehId, scheduledStops.getNextScheduledStop(vehId).arrTime);
+                    break;
                 default:
                     break;
             }
@@ -466,16 +553,16 @@ namespace karri {
             }
 
             assert(waitTime >= 0 && rideTime >= 0);
-            
+
             assignmentQualityStatsLogger << reqId << ','
-                                   << reqData.usingTransfer << ","
-                                   << arrTime << ','
-                                   << waitTime << ','
-                                   << rideTime << ','
-                                   << tripTime << ','
-                                   << reqData.walkingTimeToPickup << ','
-                                   << reqData.walkingTimeFromDropoff << ','
-                                   << reqData.assignmentCost << '\n';
+                                         << reqData.usingTransfer << ","
+                                         << arrTime << ','
+                                         << waitTime << ','
+                                         << rideTime << ','
+                                         << tripTime << ','
+                                         << reqData.walkingTimeToPickup << ','
+                                         << reqData.walkingTimeFromDropoff << ','
+                                         << reqData.assignmentCost << '\n';
 
             const auto time = timer.elapsed<std::chrono::nanoseconds>();
             eventSimulationStatsLogger << occTime << ",RequestWalkingArrival," << time << '\n';
@@ -488,8 +575,18 @@ namespace karri {
         SystemStateUpdaterT &systemStateUpdater;
         const ScheduledStopsT &scheduledStops;
 
-        AddressableQuadHeap vehicleEvents;
         AddressableQuadHeap requestEvents;
+//        AddressableQuadHeap vehicleEvents;
+
+        // Every vehicle is initialized to only have a start event. Once the start is reached, a shutdown event is
+        // added which is active until the end of the service time.
+        // An idle vehicle has no event other than the shutdown event.
+        // A vehicle that is currently driving has an arrival event but no departure event.
+        // A vehicle that is currently stopping has a departure event but no arrival event.
+        AddressableQuadHeap vehicleStartEvents;
+        AddressableQuadHeap vehicleShutdownEvents;
+        AddressableQuadHeap vehicleArrivalEvents;
+        AddressableQuadHeap vehicleDepartureEvents;
 
         std::vector<VehicleState> vehicleState;
         std::vector<RequestState> requestState;

@@ -44,7 +44,8 @@ namespace karri {
             typename PalsAssignmentsT,
             typename DalsAssignmentsT,
             typename RelevantPDLocsFilterT,
-            typename AssignmentsWithTransferT
+            typename AssignmentsWithTransferT,
+            typename InsertionAsserterT
     >
     class AssignmentFinder {
 
@@ -63,7 +64,8 @@ namespace karri {
                          const RelevantPDLocs &relBNSPickups,
                          const RelevantPDLocs &relORDDropoffs,
                          const RelevantPDLocs &relBNSDropoffs,
-                         AssignmentsWithTransferT &assignmentsWithTransfer
+                         AssignmentsWithTransferT &assignmentsWithTransfer,
+                         InsertionAsserterT &insertionAsserter
         )
                 : reqState(requestState),
                   requestStateInitializer(requestStateInitializer),
@@ -78,7 +80,8 @@ namespace karri {
                   relBNSPickups(relBNSPickups),
                   relORDDropoffs(relORDDropoffs),
                   relBNSDropoffs(relBNSDropoffs),
-                  assignmentsWithTransfer(assignmentsWithTransfer) {}
+                  assignmentsWithTransfer(assignmentsWithTransfer),
+                  insertionAsserter(insertionAsserter) {}
 
         const RequestState &findBestAssignment(const Request &req) {
 
@@ -108,6 +111,8 @@ namespace karri {
 
             // Try PBNS assignments:
             pbnsAssignments.findAssignments();
+
+            KASSERT(insertionAsserter.assertAssignment(reqState.getBestAssignmentWithoutTransfer()));
 
             // * Find the best assignment that contains a transfer
             if (InputConfig::getInstance().includeTransfers)
@@ -171,5 +176,7 @@ namespace karri {
         const RelevantPDLocs &relBNSDropoffs;
 
         AssignmentsWithTransferT &assignmentsWithTransfer;
+
+        InsertionAsserterT& insertionAsserter;
     };
 }

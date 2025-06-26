@@ -932,15 +932,22 @@ namespace karri::time_utils {
                         depTimeBeforeTransferDVeh + !transferDVehAtStop * (asgn.distToTransferDVeh + stopTime);
                 const bool transferPVehAtStop = isTransferAtExistingStopPVeh(asgn, routeState);
                 const int stopIdBeforeTransferPVeh = routeState.stopIdsFor(pVehId)[asgn.transferIdxPVeh];
-                const auto depTimeBeforeTransferPVeh = (asgn.pickupIdx == asgn.transferIdxPVeh) ?
-                                                       getActualDepTimeAtPickup(asgn, context, routeState) :
-                                                       std::max(routeState.schedDepTimesFor(
-                                                                        pVehId)[asgn.transferIdxPVeh],
-                                                                newDepTimes[stopIdBeforeTransferPVeh]);
-                auto minVehicleDepTimeAtTransferPVeh =
-                        depTimeBeforeTransferPVeh + !transferPVehAtStop * (asgn.distToTransferPVeh + stopTime);
+
+                int minRiderArrTimeAtTransferPVeh;
+                if (transferPVehAtStop) {
+                    minRiderArrTimeAtTransferPVeh = std::max(routeState.schedArrTimesFor(pVehId)[asgn.transferIdxPVeh],
+                                                             newArrTimes[stopIdBeforeTransferPVeh]);
+                } else {
+                    const auto depTimeBeforeTransferPVeh = (asgn.pickupIdx == asgn.transferIdxPVeh) ?
+                                                           getActualDepTimeAtPickup(asgn, context, routeState) :
+                                                           std::max(routeState.schedDepTimesFor(
+                                                                            pVehId)[asgn.transferIdxPVeh],
+                                                                    newDepTimes[stopIdBeforeTransferPVeh]);
+                    minRiderArrTimeAtTransferPVeh = depTimeBeforeTransferPVeh + asgn.distToTransferPVeh;
+                }
+
                 const auto depTimeAtTransfer = std::max(minVehicleDepTimeAtTransferDVeh,
-                                                        minVehicleDepTimeAtTransferPVeh);
+                                                        minRiderArrTimeAtTransferPVeh);
                 const int arrTimeRightAfterTransferDVeh = std::max(
                         routeState.schedArrTimesFor(dVehId)[asgn.transferIdxDVeh + 1],
                         depTimeAtTransfer +
@@ -1031,14 +1038,16 @@ namespace karri::time_utils {
                                       const RouteState &routeState) {
         const auto pVehId = asgn.pVeh->vehicleId;
         const int stopIdBeforeTransferPVeh = routeState.stopIdsFor(pVehId)[asgn.transferIdxPVeh];
-        const int depTimeBeforeTransferPVeh =
-                (asgn.pickupIdx == asgn.transferIdxPVeh) ? depTimeAtPickup :
-                std::max(routeState.schedDepTimesFor(pVehId)[asgn.transferIdxPVeh],
-                         detourComputer.newDepTimes[stopIdBeforeTransferPVeh]);
+
         if (transferPVehAtExistingStop) {
             return std::max(routeState.schedArrTimesFor(pVehId)[asgn.transferIdxPVeh],
                             detourComputer.newArrTimes[stopIdBeforeTransferPVeh]);
         }
+
+        const int depTimeBeforeTransferPVeh = (asgn.pickupIdx == asgn.transferIdxPVeh) ?
+                                              depTimeAtPickup :
+                                              std::max(routeState.schedDepTimesFor(pVehId)[asgn.transferIdxPVeh],
+                                                       detourComputer.newDepTimes[stopIdBeforeTransferPVeh]);
         return depTimeBeforeTransferPVeh + asgn.distToTransferPVeh;
     }
 
@@ -1061,9 +1070,9 @@ namespace karri::time_utils {
     }
 
     int computeArrTimeAtDropoffAfterTransfer(const AssignmentWithTransfer &asgn,
-                                const int depTimeAtTransfer,
-                                DetourComputer &detourComputer,
-                                const RouteState &routeState) {
+                                             const int depTimeAtTransfer,
+                                             DetourComputer &detourComputer,
+                                             const RouteState &routeState) {
         if (asgn.transferIdxDVeh == asgn.dropoffIdx) {
             // If the dropoff is at the same stop as the transfer, we can use the departure time at the transfer.
             return depTimeAtTransfer + asgn.distToDropoff;

@@ -125,7 +125,17 @@ namespace karri {
                 }
             }
 
-            if (checkHardConstraints && asgn.dropoffStopIdx < routeState.numStopsOf(vehId) - 1) {
+            const int numStops = routeState.numStopsOf(vehId);
+
+            // Count the detour for pickup and/or dropoff after last stop.
+            if (asgn.dropoffStopIdx == numStops - 1) {
+                totalResidualDetours += asgn.distToDropoff + stopTime;
+                if (asgn.pickupStopIdx == numStops - 1) {
+                    totalResidualDetours += asgn.distToPickup + stopTime;
+                }
+            }
+
+            if (checkHardConstraints && asgn.dropoffStopIdx < numStops - 1) {
                 const int depTimeRightAfterDropoff = detourComputer.newDepTimes[routeState.stopIdsFor(vehId)[
                         asgn.dropoffStopIdx + 1]];
                 const int detourRightAfterDropoff = depTimeRightAfterDropoff -
@@ -235,6 +245,22 @@ namespace karri {
                         return RequestCost::INFTY_COST();
 
                     totalResidualDetours += residualDetour;
+                }
+            }
+
+            // Count the detour for pickup and/or transfer after last stop of pVeh.
+            if (asgn.transferIdxPVeh == numStopsPVeh - 1) {
+                totalResidualDetours += asgn.distToTransferPVeh + stopTime;
+                if (asgn.pickupIdx == numStopsPVeh - 1) {
+                    totalResidualDetours += asgn.distToPickup + stopTime;
+                }
+            }
+
+            // Count the detour for transfer and/or dropoff after last stop of dVeh.
+            if (asgn.dropoffIdx == numStopsDVeh - 1) {
+                totalResidualDetours += asgn.distToDropoff + stopTime;
+                if (asgn.transferIdxDVeh == numStopsDVeh - 1) {
+                    totalResidualDetours += asgn.distToTransferDVeh + stopTime;
                 }
             }
 
