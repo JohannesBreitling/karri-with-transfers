@@ -76,6 +76,11 @@ namespace karri {
             // Method to find the best assignment with exactly one transfer, i. e. the best possible
             // single transfer journey for the given request
 
+
+            if (requestState.originalRequest.requestId == 1433) {
+                std::cout << "";
+            }
+
             const auto relALSDropoffs = dropoffALSStrategy.findDropoffsAfterLastStop();
             std::vector<int> pVehStopIds;
             std::vector<int> dVehStopIds;
