@@ -397,7 +397,7 @@ namespace karri {
                                     asgn.distToTransferDVeh = transferAtLastStop ? 0 : distToTransferDVeh;
                                     asgn.distFromTransferDVeh = 0;
 
-                                    asgn.pickupType = BEFORE_NEXT_STOP;
+                                    asgn.pickupType = BEFORE_NEXT_STOP; // TODO:fix
                                     asgn.transferTypePVeh = ORDINARY;
                                     asgn.transferTypeDVeh = AFTER_LAST_STOP;
                                     asgn.dropoffType = AFTER_LAST_STOP;

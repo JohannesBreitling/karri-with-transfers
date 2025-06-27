@@ -1005,15 +1005,20 @@ namespace karri::time_utils {
                         break;
                     }
 
+                    const auto arrTimeAtStop = newArrTimes[stopId];
                     for (const auto &dependentStopId: routeState.getForwardDependencies(stopId)) {
+
+                        // The dropoff vehicle (dependent vehicle) can only leave the transfer stop after the rider
+                        // that transfers has reached the stop in the pickup vehicle. Set new earliest departure time
+                        // at transfer stop in dropoff vehicle and mark vehicle to propagate if necessary.
 
                         // If the dependent stop has already been processed with an equal or later departure time,
                         // skip it. This avoids loops in the transfer dependency graph where one or more riders switch
                         // in both directions at a transfer.
-                        if (newDepTimes[dependentStopId] >= depTimeAtStop)
+                        if (newDepTimes[dependentStopId] >= arrTimeAtStop)
                             continue;
 
-                        newDepTimes[dependentStopId] = depTimeAtStop;
+                        newDepTimes[dependentStopId] = arrTimeAtStop;
                         firstStopIdsInRoutesToProcess.push_back(dependentStopId);
                     }
 
@@ -1087,6 +1092,11 @@ namespace karri::time_utils {
 
         const auto dVehId = asgn.dVeh->vehicleId;
         const int stopIdBeforeDropoff = routeState.stopIdsFor(dVehId)[asgn.dropoffIdx];
+        const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
+        if (dropoffAtExistingStop) {
+            return std::max(routeState.schedArrTimesFor(dVehId)[asgn.dropoffIdx],
+                            detourComputer.newArrTimes[stopIdBeforeDropoff]);
+        }
         const int depTimeBeforeDropoff = std::max(routeState.schedDepTimesFor(dVehId)[asgn.dropoffIdx],
                                                   detourComputer.newDepTimes[stopIdBeforeDropoff]);
         return depTimeBeforeDropoff + asgn.distToDropoff;

@@ -856,6 +856,21 @@ namespace karri {
 
         void addTransferDependency(const int transferStopIdPVeh, const int transferStopIdDVeh) {
             KASSERT(transferStopIdPVeh != transferStopIdDVeh);
+            const bool forwDependencyExists = contains(
+                    forwardDependenciesStopIds.begin() + forwardDependenciesPos[transferStopIdPVeh].start,
+                    forwardDependenciesStopIds.begin() + forwardDependenciesPos[transferStopIdPVeh].end,
+                    transferStopIdDVeh);
+            const bool backwDependencyExists = contains(
+                    backwardDependenciesStopIds.begin() + backwardDependenciesPos[transferStopIdDVeh].start,
+                    backwardDependenciesStopIds.begin() + backwardDependenciesPos[transferStopIdDVeh].end,
+                    transferStopIdPVeh);
+            unused(backwDependencyExists); // only for assertion
+            KASSERT((forwDependencyExists && backwDependencyExists) || (!forwDependencyExists && !backwDependencyExists));
+
+            // Avoid duplicates
+            if (forwDependencyExists)
+                return;
+
             insertion(transferStopIdPVeh, transferStopIdDVeh, forwardDependenciesPos, forwardDependenciesStopIds);
             insertion(transferStopIdDVeh, transferStopIdPVeh, backwardDependenciesPos, backwardDependenciesStopIds);
         }
@@ -1072,7 +1087,7 @@ namespace karri {
 
             // Assert the the arrival at the transfer point (dropoff for passenger) is correct
             if (transferIdxPVeh > 0 && transferAsNewStop &&
-                schedDepTimesPVeh[transferIdxPVeh - 1] + asgn.distToTransferPVeh != arrAtTransferPoint)  {
+                schedDepTimesPVeh[transferIdxPVeh - 1] + asgn.distToTransferPVeh != arrAtTransferPoint) {
                 KASSERT(false);
                 return false;
             }
@@ -1085,7 +1100,7 @@ namespace karri {
             KASSERT(schedArrTimesPVeh[transferIdxPVeh] == arrAtTransferPoint);
             KASSERT(schedArrTimesPVeh[pickupIdx] + InputConfig::getInstance().stopTime <= schedDepTimesPVeh[pickupIdx]);
             KASSERT(schedArrTimesPVeh[transferIdxPVeh] + InputConfig::getInstance().stopTime <=
-                   schedDepTimesPVeh[transferIdxPVeh]);
+                    schedDepTimesPVeh[transferIdxPVeh]);
 
             if (schedArrTimesPVeh[transferIdxPVeh] != arrAtTransferPoint
                 || schedArrTimesPVeh[pickupIdx] + InputConfig::getInstance().stopTime > schedDepTimesPVeh[pickupIdx]
@@ -1183,7 +1198,8 @@ namespace karri {
 
             if (schedArrTimesDVeh[transferIdxDVeh] + InputConfig::getInstance().stopTime >
                 schedDepTimesDVeh[transferIdxDVeh]
-                || schedArrTimesDVeh[dropoffIdx] + InputConfig::getInstance().stopTime > schedDepTimesDVeh[dropoffIdx]) {
+                ||
+                schedArrTimesDVeh[dropoffIdx] + InputConfig::getInstance().stopTime > schedDepTimesDVeh[dropoffIdx]) {
                 KASSERT(false);
                 return false;
             }
@@ -1227,7 +1243,7 @@ namespace karri {
             //     return false;
             // }
 
-            if (!paired && schedArrTimesPVeh[pickupIdx + 1] - schedDepTimesPVeh[pickupIdx] != asgn.distFromPickup)  {
+            if (!paired && schedArrTimesPVeh[pickupIdx + 1] - schedDepTimesPVeh[pickupIdx] != asgn.distFromPickup) {
                 KASSERT(false);
                 return false;
             }
@@ -1239,7 +1255,8 @@ namespace karri {
                                    ConstantVectorRange<int> schedArrTimesPVeh, const int transferIdxPVeh,
                                    const int numStopsPVeh) {
             if (transferIdxPVeh <= 0 ||
-                schedArrTimesPVeh[transferIdxPVeh] - schedDepTimesPVeh[transferIdxPVeh - 1] != asgn.distToTransferPVeh) {
+                schedArrTimesPVeh[transferIdxPVeh] - schedDepTimesPVeh[transferIdxPVeh - 1] !=
+                asgn.distToTransferPVeh) {
                 KASSERT(false);
                 return false;
             }
@@ -1300,7 +1317,7 @@ namespace karri {
 
             // If the dropoff is not als, assert the distance to the next stop
             if (dropoffIdx < numStopsDVeh - 1 &&
-                schedArrTimesDVeh[dropoffIdx + 1] - schedDepTimesDVeh[dropoffIdx] != asgn.distFromDropoff)  {
+                schedArrTimesDVeh[dropoffIdx + 1] - schedDepTimesDVeh[dropoffIdx] != asgn.distFromDropoff) {
                 KASSERT(false);
                 return false;
             }
