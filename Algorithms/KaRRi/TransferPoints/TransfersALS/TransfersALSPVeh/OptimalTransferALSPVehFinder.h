@@ -296,7 +296,7 @@ namespace karri {
                     calcLengthOfLegStartingAt(transferIdx, vehId, routeState);
             KASSERT(minTransferDetour >= 0);
             const int minResDetour = std::max(0, minTransferDetour - vehWaitTimeFromTransferToEndOfRoute);
-            int minTripTime = transferIdx == earliestDropoffIdx? 0 : e.distFromHead;
+            int minTripTime = transferIdx == earliestDropoffIdx ? 0 : e.distFromHead;
             int minAddedTripTime = 0;
             if (transferIdx < earliestDropoffIdx) {
                 const int minArrStopBeforeDropoff =
@@ -449,6 +449,9 @@ namespace karri {
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
                 // const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
                 const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
+                const auto schedDepTimesDVeh = routeState.schedDepTimesFor(dVehId);
+                const auto schedArrTimesDVeh = routeState.schedArrTimesFor(dVehId);
+                const auto occupanciesDVeh = routeState.occupanciesFor(dVehId);
 
                 if (dVehId == pVeh->vehicleId)
                     continue;
@@ -463,9 +466,41 @@ namespace karri {
                     const auto &transfersToThisDropoffDistances = transfersToDropoffsDistances.getDistancesFor(
                             relDropoff.pdId);
 
+                    // Compute part of cost lower bound that depends only on the dropoff
+                    using namespace time_utils;
+                    const bool dropoffAtExistingStop = isDropoffAtExistingStop(dVehId, INVALID_INDEX, relDropoff.stopIndex,
+                                                                               dropoff->loc, routeState);
+                    const int minInitialDropoffDetour =
+                            calcInitialDropoffDetour(dVehId, relDropoff.stopIndex, relDropoff.distToPDLoc,
+                                                     relDropoff.distFromPDLocToNextStop,
+                                                     dropoffAtExistingStop, routeState);
+                    const int minDropoffCostWithoutTrip =
+                            calc.calcMinKnownDropoffSideCostWithoutTripTime(*dVeh, relDropoff.stopIndex,
+                                                                            minInitialDropoffDetour,
+                                                                            dropoff->walkingDist, requestState);
+
                     for (int i = relDropoff.stopIndex; i > 0; i--) {
                         if (i >= numStopsDVeh - 1)
                             continue;
+
+                        // If occupancy exceeds capacity at this leg, we do not have to consider this or earlier stops
+                        // of the route, as this leg needs to be traversed.
+                        if (occupanciesDVeh[i] + requestState.originalRequest.numRiders > dVeh->capacity)
+                            break;
+
+                        // Compute lower bound for costs with transfer between i and i + 1, considering trip time
+                        // from stop i + 1 to the dropoff and detour to the dropoff. This lower bound also holds for
+                        // any stop before i so if it is worse than the best known cost, we can stop for this vehicle.
+                        const auto minTripTimeToStopBeforeDropoff =
+                                schedArrTimesDVeh[relDropoff.stopIndex] - schedDepTimesDVeh[i + 1];
+                        const int minTripTimeToDropoff =
+                                std::max(requestState.minDirectPDDist, minTripTimeToStopBeforeDropoff +
+                                        relDropoff.distToPDLoc) + dropoff->walkingDist;
+                        const int minCostFromHere =
+                                CostCalculator::CostFunction::calcTripCost(minTripTimeToDropoff, requestState) +
+                                minDropoffCostWithoutTrip;
+                        if (minCostFromHere > requestState.getBestCost())
+                            break;
 
                         const int stopId = stopIdsDVeh[i];
                         const auto &transferEdges = ellipseContainer.getEdgesInEllipse(stopId);
@@ -476,7 +511,8 @@ namespace karri {
                             KASSERT(isEdgeRel.isSet(transferLoc));
                             const int edgeOffset = inputGraph.travelTime(transferLoc);
 
-                            if (minDVehCostForTransferEdge[relEdgesToInternalIdx[transferLoc]] >= requestState.getBestCost())
+                            if (minDVehCostForTransferEdge[relEdgesToInternalIdx[transferLoc]] >=
+                                requestState.getBestCost())
                                 continue;
 
                             const int distancePVehToTransfer = thisPickupToTransfersDistances[relEdgesToInternalIdx[transferLoc]];
@@ -556,6 +592,10 @@ namespace karri {
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
                 // const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
                 const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
+                const auto schedDepTimesDVeh = routeState.schedDepTimesFor(dVehId);
+                const auto occupanciesDVeh = routeState.occupanciesFor(dVehId);
+                const auto schedArrTimeAtLastStopDVeh = routeState.schedArrTimesFor(dVehId)[numStopsDVeh - 1];
+                const auto lastStopLoc = routeState.stopLocationsFor(dVehId)[numStopsDVeh - 1];
 
                 if (dVehId == pVeh->vehicleId)
                     continue;
@@ -564,8 +604,37 @@ namespace karri {
                 for (const auto dropoffEntry: relALSDropoffs.relevantSpotsFor(dVehId)) {
                     const auto &dropoff = requestState.dropoffs[dropoffEntry.dropoffId];
 
+                    using namespace time_utils;
+                    const bool dropoffAtExistingStop = dropoff.loc == lastStopLoc;
+                    const int minInitialDropoffDetour = calcInitialDropoffDetour(dVehId, numStopsDVeh - 1,
+                                                                                 numStopsDVeh - 1, 0,
+                                                                                 dropoffAtExistingStop, routeState);
+                    const int minDropoffCostWithoutTrip =
+                            calc.calcMinKnownDropoffSideCostWithoutTripTime(*dVeh, numStopsDVeh - 1,
+                                                                            minInitialDropoffDetour,
+                                                                            dropoff.walkingDist, requestState);
+
                     // Try all possible transfer points
-                    for (int i = 1; i < numStopsDVeh - 1; i++) {
+                    for (int i = numStopsDVeh - 2; i >= 1; --i) {
+
+                        // If occupancy exceeds capacity at this leg, we do not have to consider this or earlier stops
+                        // of the route, as this leg needs to be traversed.
+                        if (occupanciesDVeh[i] + requestState.originalRequest.numRiders > dVeh->capacity)
+                            break;
+
+                        // Compute lower bound for costs with transfer between i and i + 1, considering trip time
+                        // from stop i + 1 to the dropoff and detour to the dropoff. This lower bound also holds for
+                        // any stop before i so if it is worse than the best known cost, we can stop for this vehicle.
+                        const auto minTripTimeToLastStop = schedArrTimeAtLastStopDVeh - schedDepTimesDVeh[i + 1];
+                        const int minTripTimeToDropoff = std::max(requestState.minDirectPDDist,
+                                                                  minTripTimeToLastStop + dropoffEntry.distToDropoff) +
+                                                         dropoff.walkingDist;
+                        const int minCostFromHere =
+                                CostCalculator::CostFunction::calcTripCost(minTripTimeToDropoff, requestState) +
+                                minDropoffCostWithoutTrip;
+                        if (minCostFromHere > requestState.getBestCost())
+                            break;
+
                         const int stopId = stopIdsDVeh[i];
                         const auto &transferEdges = ellipseContainer.getEdgesInEllipse(stopId);
 
@@ -574,7 +643,8 @@ namespace karri {
                             const int transferLoc = edge.edge;
                             KASSERT(isEdgeRel.isSet(transferLoc));
 
-                            if (minDVehCostForTransferEdge[relEdgesToInternalIdx[transferLoc]] >= requestState.getBestCost())
+                            if (minDVehCostForTransferEdge[relEdgesToInternalIdx[transferLoc]] >=
+                                requestState.getBestCost())
                                 continue;
 
                             const int edgeOffset = inputGraph.travelTime(transferLoc);
@@ -653,6 +723,9 @@ namespace karri {
                 const auto *dVeh = &fleet[dVehId];
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
                 const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
+                const auto schedDepTimesDVeh = routeState.schedDepTimesFor(dVehId);
+                const auto schedArrTimesDVeh = routeState.schedArrTimesFor(dVehId);
+                const auto occupanciesDVeh = routeState.occupanciesFor(dVehId);
 
                 for (const auto &dropoff: relORDDropoffs.relevantSpotsFor(dVehId)) {
                     const auto *dropoffPDLoc = &requestState.dropoffs[dropoff.pdId];
@@ -662,10 +735,41 @@ namespace karri {
                     if (dropoff.stopIndex == numStopsDVeh - 1)
                         continue;
 
+                    // Compute part of cost lower bound that depends only on the dropoff
+                    using namespace time_utils;
+                    const bool dropoffAtExistingStop = isDropoffAtExistingStop(dVehId, INVALID_INDEX, dropoff.stopIndex,
+                                                                               dropoffPDLoc->loc, routeState);
+                    const int minInitialDropoffDetour =
+                            calcInitialDropoffDetour(dVehId, dropoff.stopIndex, dropoff.distToPDLoc,
+                                                     dropoff.distFromPDLocToNextStop,
+                                                     dropoffAtExistingStop, routeState);
+                    const int minDropoffCostWithoutTrip =
+                            calc.calcMinKnownDropoffSideCostWithoutTripTime(*dVeh, dropoff.stopIndex,
+                                                                            minInitialDropoffDetour,
+                                                                            dropoffPDLoc->walkingDist, requestState);
 
                     for (int i = dropoff.stopIndex; i > 0; i--) {
                         if (i >= numStopsDVeh - 1)
                             continue;
+
+                        // If occupancy exceeds capacity at this leg, we do not have to consider this or earlier stops
+                        // of the route, as this leg needs to be traversed.
+                        if (occupanciesDVeh[i] + requestState.originalRequest.numRiders > dVeh->capacity)
+                            break;
+
+                        // Compute lower bound for costs with transfer between i and i + 1, considering trip time
+                        // from stop i + 1 to the dropoff and detour to the dropoff. This lower bound also holds for
+                        // any stop before i so if it is worse than the best known cost, we can stop for this vehicle.
+                        const auto minTripTimeToStopBeforeDropoff =
+                                schedArrTimesDVeh[dropoff.stopIndex] - schedDepTimesDVeh[i + 1];
+                        const int minTripTimeToDropoff =
+                                std::max(requestState.minDirectPDDist, minTripTimeToStopBeforeDropoff +
+                                                                       dropoff.distToPDLoc) + dropoffPDLoc->walkingDist;
+                        const int minCostFromHere =
+                                CostCalculator::CostFunction::calcTripCost(minTripTimeToDropoff, requestState) +
+                                        minDropoffCostWithoutTrip;
+                        if (minCostFromHere > requestState.getBestCost())
+                            break;
 
                         const int stopId = stopIdsDVeh[i];
                         const auto &transferPoints = ellipseContainer.getEdgesInEllipse(stopId);
@@ -709,7 +813,7 @@ namespace karri {
                             asgn.transferTypePVeh = AFTER_LAST_STOP;
                             asgn.transferTypeDVeh = ORDINARY;
 
-                            // If the pickup or dropoff conincides with the transfer, we skip the assignment
+                            // If the pickup or dropoff coincides with the transfer, we skip the assignment
                             if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
                                 continue;
 
@@ -765,11 +869,44 @@ namespace karri {
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
                 // const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
                 const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
+                const auto schedDepTimesDVeh = routeState.schedDepTimesFor(dVehId);
+                const auto occupanciesDVeh = routeState.occupanciesFor(dVehId);
+                const auto schedArrTimeAtLastStopDVeh = routeState.schedArrTimesFor(dVehId)[numStopsDVeh - 1];
+                const auto lastStopLoc = routeState.stopLocationsFor(dVehId)[numStopsDVeh - 1];
 
                 for (const auto &dropoffEntry: relALSDropoffs.relevantSpotsFor(dVehId)) {
                     const auto &dropoff = requestState.dropoffs[dropoffEntry.dropoffId];
 
-                    for (int i = 1; i < numStopsDVeh - 1; i++) {
+                    using namespace time_utils;
+                    const bool dropoffAtExistingStop = dropoff.loc == lastStopLoc;
+                    const int minInitialDropoffDetour = calcInitialDropoffDetour(dVehId, numStopsDVeh - 1,
+                                                                                 numStopsDVeh - 1, 0,
+                                                                                 dropoffAtExistingStop, routeState);
+                    const int minDropoffCostWithoutTrip =
+                            calc.calcMinKnownDropoffSideCostWithoutTripTime(*dVeh, numStopsDVeh - 1,
+                                                                            minInitialDropoffDetour,
+                                                                            dropoff.walkingDist, requestState);
+
+                    for (int i = numStopsDVeh - 2; i >= 1; --i) {
+
+                        // If occupancy exceeds capacity at this leg, we do not have to consider this or earlier stops
+                        // of the route, as this leg needs to be traversed.
+                        if (occupanciesDVeh[i] + requestState.originalRequest.numRiders > dVeh->capacity)
+                            break;
+
+                        // Compute lower bound for costs with transfer between i and i + 1, considering trip time
+                        // from stop i + 1 to the dropoff and detour to the dropoff. This lower bound also holds for
+                        // any stop before i so if it is worse than the best known cost, we can stop for this vehicle.
+                        const auto minTripTimeToLastStop = schedArrTimeAtLastStopDVeh - schedDepTimesDVeh[i + 1];
+                        const int minTripTimeToDropoff = std::max(requestState.minDirectPDDist,
+                                                                  minTripTimeToLastStop + dropoffEntry.distToDropoff) +
+                                                         dropoff.walkingDist;
+                        const int minCostFromHere =
+                                CostCalculator::CostFunction::calcTripCost(minTripTimeToDropoff, requestState) +
+                                        minDropoffCostWithoutTrip;
+                        if (minCostFromHere > requestState.getBestCost())
+                            break;
+
                         const int stopId = stopIdsDVeh[i];
                         const auto &transferPoints = ellipseContainer.getEdgesInEllipse(stopId);
 

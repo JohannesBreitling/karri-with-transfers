@@ -734,8 +734,7 @@ namespace karri {
             if (distToDropoff >= INFTY)
                 return INFTY;
 
-
-            const int minDetour = distToDropoff + stopTime;
+            const int minDetour = distToDropoff + (distToDropoff != 0) * stopTime;
 
             const int walkingCost = F::calcWalkingCost(dropoffWalkingDist, InputConfig::getInstance().dropoffRadius);
             const int minTripTime = minTripTimeToLastStop + distToDropoff + dropoffWalkingDist;
@@ -900,17 +899,19 @@ namespace karri {
                    + walkingCost + waitViolation;
         }
 
+
         // Calculates the cost for the dropoff side of an assignment that can be known without knowing which
-        // pickup is used or where the pickup will be inserted.
+        // pickup is used or where the pickup will be inserted. Does not consider any bounds on trip time.
         template<typename RequestContext>
-        int calcMinKnownDropoffSideCost(const Vehicle &veh, const int dropoffIndex,
+        int calcMinKnownDropoffSideCostWithoutTripTime(const Vehicle &veh, const int dropoffIndex,
                                         const int initialDropoffDetour, const int walkingDist,
                                         const RequestContext &context) const {
             using namespace time_utils;
 
             const auto numStops = routeState.numStopsOf(veh.vehicleId);
             const auto residualDetourAtEnd = calcResidualTotalDetour(veh.vehicleId, dropoffIndex, dropoffIndex,
-                                                                     numStops - 1, 0, initialDropoffDetour, routeState);
+                                                                     numStops - 1, initialDropoffDetour,
+                                                                     initialDropoffDetour, routeState);
 
             if (isServiceTimeConstraintViolated(veh, context, residualDetourAtEnd, routeState))
                 return INFTY;
@@ -920,10 +921,17 @@ namespace karri {
                                                                              initialDropoffDetour, routeState);
             const int minChangeInTripTimeCosts = F::calcChangeInTripCostsOfExistingPassengers(minAddedTripTimeOfOthers);
 
-            const int minTripTime = context.minDirectPDDist + walkingDist;
-            const int minTripCost = F::calcTripCost(minTripTime, context);
+            return F::calcVehicleCost(residualDetourAtEnd) + walkingCost + minChangeInTripTimeCosts;
+        }
 
-            return F::calcVehicleCost(initialDropoffDetour) + walkingCost + minChangeInTripTimeCosts + minTripCost;
+        // Calculates the cost for the dropoff side of an assignment that can be known without knowing which
+        // pickup is used or where the pickup will be inserted.
+        template<typename RequestContext>
+        int calcMinKnownDropoffSideCost(const Vehicle &veh, const int dropoffIndex,
+                                        const int initialDropoffDetour, const int walkingDist,
+                                        const RequestContext &context) const {
+            return calcMinKnownDropoffSideCostWithoutTripTime(veh, dropoffIndex, initialDropoffDetour, walkingDist, context) +
+                   F::calcTripCost(context.minDirectPDDist + walkingDist, context);
         }
 
         template<typename RequestContext>
@@ -937,6 +945,47 @@ namespace karri {
             return walkMinCost <= vehMinCost;
         }
 
+
+//        template<typename RequestContext>
+//        int calcCostLowerBoundForOrdinaryDropoffWithPickupIndex(const int vehId,
+//                                                                const PDLoc &dropoff,
+//                                                                const int pickupIdx,
+//                                                                const int dropoffIdx,
+//                                                                const int distToDropoff,
+//                                                                const int distFromDropoff,
+//                                                                const RequestContext &context) const {
+//            using namespace time_utils;
+//            const auto numStops = routeState.numStopsOf(vehId);
+//            KASSERT(distToDropoff < INFTY);
+//            KASSERT(pickupIdx <= dropoffIdx && dropoffIdx < routeState.numStopsOf(vehId) - 1);
+//
+//            // Compute lower bound for costs with transfer between i and i + 1, considering trip time
+//            // from stop i + 1 to the dropoff and detour to the dropoff. This lower bound also holds for
+//            // any stop before i so if it is worse than the best known cost, we can stop for this vehicle.
+//            const auto minTripTimeToStopBeforeDropoff = pickupIdx == dropoffIdx ? 0 :
+//                                                        routeState.schedArrTimesFor(vehId)[dropoffIdx] -
+//                                                        routeState.schedDepTimesFor(vehId)[pickupIdx + 1];
+//            const int minTripTime = minTripTimeToStopBeforeDropoff + distToDropoff + dropoff.walkingDist;
+//
+//
+//            const auto dropoffAtExistingStop = isDropoffAtExistingStop(vehId, pickupIdx, dropoffIdx, dropoff.loc,
+//                                                                       routeState);
+//            KASSERT(!dropoffAtExistingStop || distToDropoff == 0);
+//            const int initialDropoffDetour = calcInitialDropoffDetour(vehId, dropoffIdx, distToDropoff, distFromDropoff,
+//                                                                      dropoffAtExistingStop, routeState);
+//            const int minResidualDetour = calcResidualTotalDetour(vehId, pickupIdx, dropoffIdx, numStops - 1, 0,
+//                                                                  initialDropoffDetour, routeState);
+//
+//            const int minAddedTripTime = calcAddedTripTimeInInterval(vehId, dropoffIdx, numStops - 1,
+//                                                                     initialDropoffDetour, routeState);
+//
+//            const int walkingCost = F::calcWalkingCost(dropoff.walkingDist, InputConfig::getInstance().dropoffRadius);
+//            const int minTripCost = F::calcTripCost(minTripTime, context);
+//            const int minChangeInTripCostsOfOthers = F::calcChangeInTripCostsOfExistingPassengers(minAddedTripTime);
+//            const int minDetourCost = F::calcVehicleCost(minResidualDetour);
+//
+//            return walkingCost + minTripCost + minChangeInTripCostsOfOthers + minDetourCost;
+//        }
 
     private:
 
