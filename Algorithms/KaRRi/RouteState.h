@@ -1470,8 +1470,11 @@ namespace karri {
                 vehiclesWithChangesInRoute.insert(vehId);
 
 
-                for (int i = startOfVeh + stopIndex; i < endOfVeh; ++i) {
+                for (int i = startOfVeh + stopIndex + 1; i < endOfVeh; ++i) {
                     // Invariant: schedArrTimes[i] and schedDepTimes[i] are already correct for all stops before i.
+
+                    KASSERT(schedArrTimes[i] <= schedDepTimes[i - 1] + curLengthOfNextLeg);
+                    schedArrTimes[i] = schedDepTimes[i - 1] + curLengthOfNextLeg;
 
                     // For any transfers at this stop, the respective dropoff vehicle may be affected.
                     stopId = stopIds[i];
@@ -1496,24 +1499,17 @@ namespace karri {
                             lastStopsWithUpdatedDepTime.insert(dependentStopId);
                     }
 
-                    // The last stop of the route has no next stop in the same route.
-                    if (i == endOfVeh - 1)
-                        break;
-
-                    KASSERT(schedArrTimes[i + 1] <= schedDepTimes[i] + curLengthOfNextLeg);
-                    schedArrTimes[i + 1] = schedDepTimes[i] + curLengthOfNextLeg;
-                    curLengthOfNextLeg = i < endOfVeh - 2 ? schedArrTimes[i + 2] - schedDepTimes[i + 1] : INFTY;
-
                     // If the planned departure time is already later than the new arrival time demands, then the planned
                     // departure time remains unaffected and subsequent arrival/departure times in this route will not
                     // change either.
-                    if (schedDepTimes[i + 1] >= schedArrTimes[i + 1] + stopTime)
+                    if (schedDepTimes[i] >= schedArrTimes[i] + stopTime)
                         break;
 
-                    schedDepTimes[i + 1] = schedArrTimes[i + 1] + stopTime;
+                    curLengthOfNextLeg = i < endOfVeh - 1 ? schedArrTimes[i + 1] - schedDepTimes[i] : INFTY;
+                    schedDepTimes[i] = schedArrTimes[i] + stopTime;
 
-                    if (i + 1 == endOfVeh - 1)
-                        lastStopsWithUpdatedDepTime.insert(stopIds[i + 1]);
+                    if (i == endOfVeh - 1)
+                        lastStopsWithUpdatedDepTime.insert(stopId);
                 }
             }
         }
@@ -1634,8 +1630,7 @@ namespace karri {
         void recalculateVehWaitTimesPrefixSum(const int fromIdx, const int toIdx, const int baseline) {
             int prevSum = baseline;
             for (int l = fromIdx; l <= toIdx; ++l) {
-                const auto stopLength = schedDepTimes[l] - InputConfig::getInstance().stopTime - schedArrTimes[l];
-                assert(stopLength >= 0);
+                const auto stopLength = std::max(schedDepTimes[l] - InputConfig::getInstance().stopTime - schedArrTimes[l], 0);
                 vehWaitTimesPrefixSum[l] = prevSum + stopLength;
                 prevSum = vehWaitTimesPrefixSum[l];
             }

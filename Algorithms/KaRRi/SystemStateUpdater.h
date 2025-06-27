@@ -313,8 +313,6 @@ namespace karri {
             transferStopIdDVeh = routeState.stopIdsFor(dVehId)[pIdxDVeh];
             dropoffStopId = routeState.stopIdsFor(dVehId)[dIdxDVeh];
 
-            routeState.addTransferDependency(transferStopIdPVeh, transferStopIdDVeh);
-
             assert(routeState.vehicleIdOf(pickupStopId) == pVehId);
             assert(routeState.vehicleIdOf(transferStopIdPVeh) == pVehId);
             assert(routeState.vehicleIdOf(transferStopIdDVeh) == dVehId);
