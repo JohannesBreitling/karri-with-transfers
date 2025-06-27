@@ -356,7 +356,8 @@ namespace karri {
                 const auto &thisLastStopToTransfersDistances = lastStopToTransfersDistances.getDistancesFor(
                         relPVehToInternalIdx[pVehId]);
 
-                for (const auto &pickup: relORDPickups.relevantSpotsFor(pVehId)) { // TODO: fix
+
+                for (const auto &pickup: relBNSPickups.relevantSpotsFor(pVehId)) {
                     tryDropoffORD(pVeh, &pickup, postponedAssignments, thisLastStopToTransfersDistances,
                                   transfersToDropoffsDistances, ellipseContainer);
                     tryDropoffALS(pVeh, &pickup, relALSDropoffs, postponedAssignments, thisLastStopToTransfersDistances,
