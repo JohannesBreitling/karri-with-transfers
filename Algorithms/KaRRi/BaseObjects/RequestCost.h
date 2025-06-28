@@ -6,13 +6,13 @@ namespace karri {
     class RequestCost {
 
         public:
-            int total;
+            int total = INFTY;
 
-            int walkingCost;
-            int tripCost;
-            int waitTimeViolationCost;
-            int changeInTripCostsOfOthers;
-            int vehCost;
+            int walkingCost = INFTY;
+            int tripCost = INFTY;
+            int waitTimeViolationCost = INFTY;
+            int changeInTripCostsOfOthers = INFTY;
+            int vehCost = INFTY;
 
             static RequestCost INFTY_COST() {
                 RequestCost cost;

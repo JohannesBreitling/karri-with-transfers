@@ -48,7 +48,7 @@ namespace karri {
             INVALID
         };
 
-        RequestState(const CostCalculator &calculator)
+        RequestState(CostCalculator &calculator)
                 : originalRequest(),
                   originalReqDirectDist(-1),
                   minDirectPDDist(-1),
@@ -108,18 +108,8 @@ namespace karri {
             return getPassengerArrAtPickup(pickupId) + getMaxPDTripTime(pickupId, dropoffId);
         }
 
-        int getMaxArrTimeAtTransfer(const AssignmentWithTransfer &asgn) const {
-            assert(asgn.pickup->id < numPickups() && asgn.dropoff->id < numDropoffs());
-            return getMaxArrTimeAtDropoff(asgn.pickup->id, asgn.dropoff->id) - asgn.tripTimeDVeh;
-        }
-
         int getMaxDepTimeAtPickup() const {
             return originalRequest.requestTime + InputConfig::getInstance().maxWaitTime;
-        }
-
-        int getMaxDepTimeAtTransfer(const AssignmentWithTransfer &asgn) const {
-            int delta = InputConfig::getInstance().maxWaitTime - asgn.waitTimeAtPickup;
-            return asgn.arrAtTransferPoint + std::max(0, delta);
         }
 
         const Assignment &getBestAssignmentWithoutTransfer() const {
@@ -277,7 +267,7 @@ namespace karri {
         stats::OsmRoadCategoryStats allPDLocsRoadCatStats;
         stats::OsmRoadCategoryStats chosenPDLocsRoadCatStats;
 
-        const CostCalculator &calculator;
+        CostCalculator &calculator;
 
         // Information about best known assignment for current request
         int bestCostOverall;

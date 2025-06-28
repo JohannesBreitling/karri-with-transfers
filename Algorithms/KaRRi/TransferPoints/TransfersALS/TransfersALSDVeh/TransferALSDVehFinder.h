@@ -50,7 +50,7 @@ namespace karri {
             fleet(fleet),
             routeState(routeState),
             requestState(requestState),
-            calc(routeState),
+            calc(routeState, fleet),
             distancesToTransfer(),
             distancesToDropoff(),
             asserter(asserter) {}
@@ -358,7 +358,8 @@ namespace karri {
 
             Timer time;
             if (!asgn.isFinished()) {
-                const auto cost = calc.calcLowerBound(asgn, requestState);
+//                const auto cost = calc.calcLowerBound(asgn, requestState);
+                const auto cost = calc.calc(asgn, requestState);
                 if (cost.total <= requestState.getBestCost()) {
                     postponedAssignments.push_back(asgn);
                 }

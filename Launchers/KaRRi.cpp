@@ -452,7 +452,7 @@ int main(int argc, char *argv[]) {
         using VehicleLocatorImpl = VehicleLocator<VehicleInputGraph, VehCHEnv>;
         VehicleLocatorImpl locator(vehicleInputGraph, *vehChEnv, routeState);
 
-        CostCalculator calc(routeState);
+        CostCalculator calc(routeState, fleet);
 
         RequestState reqState(calc);
 
@@ -606,8 +606,8 @@ int main(int argc, char *argv[]) {
         RequestStateInitializerImpl requestStateInitializer(vehicleInputGraph, psgInputGraph, *vehChEnv, *psgChEnv,
                                                             reqState, vehicleToPdLocQuery);
 
-        using TransferAsserterImpl = InsertionAsserter<VehicleInputGraph, VehCHEnv>;
-        TransferAsserterImpl asserter(routeState, vehicleInputGraph, *vehChEnv);
+        using InsertionAsserterImpl = InsertionAsserter<VehicleInputGraph, VehCHEnv>;
+        InsertionAsserterImpl asserter(routeState, vehicleInputGraph, *vehChEnv);
 
 #if KARRI_TRANSFER_HEURISTIC_LEVEL == 0 && KARRI_TRANSFER_USE_DIJKSTRA_ELLIPSE_RECONSTRUCTION
         using TransferPointsLabelSet = BasicLabelSet<1, ParentInfo::NO_PARENT_INFO>;
@@ -634,7 +634,7 @@ int main(int argc, char *argv[]) {
 
         using EllipseReconstructorImpl = CHEllipseReconstructor<VehicleInputGraph, VehCHEnv, EllipticBucketsEnv, PARALLELIZE_PHAST_DETOUR_ELLIPSES, ELLIPSES_TOP_VERTICES_DIVISOR, TraversalCostAttribute, EllipseReconstructorLabelSet>;
         EllipseReconstructorImpl ellipseReconstructor(vehicleInputGraph, *vehChEnv, fleet, ellipticBucketsEnv,
-                                                      reqState, routeState);
+                                                      reqState, routeState, calc);
 #else
         using EllipseReconstructorImpl = NoOpEllipseReconstructor;
         EllipseReconstructorImpl ellipseReconstructor;
@@ -651,7 +651,7 @@ int main(int argc, char *argv[]) {
         DirectTransferDistancesFinder transferToDropoffDistancesFinder(vehicleInputGraph.numVertices(), *vehChEnv,
                                                                        PDLocType::DROPOFF);
 
-        using OrdinaryTransferInsertionsImpl = OrdinaryTransferFinder<VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, TransferAsserterImpl, DirectTransferDistancesFinder>;
+        using OrdinaryTransferInsertionsImpl = OrdinaryTransferFinder<VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, InsertionAsserterImpl, DirectTransferDistancesFinder>;
         OrdinaryTransferInsertionsImpl ordinaryTransferInsertions = OrdinaryTransferInsertionsImpl(
                 vehicleInputGraph,
                 *vehChEnv,
@@ -691,7 +691,7 @@ int main(int argc, char *argv[]) {
         OptimalTransferStrategyALSImpl optimalTransferALSStrategy(routeState, fleet, vehicleInputGraph, *vehChEnv,
                                                                   rphastEnv);
 
-        using TransferALSPVehFinderImpl = OptimalTransferALSPVehFinder<VehicleInputGraph, VehCHEnv, OptimalTransferStrategyALSImpl, TransfersPickupALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
+        using TransferALSPVehFinderImpl = OptimalTransferALSPVehFinder<VehicleInputGraph, VehCHEnv, OptimalTransferStrategyALSImpl, TransfersPickupALSStrategy, CurVehLocToPickupSearchesImpl, InsertionAsserterImpl>;
         TransferALSPVehFinderImpl transferALSPVehInsertions(vehicleInputGraph,
                                                             *vehChEnv,
                                                             optimalTransferALSStrategy,
@@ -703,7 +703,7 @@ int main(int argc, char *argv[]) {
                                                             routeState, reqState, calc,
                                                             asserter);
 
-        using TransferALSDVehFinderImpl = OptimalTransferALSDVehFinder<VehicleInputGraph, VehCHEnv, OptimalTransferStrategyALSImpl, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
+        using TransferALSDVehFinderImpl = OptimalTransferALSDVehFinder<VehicleInputGraph, VehCHEnv, OptimalTransferStrategyALSImpl, CurVehLocToPickupSearchesImpl, InsertionAsserterImpl>;
         TransferALSDVehFinderImpl transferALSDVehInsertions(vehicleInputGraph,
                                                             *vehChEnv,
                                                             optimalTransferALSStrategy,
@@ -712,6 +712,7 @@ int main(int argc, char *argv[]) {
                                                             relPickupsBeforeNextStop,
                                                             fleet,
                                                             routeState, reqState,
+                                                            calc,
                                                             asserter);
 #else
 
@@ -723,7 +724,7 @@ int main(int argc, char *argv[]) {
         TransferStrategyALSImpl transferALSStrategy = CHStrategyALS(routeState, fleet, vehicleInputGraph, *vehChEnv);
 #endif
 
-        using TransferALSPVehFinderImpl = TransferALSPVehFinder<TransferStrategyALSImpl, TransfersPickupALSStrategy, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
+        using TransferALSPVehFinderImpl = TransferALSPVehFinder<TransferStrategyALSImpl, TransfersPickupALSStrategy, CurVehLocToPickupSearchesImpl, InsertionAsserterImpl>;
         TransferALSPVehFinderImpl transferALSPVehInsertions(transferALSStrategy,
                                                                                         transferPickupALSStrategy,
                                                                                         curVehLocToPickupSearches,
@@ -733,7 +734,7 @@ int main(int argc, char *argv[]) {
                                                                                         routeState, reqState, calc,
                                                                                         asserter);
 
-        using TransferALSDVehFinderImpl = TransferALSDVehFinder<TransferStrategyALSImpl, CurVehLocToPickupSearchesImpl, TransferAsserterImpl>;
+        using TransferALSDVehFinderImpl = TransferALSDVehFinder<TransferStrategyALSImpl, CurVehLocToPickupSearchesImpl, InsertionAsserterImpl>;
         TransferALSDVehFinderImpl transferALSDVehInsertions = TransferALSDVehFinderImpl(transferALSStrategy,
                                                                                         curVehLocToPickupSearches,
                                                                                         relOrdinaryPickups,
@@ -747,7 +748,7 @@ int main(int argc, char *argv[]) {
                 TransferALSDVehFinderImpl,
                 TransfersDropoffALSStrategy,
                 EllipseReconstructorImpl,
-                TransferAsserterImpl>;
+                InsertionAsserterImpl>;
         AssignmentsWithTransferFinderImpl insertionsWithTransferFinder(ordinaryTransferInsertions,
                                                                        transferALSPVehInsertions,
                                                                        transferALSDVehInsertions,
@@ -763,14 +764,15 @@ int main(int argc, char *argv[]) {
                 PALSInsertionsFinderImpl,
                 DALSInsertionsFinderImpl,
                 RelevantPDLocsFilterImpl,
-                AssignmentsWithTransferFinderImpl
+                AssignmentsWithTransferFinderImpl,
+                InsertionAsserterImpl
         >;
         InsertionFinderImpl insertionFinder(reqState, requestStateInitializer, ellipticSearches, pdDistanceQuery,
                                             ordinaryInsertionsFinder, pbnsInsertionsFinder, palsInsertionsFinder,
                                             dalsInsertionsFinder, relevantPdLocsFilter,
                                             relOrdinaryPickups, relPickupsBeforeNextStop,
                                             relOrdinaryDropoffs, relDropoffsBeforeNextStop,
-                                            insertionsWithTransferFinder);
+                                            insertionsWithTransferFinder, asserter);
 
 
 #if KARRI_OUTPUT_VEHICLE_PATHS
@@ -784,7 +786,7 @@ int main(int argc, char *argv[]) {
 
         using SystemStateUpdaterImpl = SystemStateUpdater<VehicleInputGraph, EllipticBucketsEnv, LastStopBucketsEnv, CurVehLocToPickupSearchesImpl, VehPathTracker, std::ofstream>;
         SystemStateUpdaterImpl
-                systemStateUpdater(vehicleInputGraph, vehChEnv->getCH(), reqState, curVehLocToPickupSearches,
+                systemStateUpdater(vehicleInputGraph, vehChEnv->getCH(), fleet, reqState, curVehLocToPickupSearches,
                                    pathTracker, routeState, ellipticBucketsEnv, lastStopBucketsEnv);
 
 

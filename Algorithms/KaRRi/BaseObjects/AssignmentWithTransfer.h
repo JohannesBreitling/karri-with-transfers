@@ -121,15 +121,15 @@ namespace karri {
         bool dropoffBNSLowerBoundUsed = false;
         bool dropoffPairedLowerBoundUsed = false;
         
-        int distToPickup; // distance from previous stop to pickup
-        int distFromPickup; // distance from pickup to next stop (or 0 if pickupIdx == transferIdxPVeh)
-        int distToTransferPVeh; // distance from previous stop to transfer point (or from transfer point if pickupIdx == transferIdxPVeh) 
-        int distFromTransferPVeh; // distance from transfer point to next stop (or 0 if there is no next stop)
+        int distToPickup = 0; // distance from previous stop to pickup
+        int distFromPickup = 0; // distance from pickup to next stop (or 0 if pickupIdx == transferIdxPVeh)
+        int distToTransferPVeh = 0; // distance from previous stop to transfer point (or from transfer point if pickupIdx == transferIdxPVeh)
+        int distFromTransferPVeh = 0; // distance from transfer point to next stop (or 0 if there is no next stop)
         
-        int distToTransferDVeh; // distance from previous stop to transfer point
-        int distFromTransferDVeh; // distance from transfer point to next stop (or 0 if transferIdxDVeh == dropoffIdx)
-        int distToDropoff; // distance from previous stop to dropoff (or from transfer point if transferIdxDVeh == dropoffIdx)
-        int distFromDropoff; // distance from dropoff to next stop (or 0 if there is no next stop)
+        int distToTransferDVeh = 0; // distance from previous stop to transfer point
+        int distFromTransferDVeh = 0; // distance from transfer point to next stop (or 0 if transferIdxDVeh == dropoffIdx)
+        int distToDropoff = 0; // distance from previous stop to dropoff (or from transfer point if transferIdxDVeh == dropoffIdx)
+        int distFromDropoff = 0; // distance from dropoff to next stop (or 0 if there is no next stop)
 
         int waitTimeAtPickup; // Wait time at pickup
 
@@ -139,17 +139,6 @@ namespace karri {
 
         enum INS_TYPES transferTypeDVeh = NOT_SET;
         enum INS_TYPES dropoffType = NOT_SET;
-
-        int tripTimeDVeh;
-
-        // Used to test the insertions of the assignments
-        int requestTime;
-        int depAtPickup;
-        int arrAtTransferPoint;
-        int depAtTransfer;
-        int arrAtDropoff;
-    
-        bool transferAtStopPVeh;
     };
 
 }
