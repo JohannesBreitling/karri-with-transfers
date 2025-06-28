@@ -151,7 +151,9 @@ namespace karri {
             const auto detourPVeh2 = tp2.distancePVehToTransfer + tp2.distancePVehFromTransfer;
             const auto detourDVeh1 = tp1.distanceDVehToTransfer + tp1.distanceDVehFromTransfer;
             const auto detourDVeh2 = tp2.distanceDVehToTransfer + tp2.distanceDVehFromTransfer;
-            return detourPVeh1 < detourPVeh2 && detourDVeh1 < detourDVeh2;
+            const auto tripTime1 = tp1.distancePVehToTransfer + tp1.distanceDVehFromTransfer;
+            const auto tripTime2 = tp2.distancePVehToTransfer + tp2.distanceDVehFromTransfer;
+            return detourPVeh1 < detourPVeh2 && detourDVeh1 < detourDVeh2 && tripTime1 < tripTime2;
         }
 
         // Computes intersection of two ellipses. Edges in ellipses must be edge IDs in the original input graph.
