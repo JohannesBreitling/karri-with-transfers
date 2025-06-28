@@ -190,6 +190,10 @@ namespace karri {
                 it->reserve(verticesInAnyEllipse.size());
             }
             for (const auto &r: verticesInAnyEllipse) {
+                // Do not consider vertices that are not in the top vertices as specified by TOP_VERTICES_DIVISOR.
+                if (r >= numVerticesToConsider)
+                    break;
+
                 const int shifted = shiftedIndexForAlignment[r];
 
                 const auto &distToVertex = distTo[shifted];
