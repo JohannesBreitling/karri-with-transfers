@@ -90,22 +90,20 @@ namespace karri {
             KASSERT(downGraph.numVertices() == upGraph.numVertices());
             const int numVertices = downGraph.numVertices();
 
+            // We use a vertex order by CH level, allowing parallelization of vertex scans within each level.
+            auto levels = computeSharedLevelsInUpAndDownGraph(upGraph, downGraph);
+            std::vector<int> inversePerm(numVertices);
+            std::iota(inversePerm.begin(), inversePerm.end(), 0);
+            std::sort(inversePerm.begin(), inversePerm.end(), [&](const auto a, const auto b) {
+                return levels[a] > levels[b] || (levels[a] == levels[b] && a < b);
+            });
+            inverseSweepVertexPermutation.assign(inversePerm.begin(), inversePerm.end());
+            KASSERT(inverseSweepVertexPermutation.validate());
+            sweepVertexPermutation = inverseSweepVertexPermutation.getInversePermutation();
+
             if constexpr (ParallelizeQuery) {
-
-                // If queries are parallelized internally, we use a vertex order by CH level, allowing parallelization
-                // of vertex scans within each level. We set a threshold for large levels, s.t. only the large levels
-                // at the end will be processed in parallel, ensuring there is enough work to make it worth it.
-                auto levels = computeSharedLevelsInUpAndDownGraph(upGraph, downGraph);
-                std::vector<int> inversePerm(numVertices);
-                std::iota(inversePerm.begin(), inversePerm.end(), 0);
-                std::sort(inversePerm.begin(), inversePerm.end(), [&](const auto a, const auto b) {
-                    return levels[a] > levels[b] || (levels[a] == levels[b] && a < b);
-                });
-                inverseSweepVertexPermutation.assign(inversePerm.begin(), inversePerm.end());
-                KASSERT(inverseSweepVertexPermutation.validate());
-                sweepVertexPermutation = inverseSweepVertexPermutation.getInversePermutation();
-
-
+                // We set a threshold for large levels, s.t. only the large levels at the end will be processed in
+                // parallel, ensuring there is enough work to make it worth it.
                 int curLevel = INFTY;
                 for (int i = 0; i < numVertices; ++i) {
                     if (levels[inversePerm[i]] == curLevel)
@@ -123,15 +121,9 @@ namespace karri {
                 }
                 firstIdxOfLevel.erase(firstIdxOfLevel.begin(), firstIdxOfLevel.begin() + firstLargeLevelIdx);
             } else {
-                // If queries are run sequentially, we use a vertex ordering that is the inverse rank in the CH.
-                // We place all vertices in one level, that will be considered small, s.t. all vertices will be
-                // processed sequentially in the query.
-                sweepVertexPermutation = Permutation(numVertices);
-                for (int i = 0; i < numVertices; ++i) {
-                    sweepVertexPermutation[i] = numVertices - 1 - i;
-                }
-                KASSERT(sweepVertexPermutation.validate());
-                inverseSweepVertexPermutation = sweepVertexPermutation.getInversePermutation();
+                // If queries are run sequentially, we place all vertices in one level, that will be considered small,
+                // s.t. all vertices will be processed sequentially in the query without the overhead for parallel
+                // structures.
                 firstIdxOfLevel.push_back(numVertices);
             }
 
