@@ -91,6 +91,7 @@ namespace karri {
                   vehicleShutdownEvents(fleet.size()),
                   vehicleArrivalEvents(fleet.size()),
                   vehicleDepartureEvents(fleet.size()),
+                  vehiclesWithChangesInRoute(fleet.size()),
                   vehicleState(fleet.size(), OUT_OF_SERVICE),
                   requestState(requests.size(), NOT_RECEIVED),
                   requestData(requests.size(), RequestData()),
@@ -415,52 +416,33 @@ namespace karri {
             requestData[reqId].usingTransfer = true;
 
             int pickupStopId, transferStopIdPVeh, transferStopIdDVeh, dropoffStopId;
+            vehiclesWithChangesInRoute.clear();
             systemStateUpdater.insertBestAssignmentWithTransfer(asgn, pickupStopId, transferStopIdPVeh,
-                                                                transferStopIdDVeh, dropoffStopId);
+                                                                transferStopIdDVeh, dropoffStopId, vehiclesWithChangesInRoute);
             systemStateUpdater.writePerformanceLogs();
 
-            const auto pVehId = asgn.pVeh->vehicleId;
-            const auto dVehId = asgn.dVeh->vehicleId;
-
-            switch (vehicleState[pVehId]) {
-                case STOPPING:
-                    // Update event time to departure time at current stop since it may have changed
-//                    vehicleEvents.updateKey(pVehId, scheduledStops.getCurrentOrPrevScheduledStop(pVehId).depTime);
-                    vehicleDepartureEvents.updateKey(pVehId,
-                                                     scheduledStops.getCurrentOrPrevScheduledStop(pVehId).depTime);
-                    break;
-                case IDLING:
-                    // If vehicle was idling it is now driving and gets an arrival event at the next stop.
-                    vehicleState[pVehId] = VehicleState::DRIVING;
-                    vehicleArrivalEvents.insert(pVehId, scheduledStops.getNextScheduledStop(pVehId).arrTime);
-                    break;
-                case DRIVING:
-                    // Update event time to arrival time at next stop since it may have changed.
-//                    vehicleEvents.updateKey(pVehId, scheduledStops.getNextScheduledStop(pVehId).arrTime);
-                    vehicleArrivalEvents.updateKey(pVehId, scheduledStops.getNextScheduledStop(pVehId).arrTime);
-                    break;
-                default:
-                    break;
-            }
-
-            switch (vehicleState[dVehId]) {
-                case STOPPING:
-                    // Update event time to departure time at current stop since it may have changed
-//                    vehicleEvents.updateKey(dVehId, scheduledStops.getCurrentOrPrevScheduledStop(dVehId).depTime);
-                    vehicleDepartureEvents.updateKey(dVehId,
-                                                     scheduledStops.getCurrentOrPrevScheduledStop(dVehId).depTime);
-                    break;
-                case IDLING:
-                    vehicleState[dVehId] = VehicleState::DRIVING;
-                    vehicleArrivalEvents.insert(dVehId, scheduledStops.getNextScheduledStop(dVehId).arrTime);
-                    break;
-                case DRIVING:
-                    // Update event time to arrival time at next stop since it may have changed.
-//                    vehicleEvents.updateKey(dVehId, scheduledStops.getNextScheduledStop(dVehId).arrTime);
-                    vehicleArrivalEvents.updateKey(dVehId, scheduledStops.getNextScheduledStop(dVehId).arrTime);
-                    break;
-                default:
-                    break;
+            KASSERT(vehiclesWithChangesInRoute.contains(asgn.pVeh->vehicleId));
+            KASSERT(vehiclesWithChangesInRoute.contains(asgn.dVeh->vehicleId));
+            for (const auto &vehId: vehiclesWithChangesInRoute) {
+                switch (vehicleState[vehId]) {
+                    case STOPPING:
+                        // Update event time to departure time at current stop since it may have changed
+                        vehicleDepartureEvents.updateKey(vehId,
+                                                         scheduledStops.getCurrentOrPrevScheduledStop(vehId).depTime);
+                        break;
+                    case IDLING:
+                        // If vehicle was idling it is now driving and gets an arrival event at the next stop.
+                        KASSERT(vehId == asgn.pVeh->vehicleId || vehId == asgn.dVeh->vehicleId);
+                        vehicleState[vehId] = VehicleState::DRIVING;
+                        vehicleArrivalEvents.insert(vehId, scheduledStops.getNextScheduledStop(vehId).arrTime);
+                        break;
+                    case DRIVING:
+                        // Update event time to arrival time at next stop since it may have changed.
+                        vehicleArrivalEvents.updateKey(vehId, scheduledStops.getNextScheduledStop(vehId).arrTime);
+                        break;
+                    default:
+                        break;
+                }
             }
         }
 
@@ -497,29 +479,32 @@ namespace karri {
             requestData[reqId].assignmentCost = asgnFinderResponse.getBestCost();
 
             int pickupStopId, dropoffStopId;
-            systemStateUpdater.insertBestAssignment(pickupStopId, dropoffStopId);
+            vehiclesWithChangesInRoute.clear();
+            systemStateUpdater.insertBestAssignment(pickupStopId, dropoffStopId, vehiclesWithChangesInRoute);
             systemStateUpdater.writePerformanceLogs();
             assert(pickupStopId >= 0 && dropoffStopId >= 0);
 
-            const auto vehId = bestAsgn.vehicle->vehicleId;
-            switch (vehicleState[vehId]) {
-                case STOPPING:
-                    // Update event time to departure time at current stop since it may have changed
-//                    vehicleEvents.updateKey(vehId, scheduledStops.getCurrentOrPrevScheduledStop(vehId).depTime);
-                    vehicleDepartureEvents.updateKey(vehId,
-                                                     scheduledStops.getCurrentOrPrevScheduledStop(vehId).depTime);
-                    break;
-                case IDLING:
-                    // If vehicle was idling it is now driving and gets an arrival event at the next stop.
-                    vehicleState[vehId] = VehicleState::DRIVING;
-                    vehicleArrivalEvents.insert(vehId, scheduledStops.getNextScheduledStop(vehId).arrTime);
-                    break;
-                case DRIVING:
-                    // Update event time to arrival time at next stop since it may have changed.
-                    vehicleArrivalEvents.updateKey(vehId, scheduledStops.getNextScheduledStop(vehId).arrTime);
-                    break;
-                default:
-                    break;
+            KASSERT(vehiclesWithChangesInRoute.contains(bestAsgn.vehicle->vehicleId));
+            for (const auto &vehId: vehiclesWithChangesInRoute) {
+                switch (vehicleState[vehId]) {
+                    case STOPPING:
+                        // Update event time to departure time at current stop since it may have changed
+                        vehicleDepartureEvents.updateKey(vehId,
+                                                         scheduledStops.getCurrentOrPrevScheduledStop(vehId).depTime);
+                        break;
+                    case IDLING:
+                        // If vehicle was idling it is now driving and gets an arrival event at the next stop.
+                        KASSERT(vehId == bestAsgn.vehicle->vehicleId);
+                        vehicleState[vehId] = VehicleState::DRIVING;
+                        vehicleArrivalEvents.insert(vehId, scheduledStops.getNextScheduledStop(vehId).arrTime);
+                        break;
+                    case DRIVING:
+                        // Update event time to arrival time at next stop since it may have changed.
+                        vehicleArrivalEvents.updateKey(vehId, scheduledStops.getNextScheduledStop(vehId).arrTime);
+                        break;
+                    default:
+                        break;
+                }
             }
         }
 
@@ -587,6 +572,8 @@ namespace karri {
         AddressableQuadHeap vehicleShutdownEvents;
         AddressableQuadHeap vehicleArrivalEvents;
         AddressableQuadHeap vehicleDepartureEvents;
+
+        Subset vehiclesWithChangesInRoute;
 
         std::vector<VehicleState> vehicleState;
         std::vector<RequestState> requestState;

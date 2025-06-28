@@ -997,13 +997,11 @@ namespace karri::time_utils {
                 const auto schedArrTimes = routeState.schedArrTimesFor(vehId);
 
                 for (int i = initialStopIdx; i < numStops; ++i) {
+                    // Invariant: newDepTimes is already correct for all stops up to and including i. newArrTimes is
+                    // either correct or equal to -1, the initial value.
                     stopId = stopIds[i];
+                    KASSERT(newDepTimes[stopId] != -1);
                     stopIdsSeen.insert(stopId);
-                    const auto depTimeAtStop = newDepTimes[stopId];
-                    if (depTimeAtStop <= schedDepTimes[i]) {
-                        // If the departure time at i does not change, the schedule remains the same from i onwards.
-                        break;
-                    }
 
                     const auto arrTimeAtStop = newArrTimes[stopId];
                     for (const auto &dependentStopId: routeState.getForwardDependencies(stopId)) {
@@ -1020,6 +1018,12 @@ namespace karri::time_utils {
 
                         newDepTimes[dependentStopId] = arrTimeAtStop;
                         firstStopIdsInRoutesToProcess.push_back(dependentStopId);
+                    }
+
+                    const auto depTimeAtStop = newDepTimes[stopId];
+                    if (depTimeAtStop <= schedDepTimes[i]) {
+                        // If the departure time at i does not change, the schedule remains the same from i onwards.
+                        break;
                     }
 
                     if (i == numStops - 1)

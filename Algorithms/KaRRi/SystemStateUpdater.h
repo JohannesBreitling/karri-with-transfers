@@ -61,7 +61,6 @@ namespace karri {
                   ellipticBucketsEnv(ellipticBucketsEnv),
                   lastStopBucketsEnv(lastStopBucketsEnv),
                   lastStopsWithChangedDepTime(fleet.size()),
-                  vehiclesWithChangesInRoute(fleet.size()),
                   bestAssignmentsOverallLogger(LogManager<LoggerT>::getLogger("bestassignmentsoverall.csv",
                                                                               "request_id,"
                                                                               "request_time,"
@@ -204,7 +203,8 @@ namespace karri {
 
         void
         insertBestAssignmentWithTransfer(const AssignmentWithTransfer &asgn, int &pickupStopId, int &transferStopIdPVeh,
-                                         int &transferStopIdDVeh, int &dropoffStopId) {
+                                         int &transferStopIdDVeh, int &dropoffStopId,
+                                         Subset& vehiclesWithChangesInRoute) {
             Timer timer;
 
             requestState.chosenPDLocsRoadCategoryStats().incCountForCat(inputGraph.osmRoadCategory(asgn.pickup->loc));
@@ -323,7 +323,8 @@ namespace karri {
             pathTracker.registerPdEventsForBestAssignment(transferStopIdDVeh, dropoffStopId);
         }
 
-        void insertBestAssignment(int &pickupStopId, int &dropoffStopId) {
+        void insertBestAssignment(int &pickupStopId, int &dropoffStopId,
+                                  Subset& vehiclesWithChangesInRoute) {
             Timer timer;
 
             if (requestState.isNotUsingVehicleBest()) {
@@ -761,7 +762,6 @@ namespace karri {
         LastStopBucketsEnvT &lastStopBucketsEnv;
 
         Subset lastStopsWithChangedDepTime;
-        Subset vehiclesWithChangesInRoute;
 
         // Performance Loggers
         LoggerT &bestAssignmentsOverallLogger;
