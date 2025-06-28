@@ -32,6 +32,20 @@ namespace karri {
     template<typename InputGraphT, typename VehCHEnvT, typename TransferALSStrategyT, typename TransfersPickupALSStrategyT, typename CurVehLocToPickupSearchesT, typename InsertionAsserterT>
     class OptimalTransferALSPVehFinder {
 
+
+        struct TPDistances {
+            int distToTransferPVeh = INFTY;
+            int distToTransferDVeh = INFTY;
+            int distFromTransferDVeh = INFTY;
+
+            static bool dominates(const TPDistances &lhs, const TPDistances &rhs) {
+                return lhs.distToTransferPVeh < rhs.distToTransferPVeh &&
+                       lhs.distToTransferDVeh < rhs.distToTransferDVeh &&
+                       lhs.distFromTransferDVeh < rhs.distFromTransferDVeh;
+            }
+        };
+
+
         // The pVeh drives the detour to the transfer point
         // This implies, that the pVeh drives from its last stop to a stop of the dVeh and drops off the customer
         // The dVeh then will then perform the dropoff ORD or ALS
@@ -435,6 +449,33 @@ namespace karri {
         }
 
 
+        // Checks if the new transfer point distance is dominated by any of the existing optimal distances.
+        // If yes, returns false. If no, adds the new distance to the list of optimal distances, removes any
+        // distances that are dominated by the new distance, and returns true.
+        static bool checkPareto(const TPDistances &newTpDist, std::vector<TPDistances> &optimalDistances) {
+            // Check if newTpDist is dominated by any of the existing distances
+            for (const auto &existingDist: optimalDistances) {
+                if (TPDistances::dominates(existingDist, newTpDist)) {
+                    return false; // newTpDist is dominated, do not add it
+                }
+            }
+
+            // Add newTpDist to the list of optimal distances
+            optimalDistances.push_back(newTpDist);
+
+            // Remove any distances that are dominated by the newTpDist
+            for (int i = 0; i < optimalDistances.size();) {
+                if (TPDistances::dominates(newTpDist, optimalDistances[i])) {
+                    std::swap(optimalDistances[i], optimalDistances.back());
+                    optimalDistances.pop_back();
+                    continue;
+                }
+                ++i;
+            }
+
+            return true;
+        }
+
         void tryDropoffORDForPickupALS(const Vehicle *pVeh, const PDLoc *pickup, const int distanceToPickup,
                                        const auto &thisPickupToTransfersDistances,
                                        const auto &transfersToDropoffsDistances,
@@ -453,6 +494,7 @@ namespace karri {
                 const auto schedDepTimesDVeh = routeState.schedDepTimesFor(dVehId);
                 const auto schedArrTimesDVeh = routeState.schedArrTimesFor(dVehId);
                 const auto occupanciesDVeh = routeState.occupanciesFor(dVehId);
+                const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
 
                 if (dVehId == pVeh->vehicleId)
                     continue;
@@ -469,7 +511,8 @@ namespace karri {
 
                     // Compute part of cost lower bound that depends only on the dropoff
                     using namespace time_utils;
-                    const bool dropoffAtExistingStop = isDropoffAtExistingStop(dVehId, INVALID_INDEX, relDropoff.stopIndex,
+                    const bool dropoffAtExistingStop = isDropoffAtExistingStop(dVehId, INVALID_INDEX,
+                                                                               relDropoff.stopIndex,
                                                                                dropoff->loc, routeState);
                     const int minInitialDropoffDetour =
                             calcInitialDropoffDetour(dVehId, relDropoff.stopIndex, relDropoff.distToPDLoc,
@@ -496,7 +539,7 @@ namespace karri {
                                 schedArrTimesDVeh[relDropoff.stopIndex] - schedDepTimesDVeh[i + 1];
                         const int minTripTimeToDropoff =
                                 std::max(requestState.minDirectPDDist, minTripTimeToStopBeforeDropoff +
-                                        relDropoff.distToPDLoc) + dropoff->walkingDist;
+                                                                       relDropoff.distToPDLoc) + dropoff->walkingDist;
                         const int minCostFromHere =
                                 CostCalculator::CostFunction::calcTripCost(minTripTimeToDropoff, requestState) +
                                 minDropoffCostWithoutTrip;
@@ -506,10 +549,17 @@ namespace karri {
                         const int stopId = stopIdsDVeh[i];
                         const auto &transferEdges = ellipseContainer.getEdgesInEllipse(stopId);
 
+                        paretoOptimalTps.clear();
+
                         for (int tpIdx = 0; tpIdx < transferEdges.size(); tpIdx++) {
                             const auto edge = transferEdges[tpIdx];
                             const int transferLoc = edge.edge;
                             KASSERT(isEdgeRel.isSet(transferLoc));
+
+                            // If the pickup or dropoff conincides with the transfer, we skip the assignment
+                            if (pickup->loc == transferLoc || transferLoc == dropoff->loc)
+                                continue;
+
                             const int edgeOffset = inputGraph.travelTime(transferLoc);
 
                             if (minDVehCostForTransferEdge[relEdgesToInternalIdx[transferLoc]] >=
@@ -517,11 +567,20 @@ namespace karri {
                                 continue;
 
                             const int distancePVehToTransfer = thisPickupToTransfersDistances[relEdgesToInternalIdx[transferLoc]];
-                            // KASSERT(distancePVehToTransfer == asserter.getDistanceBetweenLocations(pickup->loc, transferLoc));
 
-                            // If the pickup or dropoff conincides with the transfer, we skip the assignment
-                            if (pickup->loc == transferLoc || transferLoc == dropoff->loc)
-                                continue;
+                            if (i > 0) { // Cannot pareto check for transfer BNS because we only know lower bounds
+                                const bool transferAtStopDVeh = transferLoc == stopLocationsDVeh[i];
+                                const int distToTransferDVeh = transferAtStopDVeh ? 0 : edge.distToTail + edgeOffset;
+                                const int distNextLegAfterTransferDVeh = i == relDropoff.stopIndex ?
+                                                                         transfersToThisDropoffDistances[relEdgesToInternalIdx[transferLoc]]
+                                                                                                   : edge.distFromHead;
+                                const bool notDominated = checkPareto(
+                                        TPDistances(distancePVehToTransfer, distToTransferDVeh,
+                                                    distNextLegAfterTransferDVeh),
+                                        paretoOptimalTps);
+                                if (!notDominated)
+                                    continue;
+                            }
 
                             // Build the transfer point
                             TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh - 1, i,
@@ -595,6 +654,7 @@ namespace karri {
                 const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
                 const auto schedDepTimesDVeh = routeState.schedDepTimesFor(dVehId);
                 const auto occupanciesDVeh = routeState.occupanciesFor(dVehId);
+                const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
                 const auto schedArrTimeAtLastStopDVeh = routeState.schedArrTimesFor(dVehId)[numStopsDVeh - 1];
                 const auto lastStopLoc = routeState.stopLocationsFor(dVehId)[numStopsDVeh - 1];
 
@@ -639,10 +699,16 @@ namespace karri {
                         const int stopId = stopIdsDVeh[i];
                         const auto &transferEdges = ellipseContainer.getEdgesInEllipse(stopId);
 
+                        paretoOptimalTps.clear();
+
                         for (int tpIdx = 0; tpIdx < transferEdges.size(); tpIdx++) {
                             const auto edge = transferEdges[tpIdx];
                             const int transferLoc = edge.edge;
                             KASSERT(isEdgeRel.isSet(transferLoc));
+
+                            // If the pickup or dropoff conincides with the transfer, we skip the assignment
+                            if (pickup->loc == transferLoc || transferLoc == dropoff.loc)
+                                continue;
 
                             if (minDVehCostForTransferEdge[relEdgesToInternalIdx[transferLoc]] >=
                                 requestState.getBestCost())
@@ -652,6 +718,19 @@ namespace karri {
                             const int distancePVehToTransfer = thisPickupToTransfersDistances[relEdgesToInternalIdx[transferLoc]];
                             // KASSERT(distancePVehToTransfer == asserter.getDistanceBetweenLocations(pickup->loc, transferLoc));
                             KASSERT(distancePVehToTransfer > 0 || transferLoc == pickup->loc);
+
+                            if (i > 0) { // Cannot pareto check for transfer BNS because we only know lower bounds
+                                const bool transferAtStopDVeh = transferLoc == stopLocationsDVeh[i];
+                                const int distToTransferDVeh = transferAtStopDVeh ? 0 : edge.distToTail + edgeOffset;
+                                KASSERT(i != numStopsDVeh - 1);
+                                const int distNextLegAfterTransferDVeh = edge.distFromHead;
+                                const bool notDominated = checkPareto(
+                                        TPDistances(distancePVehToTransfer, distToTransferDVeh,
+                                                    distNextLegAfterTransferDVeh),
+                                        paretoOptimalTps);
+                                if (!notDominated)
+                                    continue;
+                            }
 
                             // Build the transfer point
                             TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh - 1, i,
@@ -678,10 +757,6 @@ namespace karri {
                             asgn.dropoffType = AFTER_LAST_STOP;
                             asgn.transferTypePVeh = AFTER_LAST_STOP;
                             asgn.transferTypeDVeh = ORDINARY;
-
-                            // If the pickup or dropoff conincides with the transfer, we skip the assignment
-                            if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
-                                continue;
 
                             finishDistances(asgn, distancePVehToTransfer, distanceToPickup, 0, distanceToDropoff);
                             assert(asgn.distFromPickup == 0);
@@ -727,6 +802,7 @@ namespace karri {
                 const auto schedDepTimesDVeh = routeState.schedDepTimesFor(dVehId);
                 const auto schedArrTimesDVeh = routeState.schedArrTimesFor(dVehId);
                 const auto occupanciesDVeh = routeState.occupanciesFor(dVehId);
+                const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
 
                 for (const auto &dropoff: relORDDropoffs.relevantSpotsFor(dVehId)) {
                     const auto *dropoffPDLoc = &requestState.dropoffs[dropoff.pdId];
@@ -768,12 +844,14 @@ namespace karri {
                                                                        dropoff.distToPDLoc) + dropoffPDLoc->walkingDist;
                         const int minCostFromHere =
                                 CostCalculator::CostFunction::calcTripCost(minTripTimeToDropoff, requestState) +
-                                        minDropoffCostWithoutTrip;
+                                minDropoffCostWithoutTrip;
                         if (minCostFromHere > requestState.getBestCost())
                             break;
 
                         const int stopId = stopIdsDVeh[i];
                         const auto &transferPoints = ellipseContainer.getEdgesInEllipse(stopId);
+
+                        paretoOptimalTps.clear();
 
                         // Loop over all possible transfer points
                         for (int tpIdx = 0; tpIdx < transferPoints.size(); tpIdx++) {
@@ -781,13 +859,33 @@ namespace karri {
                             const auto edge = transferPoints[tpIdx];
                             const int transferLoc = edge.edge;
                             KASSERT(isEdgeRel.isSet(transferLoc));
+
+                            // If the pickup or dropoff coincides with the transfer, we skip it
+                            if (pickupPDLoc->loc == transferLoc || transferLoc == dropoffPDLoc->loc)
+                                continue;
+
                             const auto edgeOffset = inputGraph.travelTime(transferLoc);
                             const int distancePVehToTransfer = thisLastStopToTransfersDistances[relEdgesToInternalIdx[transferLoc]];
-                            // assert(distancePVehToTransfer == asserter.getDistanceBetweenLocations(lastStopLocPVeh, transferLoc));
+
+                            if (i > 0) { // Cannot pareto check for transfer BNS because we only know lower bounds
+                                const bool transferAtStopDVeh = transferLoc == stopLocationsDVeh[i];
+                                const int distToTransferDVeh = transferAtStopDVeh ? 0 : edge.distToTail + edgeOffset;
+                                const int distNextLegAfterTransferDVeh = i == dropoff.stopIndex ?
+                                                                         transfersToThisDropoffDistances[relEdgesToInternalIdx[transferLoc]]
+                                                                                                : edge.distFromHead;
+                                const bool notDominated = checkPareto(
+                                        TPDistances(distancePVehToTransfer, distToTransferDVeh,
+                                                    distNextLegAfterTransferDVeh),
+                                        paretoOptimalTps);
+                                if (!notDominated)
+                                    continue;
+                            }
 
                             TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh, i,
                                                              distancePVehToTransfer, 0, edge.distToTail + edgeOffset,
                                                              edge.distFromHead);
+
+                            ++numTransferPoints;
 
                             // Build the assignment
                             AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
@@ -814,9 +912,6 @@ namespace karri {
                             asgn.transferTypePVeh = AFTER_LAST_STOP;
                             asgn.transferTypeDVeh = ORDINARY;
 
-                            // If the pickup or dropoff coincides with the transfer, we skip the assignment
-                            if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
-                                continue;
 
                             finishDistances(asgn, 0, distancePVehToTransfer, dropoff.distToPDLoc, 0);
 
@@ -846,6 +941,7 @@ namespace karri {
                 return;
 
             const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
+            const auto *pickupPDLoc = &requestState.pickups[pickup->pdId];
 
             // In this case we consider all the vehicles that are able to perform the dropoff ALS
             bool bnsLowerBoundUsed = false;
@@ -872,6 +968,7 @@ namespace karri {
                 const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
                 const auto schedDepTimesDVeh = routeState.schedDepTimesFor(dVehId);
                 const auto occupanciesDVeh = routeState.occupanciesFor(dVehId);
+                const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
                 const auto schedArrTimeAtLastStopDVeh = routeState.schedArrTimesFor(dVehId)[numStopsDVeh - 1];
                 const auto lastStopLoc = routeState.stopLocationsFor(dVehId)[numStopsDVeh - 1];
 
@@ -904,20 +1001,39 @@ namespace karri {
                                                          dropoff.walkingDist;
                         const int minCostFromHere =
                                 CostCalculator::CostFunction::calcTripCost(minTripTimeToDropoff, requestState) +
-                                        minDropoffCostWithoutTrip;
+                                minDropoffCostWithoutTrip;
                         if (minCostFromHere > requestState.getBestCost())
                             break;
 
                         const int stopId = stopIdsDVeh[i];
                         const auto &transferPoints = ellipseContainer.getEdgesInEllipse(stopId);
 
+                        paretoOptimalTps.clear();
+
                         for (int tpIdx = 0; tpIdx < transferPoints.size(); tpIdx++) {
                             const auto edge = transferPoints[tpIdx];
                             const int transferLoc = edge.edge;
                             KASSERT(isEdgeRel.isSet(transferLoc));
+
+                            // If the pickup or dropoff conincides with the transfer, we skip the assignment
+                            if (pickupPDLoc->loc == transferLoc || transferLoc == dropoff.loc)
+                                continue;
+
                             const auto edgeOffset = inputGraph.travelTime(transferLoc);
                             const int distancePVehToTransfer = thisLastStopToTransfersDistances[relEdgesToInternalIdx[transferLoc]];
-                            // assert(distancePVehToTransfer == asserter.getDistanceBetweenLocations(lastStopLocPVeh, transferLoc));
+
+                            if (i > 0) { // Cannot pareto check for transfer BNS because we only know lower bounds
+                                const bool transferAtStopDVeh = transferLoc == stopLocationsDVeh[i];
+                                const int distToTransferDVeh = transferAtStopDVeh ? 0 : edge.distToTail + edgeOffset;
+                                KASSERT(i != numStopsDVeh - 1);
+                                const int distNextLegAfterTransferDVeh = edge.distFromHead;
+                                const bool notDominated = checkPareto(
+                                        TPDistances(distancePVehToTransfer, distToTransferDVeh,
+                                                    distNextLegAfterTransferDVeh),
+                                        paretoOptimalTps);
+                                if (!notDominated)
+                                    continue;
+                            }
 
                             TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh, i,
                                                              distancePVehToTransfer, 0, edge.distToTail + edgeOffset,
@@ -939,7 +1055,6 @@ namespace karri {
 
                             asgn.pickupBNSLowerBoundUsed = bnsLowerBoundUsed;
 
-                            const auto *pickupPDLoc = &requestState.pickups[pickup->pdId];
                             asgn.pickup = pickupPDLoc;
                             asgn.dropoff = &dropoff;
 
@@ -953,10 +1068,6 @@ namespace karri {
                             asgn.pickupType = pickup->stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
                             asgn.transferTypePVeh = AFTER_LAST_STOP;
                             asgn.transferTypeDVeh = ORDINARY;
-
-                            // If the pickup or dropoff conincides with the transfer, we skip the assignment
-                            if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
-                                continue;
 
                             finishDistances(asgn, 0, distancePVehToTransfer, 0, distanceToDropoff);
                             assert(asgn.distFromTransferPVeh == 0);
@@ -1229,6 +1340,7 @@ namespace karri {
         AssignmentWithTransfer bestAssignment;
         int bestCost;
 
+        std::vector<TPDistances> paretoOptimalTps;
 
         //* Statistics for the transfer als pveh assignment finder
         int64_t totalTime;
@@ -1244,7 +1356,7 @@ namespace karri {
         int64_t numPickups;
         int64_t numDropoffs;
 
-        // Stats for the tried assignments 
+        // Stats for the tried assignments
         int64_t numAssignmentsTriedPickupBNS;
         int64_t numAssignmentsTriedPickupORD;
         int64_t numAssignmentsTriedPickupALS;
