@@ -30,16 +30,14 @@ namespace karri {
     class OptimalTransferALSDVehFinder {
 
         struct TPDistances {
-            int distToTransferPVeh = INFTY;
-            int distFromTransferPVeh = INFTY;
-            int distToTransferDVeh = INFTY;
-            int distFromTransferDVeh = INFTY;
+            int detourPVeh = INFTY;
+            int detourDVeh = INFTY;
+            int trip = INFTY;
 
             static bool dominates(const TPDistances &lhs, const TPDistances &rhs) {
-                return lhs.distToTransferPVeh < rhs.distToTransferPVeh &&
-                       lhs.distFromTransferPVeh < rhs.distFromTransferPVeh &&
-                       lhs.distToTransferDVeh < rhs.distToTransferDVeh &&
-                       lhs.distFromTransferDVeh < rhs.distFromTransferDVeh;
+                return lhs.detourPVeh < rhs.detourPVeh &&
+                       lhs.detourDVeh < rhs.detourDVeh &&
+                       lhs.trip < rhs.trip;
             }
         };
 
@@ -290,20 +288,25 @@ namespace karri {
 
                                     const int tpOffset = inputGraph.travelTime(tpLoc);
 
-                                    const bool transferAtLastStop = tpLoc == stopLocationsDVeh[numStopsDVeh - 1];
-                                    const int distToTransferDVeh = transferAtLastStop ? 0
+                                    const bool transferAtLastStopDVeh = tpLoc == stopLocationsDVeh[numStopsDVeh - 1];
+                                    const bool transferAtStopPVeh =
+                                            tpLoc == stopLocationsPVeh[i] && pickup.stopIndex != i;
+                                    const int distToTransferDVeh = transferAtLastStopDVeh ? 0
                                                                                       : dVehDistancesToTransfer[relEdgesToInternalIdx[tpLoc]];
 
+                                    static const int stopTime = InputConfig::getInstance().stopTime;
                                     if (i > 0) {
                                         // TODO: This will no longer be true if we allow paired BNS for pVeh. Then, we
                                         //  possibly need to set distToTransferPVeh to the pickup to transfer distance.
                                         KASSERT(i != pickup.stopIndex);
-                                        const int distToTransferPVeh = edge.distToTail + tpOffset;
+                                        const int distToTransferPVeh = transferAtStopPVeh? 0 : edge.distToTail + tpOffset;
                                         const int distFromTransferPVeh = edge.distFromHead;
                                         const int distNextLegAfterTransferDVeh = distancesToDropoff[relEdgesToInternalIdx[tpLoc]];
+                                        const int detourPVeh = distToTransferPVeh + !transferAtStopPVeh * stopTime + distFromTransferPVeh;
+                                        const int detourDVeh = distToTransferDVeh + !transferAtLastStopDVeh * stopTime + distNextLegAfterTransferDVeh;
+                                        const int trip = distToTransferPVeh + distNextLegAfterTransferDVeh;
                                         const bool notDominated = checkPareto(
-                                                TPDistances(distToTransferPVeh, distFromTransferPVeh,
-                                                            distToTransferDVeh, distNextLegAfterTransferDVeh),
+                                                TPDistances(detourPVeh, detourDVeh, trip),
                                                 paretoOptimalTps);
                                         if (!notDominated)
                                             continue;
@@ -340,8 +343,6 @@ namespace karri {
                                     asgn.distFromDropoff = 0;
 
                                     // Check transfer at stop pVeh
-                                    const bool transferAtStopPVeh =
-                                            tp.loc == stopLocationsPVeh[i] && asgn.pickupIdx != asgn.transferIdxPVeh;
                                     if (transferAtStopPVeh) {
                                         asgn.distToTransferPVeh = 0;
 
@@ -421,19 +422,23 @@ namespace karri {
 
                                     const int tpOffset = inputGraph.travelTime(tpLoc);
 
-                                    const bool transferAtLastStop = tpLoc == stopLocationsDVeh[numStopsDVeh - 1];
-                                    const int distToTransferDVeh = transferAtLastStop ? 0
+                                    const bool transferAtLastStopDVeh = tpLoc == stopLocationsDVeh[numStopsDVeh - 1];
+                                    const bool transferAtStopPVeh =
+                                           tpLoc == stopLocationsPVeh[i] && pickup.stopIndex != i;
+                                    const int distToTransferDVeh = transferAtLastStopDVeh ? 0
                                                                                       : dVehDistancesToTransfer[relEdgesToInternalIdx[tpLoc]];
 
+                                    static const int stopTime = InputConfig::getInstance().stopTime;
                                     // TODO: This will no longer be true if we allow paired for pVeh. Then, we
                                     //  possibly need to set distToTransferPVeh to the pickup to transfer distance.
                                     KASSERT(i != pickup.stopIndex);
-                                    const int distToTransferPVeh = edge.distToTail + tpOffset;
+                                    const int distToTransferPVeh = transferAtStopPVeh? 0 : edge.distToTail + tpOffset;
                                     const int distFromTransferPVeh = edge.distFromHead;
                                     const int distNextLegAfterTransferDVeh = distancesToDropoff[relEdgesToInternalIdx[tpLoc]];
-                                    const bool notDominated = checkPareto(
-                                            TPDistances(distToTransferPVeh, distFromTransferPVeh,
-                                                        distToTransferDVeh, distNextLegAfterTransferDVeh),
+                                    const int detourPVeh = distToTransferPVeh + !transferAtStopPVeh * stopTime + distFromTransferPVeh;
+                                    const int detourDVeh = distToTransferDVeh + !transferAtLastStopDVeh * stopTime + distNextLegAfterTransferDVeh;
+                                    const int trip = distToTransferPVeh + distNextLegAfterTransferDVeh;
+                                    const bool notDominated = checkPareto(TPDistances(detourPVeh, detourDVeh, trip),
                                             paretoOptimalTps);
                                     if (!notDominated)
                                         continue;
@@ -469,8 +474,6 @@ namespace karri {
                                     asgn.distFromDropoff = 0;
 
                                     // Check transfer at stop pVeh
-                                    const bool transferAtStopPVeh =
-                                            tp.loc == stopLocationsPVeh[i] && asgn.pickupIdx != asgn.transferIdxPVeh;
                                     if (transferAtStopPVeh) {
                                         asgn.distToTransferPVeh = 0;
 
