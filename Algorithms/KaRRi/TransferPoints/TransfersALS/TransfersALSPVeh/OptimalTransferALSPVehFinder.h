@@ -356,6 +356,7 @@ namespace karri {
                 const auto &thisLastStopToTransfersDistances = lastStopToTransfersDistances.getDistancesFor(
                         relPVehToInternalIdx[pVehId]);
 
+
                 for (const auto &pickup: relBNSPickups.relevantSpotsFor(pVehId)) {
                     tryDropoffORD(pVeh, &pickup, postponedAssignments, thisLastStopToTransfersDistances,
                                   transfersToDropoffsDistances, ellipseContainer);
@@ -1156,7 +1157,8 @@ namespace karri {
                 return;
 
             if (!asgn.isFinished()) {
-                const auto lowerBound = calc.calcLowerBound(asgn, requestState);
+//                const auto lowerBound = calc.calcLowerBound(asgn, requestState);
+                const auto lowerBound = calc.calc(asgn, requestState);
                 if (lowerBound.total >= requestState.getBestCost())
                     return;
 

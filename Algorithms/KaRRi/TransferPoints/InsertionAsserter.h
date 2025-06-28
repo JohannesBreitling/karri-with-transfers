@@ -22,10 +22,11 @@ namespace karri {
             if (!assertPVeh(asgn) || !assertDVeh(asgn))
                 return false;
 
-            // Assert the times
-            KASSERT(asgn.requestTime <= asgn.depAtPickup && asgn.arrAtTransferPoint > asgn.depAtPickup);
-
             return true;
+        }
+
+        bool assertAssignment(const Assignment &asgn) {
+            return assertNoTransferAssignment(asgn);
         }
         
         int assertLastStopDistance(const int vehId, const int loc) {
@@ -191,6 +192,83 @@ namespace karri {
                 KASSERT(stopAfterDropoff != dropoff);
                 KASSERT(distanceFromDropoff == asgn.distFromDropoff);
             
+                if (stopAfterDropoff == dropoff || distanceFromDropoff != asgn.distFromDropoff) {
+                    KASSERT(false);
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+
+        bool assertNoTransferAssignment(const Assignment &asgn) {
+
+            // An invalid assignment can be skipped
+            if (!asgn.vehicle || !asgn.dropoff || !asgn.pickup)
+                return true;
+
+            const int numStops = routeState.numStopsOf(asgn.vehicle->vehicleId);
+            const auto stopLocations = routeState.stopLocationsFor(asgn.vehicle->vehicleId);
+
+            const int stopBeforePickup = stopLocations[asgn.pickupStopIdx];
+            const int pickup = asgn.pickup->loc;
+            const int dropoff = asgn.dropoff->loc;
+
+            // Assert the distance to the pickup
+            if (asgn.pickupStopIdx > 0 || numStops == 1) {
+                const int distToPickup = stopBeforePickup != pickup ? getDistanceBetweenLocations(stopBeforePickup, pickup) : 0;
+
+                if (distToPickup != asgn.distToPickup) {
+                    KASSERT(false);
+                    return false;
+                }
+            }
+
+            if (asgn.pickupStopIdx != asgn.dropoffStopIdx && asgn.pickupStopIdx < numStops - 1) {
+                // Pickup not als
+                const int stopAfterPickup = stopLocations[asgn.pickupStopIdx + 1];
+                const int distFromPickup = getDistanceBetweenLocations(pickup, stopAfterPickup);
+
+                if (stopAfterPickup == pickup || distFromPickup != asgn.distFromPickup) {
+                    KASSERT(false);
+                    return false;
+                }
+            }
+
+            if (asgn.pickupStopIdx == asgn.dropoffStopIdx) {
+                // Assert paired distance
+                const int pairedDistance = getDistanceBetweenLocations(pickup, dropoff);
+                if (pickup == dropoff || asgn.distFromPickup > 0 || asgn.distToDropoff != pairedDistance) {
+                    KASSERT(false);
+                    return false;
+                }
+            }
+
+            /* // TODO BNS
+            if (asgn.pickupStopIdx == 0) {
+                // Assert the paired distance
+
+                // Get the current location of the vehicle
+            }*/
+
+            if (asgn.pickupStopIdx != asgn.dropoffStopIdx) {
+                // Assert the distance to the dropoff
+                const int stopBeforeDropoff = stopLocations[asgn.dropoffStopIdx];
+                const bool sameLoc = stopBeforeDropoff == dropoff;
+                const int distanceToDropoff = !sameLoc ? getDistanceBetweenLocations(stopBeforeDropoff, dropoff) : 0;
+
+                if (distanceToDropoff != asgn.distToDropoff) {
+                    KASSERT(false);
+                    return false;
+                }
+            }
+
+            if (asgn.dropoffStopIdx < numStops - 1) {
+                // Assert the distance from the dropoff (dropoff is not als)
+                const int stopAfterDropoff = stopLocations[asgn.dropoffStopIdx + 1];
+                const int distanceFromDropoff = getDistanceBetweenLocations(dropoff, stopAfterDropoff);
+
                 if (stopAfterDropoff == dropoff || distanceFromDropoff != asgn.distFromDropoff) {
                     KASSERT(false);
                     return false;

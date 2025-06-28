@@ -58,7 +58,7 @@ namespace karri::PickupAfterLastStopStrategies {
                               VehicleToPDLocQueryT &vehicleToPDLocQuery,
                               const LastStopBucketsEnvT &lastStopBucketsEnv,
                               PDDistancesT &pdDistances,
-                              const CostCalculator &calculator,
+                              CostCalculator &calculator,
                               const RouteState &routeState,
                               RequestState &requestState)
                 : inputGraph(inputGraph),
@@ -163,7 +163,7 @@ namespace karri::PickupAfterLastStopStrategies {
 
         const InputGraphT &inputGraph;
         const Fleet &fleet;
-        const CostCalculator &calculator;
+        CostCalculator &calculator;
         const CH &ch;
         const RouteState &routeState;
         RequestState &requestState;

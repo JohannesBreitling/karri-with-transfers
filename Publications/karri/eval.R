@@ -86,15 +86,21 @@ asgnTypeStatsNoTransfer <- function(file) {
 }
 
 asgnTypeStats <- function(file) {
+  dfoverall <- read.csv(paste0(file, ".bestassignmentsoverall.csv"))
+  numnoveh <- sum(dfoverall$number_of_legs == 0)
+  numoneleg <- sum(dfoverall$number_of_legs == 1)
+  numtwolegs <- sum(dfoverall$number_of_legs == 2)
+  
   df <- read.csv(paste0(file, ".bestassignmentswithouttransfer.csv"))
   
-  numnoveh <- sum(df$not_using_vehicle == " true")
   numord <- sum((df$pickup_insertion_point > 0) & (df$pickup_insertion_point < df$num_stops - 1) & (df$dropoff_insertion_point < df$num_stops - 1))
   numpbns <- sum((df$pickup_insertion_point == 0) & (df$pickup_insertion_point < df$num_stops - 1) & (df$dropoff_insertion_point < df$num_stops - 1))
   numpals <- sum(df$pickup_insertion_point == df$num_stops - 1)
   numdals <- sum((df$pickup_insertion_point < df$num_stops - 1) & (df$dropoff_insertion_point == df$num_stops - 1))
   
   print(paste0("NoVeh: ", numnoveh))
+  print(paste0("One leg: ", numoneleg))
+  print(paste0("Two legs:", numtwolegs))
   print(paste0("ORD: ", numord))
   print(paste0("PBNS: ", numpbns))
   print(paste0("PALS: ", numpals))

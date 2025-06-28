@@ -68,13 +68,14 @@ namespace karri {
                                const Fleet &fleet,
                                const EllipticBucketsEnvironmentT &ellipticBucketsEnv,
                                const RequestState &requestState,
-                               const RouteState &routeState)
+                               const RouteState &routeState,
+                               CostCalculator &calc)
                 : inputGraph(inputGraph),
                   ch(chEnv.getCH()),
                   fleet(fleet),
                   requestState(requestState),
                   routeState(routeState),
-                  calc(routeState),
+                  calc(calc),
                   downGraph(chEnv.getCH().downwardGraph()),
                   upGraph(chEnv.getCH().upwardGraph()),
                   sweepVertexPermutation(),
@@ -144,7 +145,8 @@ namespace karri {
         // Given a set of stop IDs for pickup vehicles and dropoff vehicles, this computes the transfer points between
         // any pair of stops in the two sets. The given stop IDs should indicate the first stop in a pair of stops of
         // the respective vehicle.
-        EdgeEllipseContainer computeEllipses(const std::vector<int> &stopIds, stats::EllipseReconstructionStats& stats) {
+        EdgeEllipseContainer
+        computeEllipses(const std::vector<int> &stopIds, stats::EllipseReconstructionStats &stats) {
 
             Timer totalTimer;
             Timer timer;
@@ -459,7 +461,7 @@ namespace karri {
         const Fleet &fleet;
         const RequestState &requestState;
         const RouteState &routeState;
-        const CostCalculator calc;
+        CostCalculator& calc;
         CH::SearchGraph downGraph; // Reverse downward edges in CH. Vertices ordered by decreasing rank.
         CH::SearchGraph upGraph; // Upward edges in CH. Vertices ordered by decreasing rank.
 

@@ -52,23 +52,25 @@ namespace karri {
 
         using CostFunction = CostFunctionT;
 
-        explicit CostCalculatorTemplate(const RouteState &routeState)
+        explicit CostCalculatorTemplate(const RouteState &routeState, const Fleet &fleet)
                 : routeState(routeState),
-                  stopTime(InputConfig::getInstance().stopTime) {}
+                  fleet(fleet),
+                  stopTime(InputConfig::getInstance().stopTime),
+                  detourComputer(routeState) {}
 
         template<typename RequestContext>
-        RequestCost calc(const Assignment &asgn, const RequestContext &context) const {
+        RequestCost calc(const Assignment &asgn, const RequestContext &context) {
             return calcBase<true>(asgn, context);
         }
 
         template<typename RequestContext>
-        RequestCost calcWithoutHardConstraints(const Assignment &asgn, const RequestContext &context) const {
+        RequestCost calcWithoutHardConstraints(const Assignment &asgn, const RequestContext &context) {
             return calcBase<false>(asgn, context);
         }
 
         // Calculates the objective value for a given assignment.
         template<bool checkHardConstraints, typename RequestContext>
-        RequestCost calcBase(const Assignment &asgn, const RequestContext &context) const {
+        RequestCost calcBase(const Assignment &asgn, const RequestContext &context) {
             using namespace time_utils;
             assert(asgn.vehicle && asgn.pickup && asgn.dropoff);
             if (!asgn.vehicle || !asgn.pickup || !asgn.dropoff)
@@ -78,175 +80,331 @@ namespace karri {
                 asgn.distToDropoff == INFTY || asgn.distFromDropoff == INFTY)
                 return RequestCost::INFTY_COST();
             const int vehId = asgn.vehicle->vehicleId;
-            const auto numStops = routeState.numStopsOf(asgn.vehicle->vehicleId);
             const auto actualDepTimeAtPickup = getActualDepTimeAtPickup(asgn, context, routeState);
-            const auto initialPickupDetour = calcInitialPickupDetour(asgn, actualDepTimeAtPickup, context, routeState);
-
-            int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.pickupStopIdx, asgn.dropoffStopIdx,
-                                                            initialPickupDetour, routeState);
-
             const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
-            const auto initialDropoffDetour = calcInitialDropoffDetour(asgn, dropoffAtExistingStop, routeState);
-            const auto detourRightAfterDropoff = calcDetourRightAfterDropoff(asgn, initialPickupDetour,
-                                                                             initialDropoffDetour, routeState);
-            const auto residualDetourAtEnd = calcResidualTotalDetourForStopAfterDropoff(asgn.vehicle->vehicleId,
-                                                                                        asgn.dropoffStopIdx,
-                                                                                        numStops - 1,
-                                                                                        detourRightAfterDropoff,
-                                                                                        routeState);
+            if constexpr (checkHardConstraints) {
+                const auto initialPickupDetour = calcInitialPickupDetour(vehId, asgn.pickupStopIdx, asgn.dropoffStopIdx,
+                                                                         actualDepTimeAtPickup, asgn.distFromPickup,
+                                                                         context, routeState);
+                if (doesPickupDetourViolateRiderHardConstraints(vehId, asgn.pickupStopIdx, asgn.dropoffStopIdx,
+                                                                initialPickupDetour, routeState))
+                    return RequestCost::INFTY_COST();
 
-            if (checkHardConstraints && isAnyHardConstraintViolated(asgn, context, initialPickupDetour,
-                                                                    detourRightAfterDropoff, residualDetourAtEnd,
-                                                                    dropoffAtExistingStop, routeState))
-                return RequestCost::INFTY_COST();
+                if (isOccupancyConstraintViolated(*asgn.vehicle, asgn.pickupStopIdx, asgn.dropoffStopIdx,
+                                                  dropoffAtExistingStop, context, routeState))
+                    return RequestCost::INFTY_COST();
+            }
 
-            addedTripTime += calcAddedTripTimeAffectedByPickupAndDropoff(asgn, detourRightAfterDropoff, routeState);
+            // Compute detour and added trip times for existing riders for every vehicle that is affected
+            // through transfer dependencies
+            detourComputer.computeDetours(asgn, context);
+            int addedTripTime = 0;
+            int totalResidualDetours = 0;
+            for (const auto &stopId: detourComputer.stopIdsSeen) {
+                const int newArrTime = detourComputer.newArrTimes[stopId];
+                const int newDepTime = detourComputer.newDepTimes[stopId];
+                const int stopIdx = routeState.stopPositionOf(stopId);
+                const int stopVehId = routeState.vehicleIdOf(stopId);
+                const int schedArrTime = routeState.schedArrTimesFor(stopVehId)[stopIdx];
+                if (newArrTime > schedArrTime) {
+                    KASSERT(stopIdx > 0);
+                    const auto numDropoffsPs = routeState.numDropoffsPrefixSumFor(stopVehId);
+                    const int numDropoffs = numDropoffsPs[stopIdx] - numDropoffsPs[stopIdx - 1];
+                    addedTripTime += (newArrTime - schedArrTime) * numDropoffs;
+                }
+                if (stopIdx == routeState.numStopsOf(stopVehId) - 1) {
+                    const int schedDepTime = routeState.schedDepTimesFor(stopVehId)[stopIdx];
+                    const int residualDetour = std::max(0, newDepTime - schedDepTime);
+                    // For every vehicle whose last stop is reached later due to the assignment, check whether the
+                    // service time constraint still holds.
+                    if (checkHardConstraints &&
+                        isServiceTimeConstraintViolated(fleet[stopVehId], context, residualDetour, routeState))
+                        return RequestCost::INFTY_COST();
 
-            return calcCost(asgn, context, initialPickupDetour, residualDetourAtEnd,
-                            actualDepTimeAtPickup, dropoffAtExistingStop, addedTripTime);
+                    totalResidualDetours += residualDetour;
+                }
+            }
+
+            const int numStops = routeState.numStopsOf(vehId);
+
+            // Count the detour for pickup and/or dropoff after last stop.
+            if (asgn.dropoffStopIdx == numStops - 1) {
+                totalResidualDetours += asgn.distToDropoff + stopTime;
+                if (asgn.pickupStopIdx == numStops - 1) {
+                    totalResidualDetours += asgn.distToPickup + stopTime;
+                }
+            }
+
+            if (checkHardConstraints && asgn.dropoffStopIdx < numStops - 1) {
+                const int depTimeRightAfterDropoff = detourComputer.newDepTimes[routeState.stopIdsFor(vehId)[
+                        asgn.dropoffStopIdx + 1]];
+                const int detourRightAfterDropoff = depTimeRightAfterDropoff -
+                                                    routeState.schedDepTimesFor(vehId)[asgn.dropoffStopIdx + 1];
+                if (detourRightAfterDropoff > 0 &&
+                    doesDropoffDetourViolateRiderHardConstraints(vehId, asgn.dropoffStopIdx, detourRightAfterDropoff,
+                                                                 routeState))
+                    return RequestCost::INFTY_COST();
+            }
+
+            int arrTimeAtDropoff;
+            if (asgn.pickupStopIdx == asgn.dropoffStopIdx) {
+                arrTimeAtDropoff = actualDepTimeAtPickup + asgn.distToDropoff;
+            } else {
+                const int stopIdBeforeDropoff = routeState.stopIdsFor(vehId)[asgn.dropoffStopIdx];
+                arrTimeAtDropoff = std::max(routeState.schedDepTimesFor(vehId)[asgn.dropoffStopIdx],
+                                            detourComputer.newDepTimes[stopIdBeforeDropoff]) +
+                                   asgn.distToDropoff;
+            }
+            const int tripTime = arrTimeAtDropoff - context.originalRequest.requestTime + asgn.dropoff->walkingDist;
+
+            // Apply cost function to time values
+            RequestCost cost;
+            cost.walkingCost = F::calcWalkingCost(asgn.pickup->walkingDist, InputConfig::getInstance().pickupRadius) +
+                               F::calcWalkingCost(asgn.dropoff->walkingDist, InputConfig::getInstance().dropoffRadius);
+            cost.tripCost = F::calcTripCost(tripTime, context);
+            cost.waitTimeViolationCost = F::calcWaitViolationCost(actualDepTimeAtPickup, context);
+            cost.changeInTripCostsOfOthers = F::calcChangeInTripCostsOfExistingPassengers(addedTripTime);
+            cost.vehCost = F::calcVehicleCost(totalResidualDetours);
+            cost.total = cost.vehCost + cost.walkingCost + cost.tripCost + cost.waitTimeViolationCost +
+                         cost.changeInTripCostsOfOthers;
+            return cost;
         }
 
         template<typename RequestContext>
-        RequestCost calc(AssignmentWithTransfer &asgn, RequestContext &context) const {
+        RequestCost calc(AssignmentWithTransfer &asgn, RequestContext &context) {
             return calcBase<true>(asgn, context);
         }
 
-        template<typename RequestContext>
-        RequestCost calcLowerBound(AssignmentWithTransfer &asgn, RequestContext &context) const {
-            return calcBaseLowerBound<true>(asgn, context);
-        }
+//        template<typename RequestContext>
+//        RequestCost calcLowerBound(AssignmentWithTransfer &asgn, RequestContext &context) const {
+//            return calcBaseLowerBound<true>(asgn, context);
+//        }
 
         template<bool checkHardConstraints, typename RequestContext>
-        RequestCost calcBase(AssignmentWithTransfer &asgn, const RequestContext &context) const {
-            bool unfinishedPVeh = asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed;
-
-            RequestCost costPVeh;
-            if (unfinishedPVeh) {
-                costPVeh = calcPartialCostForPVehLowerBound<checkHardConstraints>(asgn, context);
-            } else {
-                costPVeh = calcPartialCostForPVeh<checkHardConstraints>(asgn, context);
-            }
-
-            if (costPVeh.total >= INFTY) {
-                return RequestCost::INFTY_COST();
-            }
-
-            assert(asgn.dropoff);
-
-            if (!asgn.dropoff || asgn.distToDropoff == INFTY || asgn.distFromDropoff == INFTY) {
-                return RequestCost::INFTY_COST();
-            }
-
+        RequestCost calcBase(AssignmentWithTransfer &asgn, const RequestContext &context) {
             using namespace time_utils;
 
-            const int vehId = asgn.dVeh->vehicleId;
-            const auto numStops = routeState.numStopsOf(vehId);
+            if (!asgn.pVeh || !asgn.dVeh || !asgn.pickup || !asgn.dropoff)
+                return RequestCost::INFTY_COST();
+            if (asgn.distToPickup == INFTY || asgn.distFromPickup == INFTY ||
+                asgn.distToTransferPVeh == INFTY || asgn.distFromTransferPVeh == INFTY ||
+                asgn.distToTransferDVeh == INFTY || asgn.distFromTransferDVeh == INFTY ||
+                asgn.distToDropoff == INFTY || asgn.distFromDropoff == INFTY) {
+                return RequestCost::INFTY_COST();
+            }
 
-            const auto actualDepTimeAtTransfer = getActualDepTimeAtTranfer(asgn, context, routeState);
-            asgn.depAtTransfer = actualDepTimeAtTransfer;
-            const auto initialTransferDetour = calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context,
+            const int pVehId = asgn.pVeh->vehicleId;
+            const int dVehId = asgn.dVeh->vehicleId;
+            const auto numStopsPVeh = routeState.numStopsOf(pVehId);
+            const auto numStopsDVeh = routeState.numStopsOf(dVehId);
+
+            const auto actualDepTimeAtPickup = getActualDepTimeAtPickup(asgn, context, routeState);
+            const bool transferPVehAtExistingStop = isTransferAtExistingStopPVeh(asgn, routeState);
+            const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
+            if constexpr (checkHardConstraints) {
+                const auto initialPickupDetour = calcInitialPickupDetour(pVehId, asgn.pickupIdx, asgn.transferIdxDVeh,
+                                                                         actualDepTimeAtPickup, asgn.distFromPickup,
+                                                                         context, routeState);
+                if (doesPickupDetourViolateRiderHardConstraints(pVehId, asgn.pickupIdx, asgn.transferIdxPVeh,
+                                                                initialPickupDetour, routeState))
+                    return RequestCost::INFTY_COST();
+
+                if (isOccupancyConstraintViolated(*asgn.pVeh, asgn.pickupIdx, asgn.transferIdxPVeh,
+                                                  transferPVehAtExistingStop, context, routeState))
+                    return RequestCost::INFTY_COST();
+
+                if (isOccupancyConstraintViolated(*asgn.dVeh, asgn.transferIdxDVeh, asgn.dropoffIdx,
+                                                  dropoffAtExistingStop, context, routeState))
+                    return RequestCost::INFTY_COST();
+            }
+
+            // Compute detour and added trip times for existing riders for every vehicle that is affected
+            // through transfer dependencies
+            detourComputer.computeDetours(asgn, context);
+            int addedTripTime = 0;
+            int totalResidualDetours = 0;
+            for (const auto &stopId: detourComputer.stopIdsSeen) {
+                const int newArrTime = detourComputer.newArrTimes[stopId];
+                const int newDepTime = detourComputer.newDepTimes[stopId];
+                const int stopIdx = routeState.stopPositionOf(stopId);
+                const int stopVehId = routeState.vehicleIdOf(stopId);
+                const int schedArrTime = routeState.schedArrTimesFor(stopVehId)[stopIdx];
+                if (newArrTime > schedArrTime) {
+                    KASSERT(stopIdx > 0);
+                    const auto numDropoffsPs = routeState.numDropoffsPrefixSumFor(stopVehId);
+                    const int numDropoffs = numDropoffsPs[stopIdx] - numDropoffsPs[stopIdx - 1];
+                    addedTripTime += (newArrTime - schedArrTime) * numDropoffs;
+                }
+                if (stopIdx == routeState.numStopsOf(stopVehId) - 1) {
+                    const int schedDepTime = routeState.schedDepTimesFor(stopVehId)[stopIdx];
+                    const int residualDetour = std::max(0, newDepTime - schedDepTime);
+                    // For every vehicle whose last stop is reached later due to the assignment, check whether the
+                    // service time constraint still holds.
+                    if (checkHardConstraints &&
+                        isServiceTimeConstraintViolated(fleet[stopVehId], context, residualDetour, routeState))
+                        return RequestCost::INFTY_COST();
+
+                    totalResidualDetours += residualDetour;
+                }
+            }
+
+            // Count the detour for pickup and/or transfer after last stop of pVeh.
+            if (asgn.transferIdxPVeh == numStopsPVeh - 1) {
+                totalResidualDetours += asgn.distToTransferPVeh + stopTime;
+                if (asgn.pickupIdx == numStopsPVeh - 1) {
+                    totalResidualDetours += asgn.distToPickup + stopTime;
+                }
+            }
+
+            // Count the detour for transfer and/or dropoff after last stop of dVeh.
+            if (asgn.dropoffIdx == numStopsDVeh - 1) {
+                totalResidualDetours += asgn.distToDropoff + stopTime;
+                if (asgn.transferIdxDVeh == numStopsDVeh - 1) {
+                    totalResidualDetours += asgn.distToTransferDVeh + stopTime;
+                }
+            }
+
+            if constexpr (checkHardConstraints) {
+                // Check rider hard constraints with detour after transfer in pVeh
+                if (asgn.transferIdxPVeh < numStopsPVeh - 1) {
+                    const int depTimeRightAfterTransferPVeh =
+                            detourComputer.newDepTimes[routeState.stopIdsFor(pVehId)[asgn.transferIdxPVeh + 1]];
+                    const int detourRightAfterTransferPVeh =
+                            depTimeRightAfterTransferPVeh - routeState.schedDepTimesFor(pVehId)[
+                                    asgn.transferIdxPVeh + 1];
+                    if (detourRightAfterTransferPVeh > 0 &&
+                        doesDropoffDetourViolateRiderHardConstraints(pVehId, asgn.transferIdxPVeh,
+                                                                     detourRightAfterTransferPVeh, routeState))
+                        return RequestCost::INFTY_COST();
+                }
+
+                // Check rider hard constraints with detour after transfer in dVeh
+                if (asgn.transferIdxDVeh < numStopsDVeh - 1) {
+                    const int depTimeRightAfterTransferDVeh =
+                            detourComputer.newDepTimes[routeState.stopIdsFor(dVehId)[asgn.transferIdxDVeh + 1]];
+                    const int detourRightAfterTransferDVeh =
+                            depTimeRightAfterTransferDVeh - routeState.schedDepTimesFor(dVehId)[
+                                    asgn.transferIdxDVeh + 1];
+                    if (detourRightAfterTransferDVeh > 0 &&
+                        doesPickupDetourViolateRiderHardConstraints(dVehId, asgn.transferIdxDVeh, asgn.dropoffIdx,
+                                                                    detourRightAfterTransferDVeh, routeState))
+                        return RequestCost::INFTY_COST();
+                }
+
+                // Check rider hard constraints with detour after dropoff in dVeh
+                if (asgn.dropoffIdx < numStopsDVeh - 1) {
+                    const int depTimeRightAfterDropoff =
+                            detourComputer.newDepTimes[routeState.stopIdsFor(dVehId)[asgn.dropoffIdx + 1]];
+                    const int detourRightAfterDropoff =
+                            depTimeRightAfterDropoff - routeState.schedDepTimesFor(dVehId)[asgn.dropoffIdx + 1];
+                    if (detourRightAfterDropoff > 0 &&
+                        doesDropoffDetourViolateRiderHardConstraints(dVehId, asgn.dropoffIdx, detourRightAfterDropoff,
+                                                                     routeState))
+                        return RequestCost::INFTY_COST();
+                }
+            }
+
+            // Compute trip time of new rider
+            const int riderArrTimeAtTransfer = computeRiderArrTimeAtTransfer(asgn, actualDepTimeAtPickup,
+                                                                             transferPVehAtExistingStop, detourComputer,
                                                                              routeState);
-            assert(initialTransferDetour >= 0);
+            const int depTimeAtTransfer = computeDVehDepTimeAtTransfer(asgn, riderArrTimeAtTransfer, detourComputer,
+                                                                       routeState, context);
+            const int arrTimeAtDropoff = computeArrTimeAtDropoffAfterTransfer(
+                    asgn, depTimeAtTransfer, detourComputer, routeState);
 
-            int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.transferIdxDVeh, asgn.dropoffIdx,
-                                                            initialTransferDetour, routeState);
-            const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
+            const int tripTime = arrTimeAtDropoff - context.originalRequest.requestTime + asgn.dropoff->walkingDist;
+            const int waitTimePickup = actualDepTimeAtPickup - context.originalRequest.requestTime;
 
-            const auto initialDropoffDetour = calcInitialDropoffDetour(asgn, dropoffAtExistingStop, routeState);
-            assert(asgn.transferIdxDVeh == asgn.dropoffIdx || initialDropoffDetour >= 0);
-
-            const auto detourRightAfterDropoff = calcDetourRightAfterDropoff(asgn, initialTransferDetour,
-                                                                             initialDropoffDetour, routeState);
-
-            const auto residualDetourAtEnd = calcResidualTotalDetourForStopAfterDropoff(asgn.dVeh->vehicleId,
-                                                                                        asgn.dropoffIdx,
-                                                                                        numStops - 1,
-                                                                                        detourRightAfterDropoff,
-                                                                                        routeState);
-
-            if (checkHardConstraints &&
-                isAnyHardConstraintViolatedDVeh(asgn, context, initialTransferDetour, detourRightAfterDropoff,
-                                                residualDetourAtEnd, dropoffAtExistingStop, routeState)) {
-                return RequestCost::INFTY_COST();
-            }
-
-            addedTripTime += calcAddedTripTimeAffectedByTransferAndDropoff(asgn, detourRightAfterDropoff, routeState);
-
-            return calcFinalCost(asgn, costPVeh, context, initialTransferDetour, residualDetourAtEnd, actualDepTimeAtTransfer,
-                                 dropoffAtExistingStop, addedTripTime);
+            // Apply cost function to time values
+            RequestCost cost;
+            cost.walkingCost = F::calcWalkingCost(asgn.pickup->walkingDist, InputConfig::getInstance().pickupRadius) +
+                               F::calcWalkingCost(asgn.dropoff->walkingDist, InputConfig::getInstance().dropoffRadius);
+            cost.tripCost = F::calcTripCost(tripTime, context);
+            cost.waitTimeViolationCost = F::calcWaitViolationCost(riderArrTimeAtTransfer, depTimeAtTransfer,
+                                                                  waitTimePickup, context);
+            cost.changeInTripCostsOfOthers = F::calcChangeInTripCostsOfExistingPassengers(addedTripTime);
+            cost.vehCost = F::calcVehicleCost(totalResidualDetours);
+            cost.total = cost.vehCost + cost.walkingCost + cost.tripCost + cost.waitTimeViolationCost +
+                         cost.changeInTripCostsOfOthers;
+            return cost;
         }
 
-        template<bool checkHardConstraints, typename RequestContext>
-        RequestCost calcBaseLowerBound(AssignmentWithTransfer &asgn, const RequestContext &context) const {
-            const bool unfinishedPVeh = asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed;
 
-            RequestCost costPVeh;
-            if (unfinishedPVeh) {
-                costPVeh = calcPartialCostForPVehLowerBound<checkHardConstraints>(asgn, context);
-            } else {
-                costPVeh = calcPartialCostForPVeh<checkHardConstraints>(asgn, context);
-            }
 
-            if (costPVeh.total >= INFTY) {
-                return RequestCost::INFTY_COST();
-            }
-
-            assert(asgn.dropoff);
-            assert(costPVeh.walkingCost >= 0 && costPVeh.tripCost >= 0 &&
-                   costPVeh.waitTimeViolationCost >= 0 && costPVeh.changeInTripCostsOfOthers >= 0 &&
-                   costPVeh.vehCost >= 0);
-
-            if (!asgn.dropoff) {
-                return RequestCost::INFTY_COST();
-            }
-
-            if (asgn.distToDropoff == INFTY || asgn.distFromDropoff == INFTY || costPVeh.total >= INFTY) {
-                return RequestCost::INFTY_COST();
-            }
-
-            using namespace time_utils;
-
-            const int vehId = asgn.dVeh->vehicleId;
-            const auto numStops = routeState.numStopsOf(vehId);
-
-            const auto actualDepTimeAtTransfer = getActualDepTimeAtTranfer(asgn, context, routeState);
-            const auto initialTransferDetour = std::max(
-                    calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context, routeState), 0);
-
-            int addedTripTime = std::max(
-                    calcAddedTripTimeInInterval(vehId, asgn.transferIdxDVeh, asgn.dropoffIdx, initialTransferDetour,
-                                                routeState), 0);
-            const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
-
-            const auto initialDropoffDetour = std::max(
-                    calcInitialDropoffDetour(asgn, dropoffAtExistingStop, routeState), 0);
-
-            const auto detourRightAfterDropoff = std::max(calcDetourRightAfterDropoff(asgn, initialTransferDetour,
-                                                                                      initialDropoffDetour, routeState),
-                                                          0);
-
-            const auto residualDetourAtEnd = std::max(calcResidualTotalDetourForStopAfterDropoff(asgn.dVeh->vehicleId,
-                                                                                                 asgn.dropoffIdx,
-                                                                                                 numStops - 1,
-                                                                                                 detourRightAfterDropoff,
-                                                                                                 routeState), 0);
-
-            if (checkHardConstraints &&
-                isAnyHardConstraintViolatedDVeh(asgn, context, initialTransferDetour, detourRightAfterDropoff,
-                                                residualDetourAtEnd, dropoffAtExistingStop, routeState)) {
-                return RequestCost::INFTY_COST();
-            }
-
-            addedTripTime += calcAddedTripTimeAffectedByTransferAndDropoff(asgn, detourRightAfterDropoff, routeState);
-
-            return calcFinalCost(asgn, costPVeh, context, initialTransferDetour, residualDetourAtEnd, actualDepTimeAtTransfer,
-                                 dropoffAtExistingStop, addedTripTime);
-        }
+//
+//        template<bool checkHardConstraints, typename RequestContext>
+//        RequestCost calcBaseLowerBound(AssignmentWithTransfer &asgn, const RequestContext &context) const {
+//            const bool unfinishedPVeh = asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed;
+//
+//            RequestCost costPVeh;
+//            if (unfinishedPVeh) {
+//                costPVeh = calcPartialCostForPVehLowerBound<checkHardConstraints>(asgn, context);
+//            } else {
+//                costPVeh = calcPartialCostForPVeh<checkHardConstraints>(asgn, context);
+//            }
+//
+//            if (costPVeh.total >= INFTY) {
+//                return RequestCost::INFTY_COST();
+//            }
+//
+//            assert(asgn.dropoff);
+//            assert(costPVeh.walkingCost >= 0 && costPVeh.tripCost >= 0 &&
+//                   costPVeh.waitTimeViolationCost >= 0 && costPVeh.changeInTripCostsOfOthers >= 0 &&
+//                   costPVeh.vehCost >= 0);
+//
+//            if (!asgn.dropoff) {
+//                return RequestCost::INFTY_COST();
+//            }
+//
+//            if (asgn.distToDropoff == INFTY || asgn.distFromDropoff == INFTY || costPVeh.total >= INFTY) {
+//                return RequestCost::INFTY_COST();
+//            }
+//
+//            using namespace time_utils;
+//
+//            const int vehId = asgn.dVeh->vehicleId;
+//            const auto numStops = routeState.numStopsOf(vehId);
+//
+//            const auto actualDepTimeAtTransfer = getActualDepTimeAtTransfer(asgn, context, routeState);
+//            const auto initialTransferDetour = std::max(
+//                    calcInitialTransferDetourDVeh(asgn, actualDepTimeAtTransfer, context, routeState), 0);
+//
+//            int addedTripTime = std::max(
+//                    calcAddedTripTimeInInterval(vehId, asgn.transferIdxDVeh, asgn.dropoffIdx, initialTransferDetour,
+//                                                routeState), 0);
+//            const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
+//
+//            const auto initialDropoffDetour = std::max(
+//                    calcInitialDropoffDetour(asgn, dropoffAtExistingStop, routeState), 0);
+//
+//            const auto detourRightAfterDropoff = std::max(calcDetourRightAfterDropoff(asgn, initialTransferDetour,
+//                                                                                      initialDropoffDetour, routeState),
+//                                                          0);
+//
+//            const auto residualDetourAtEnd = std::max(calcResidualTotalDetourForStopAfterDropoff(asgn.dVeh->vehicleId,
+//                                                                                                 asgn.dropoffIdx,
+//                                                                                                 numStops - 1,
+//                                                                                                 detourRightAfterDropoff,
+//                                                                                                 routeState), 0);
+//
+//            if (checkHardConstraints &&
+//                isAnyHardConstraintViolatedDVeh(asgn, context, initialTransferDetour, detourRightAfterDropoff,
+//                                                residualDetourAtEnd, dropoffAtExistingStop, routeState)) {
+//                return RequestCost::INFTY_COST();
+//            }
+//
+//            addedTripTime += calcAddedTripTimeAffectedByTransferAndDropoff(asgn, detourRightAfterDropoff, routeState);
+//
+//            return calcFinalCost(asgn, costPVeh, context, initialTransferDetour, residualDetourAtEnd,
+//                                 actualDepTimeAtTransfer,
+//                                 dropoffAtExistingStop, addedTripTime);
+//        }
 
         template<typename RequestContext>
         RequestCost calcMinCostForTransferPoint(const TransferPoint &tp, const RequestContext &context) const {
             using namespace time_utils;
-            RequestCost cost = {0,0,0,0,0,0};
+            RequestCost cost = {0, 0, 0, 0, 0, 0};
             const auto pVehId = tp.pVeh->vehicleId;
             const auto numStopsPVeh = routeState.numStopsOf(pVehId);
             const bool transferAtExistingStopPVeh =
@@ -296,7 +454,8 @@ namespace karri {
                              tp.distanceDVehToTransfer, context.originalRequest.requestTime);
             const auto psgDepTimeAtTransfer =
                     std::max(minArrTimeAtTransferPVeh,
-                             minArrTimeAtTransferDVeh + !transferAtExistingStopDVeh * InputConfig::getInstance().stopTime);
+                             minArrTimeAtTransferDVeh +
+                             !transferAtExistingStopDVeh * InputConfig::getInstance().stopTime);
             const auto minTripTime = psgDepTimeAtTransfer - context.originalRequest.requestTime;
             KASSERT(minTripTime >= 0);
             cost.tripCost += F::calcTripCost(minTripTime, context);
@@ -306,114 +465,109 @@ namespace karri {
             return cost;
         }
 
-        template<typename RequestContext>
-        RequestCost recomputePVeh(AssignmentWithTransfer &asgn, RequestContext &context) const {
-            return calcPartialCostForPVeh<true>(asgn, context);
-        }
-
-        template<bool checkHardConstraints, typename RequestContext>
-        RequestCost calcPartialCostForPVeh(AssignmentWithTransfer &asgn, const RequestContext &context) const {
-            using namespace time_utils;
-
-            assert(asgn.pVeh && asgn.pickup);
-            if (!asgn.pVeh || !asgn.pickup) {
-                return RequestCost::INFTY_COST();
-            }
-
-            if (asgn.distToPickup == INFTY || asgn.distFromPickup == INFTY ||
-                asgn.distToTransferPVeh == INFTY || asgn.distFromTransferPVeh == INFTY) {
-                return RequestCost::INFTY_COST();
-            }
-
-            const int vehId = asgn.pVeh->vehicleId;
-            const auto numStops = routeState.numStopsOf(vehId);
-            const auto actualDepTimeAtPickup = getActualDepTimeAtPickup(asgn, context, routeState);
-            asgn.depAtPickup = actualDepTimeAtPickup;
-            assert(actualDepTimeAtPickup >= context.originalRequest.requestTime);
-            const auto initialPickupDetour = calcInitialPickupDetour(asgn, actualDepTimeAtPickup, context, routeState);
-            assert(initialPickupDetour >= 0);
-
-            int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.pickupIdx, asgn.transferIdxPVeh,
-                                                            initialPickupDetour, routeState);
-            bool transferAtExistingStop = isTransferAtExistingStopPVeh(asgn, routeState);
-            asgn.transferAtStopPVeh = transferAtExistingStop;
-
-            const auto initalTransferDetour = calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState);
-            assert(asgn.pickupIdx == asgn.transferIdxPVeh || initalTransferDetour >= 0);
-
-            const auto detourRightAfterTransfer = calcDetourRightAfterTransferPVeh(asgn, initialPickupDetour,
-                                                                                   initalTransferDetour, routeState);
-            // The detourRightAfterTransfer is greater than or equal to zero by definition of the method
-
-            const auto residualDetourAtEnd = calcResidualTotalDetourForStopAfterDropoff(asgn.pVeh->vehicleId,
-                                                                                        asgn.transferIdxPVeh,
-                                                                                        numStops - 1,
-                                                                                        detourRightAfterTransfer,
-                                                                                        routeState);
-            // The residualDetourAtEnd is greater than or equal to zero by definition of the method
-
-            if (checkHardConstraints && isAnyHardConstraintViolatedPVeh(asgn, context, initialPickupDetour,
-                                                                        detourRightAfterTransfer, residualDetourAtEnd,
-                                                                        transferAtExistingStop, routeState)) {
-                return RequestCost::INFTY_COST();
-            }
-
-            addedTripTime += calcAddedTripTimeAffectedByPickupAndTransfer(asgn, detourRightAfterTransfer, routeState);
-            assert(addedTripTime >= 0);
-
-            return calcCostPVeh(asgn, context, initialPickupDetour, residualDetourAtEnd, actualDepTimeAtPickup,
-                                transferAtExistingStop, addedTripTime);
-        }
-
-        template<bool checkHardConstraints, typename RequestContext>
-        RequestCost
-        calcPartialCostForPVehLowerBound(AssignmentWithTransfer &asgn, const RequestContext &context) const {
-            using namespace time_utils;
-
-            assert(asgn.pVeh && asgn.pickup);
-            if (!asgn.pVeh || !asgn.pickup) {
-                return RequestCost::INFTY_COST();
-            }
-
-            if (asgn.distToPickup == INFTY || asgn.distFromPickup == INFTY || asgn.distToTransferPVeh == INFTY ||
-                asgn.distFromTransferPVeh == INFTY) {
-                return RequestCost::INFTY_COST();
-            }
-
-
-            const int vehId = asgn.pVeh->vehicleId;
-            const auto numStops = routeState.numStopsOf(vehId);
-            const auto actualDepTimeAtPickup = getActualDepTimeAtPickup(asgn, context, routeState);
-            const auto initialPickupDetour = std::max(
-                    calcInitialPickupDetour(asgn, actualDepTimeAtPickup, context, routeState), 0);
-            int addedTripTime = std::max(
-                    calcAddedTripTimeInInterval(vehId, asgn.pickupIdx, asgn.transferIdxPVeh, initialPickupDetour,
-                                                routeState), 0);
-
-            const bool transferAtExistingStop = isTransferAtExistingStopPVeh(asgn, routeState);
-
-            const auto initalTransferDetour = std::max(
-                    calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState), 0);
-
-            const auto detourRightAfterTransfer = calcDetourRightAfterTransferPVeh(asgn, initialPickupDetour,
-                                                                                   initalTransferDetour, routeState);
-            const auto residualDetourAtEnd = calcResidualTotalDetourForStopAfterDropoff(asgn.pVeh->vehicleId,
-                                                                                        asgn.transferIdxPVeh,
-                                                                                        numStops - 1,
-                                                                                        detourRightAfterTransfer,
-                                                                                        routeState);
-
-            if (checkHardConstraints && isAnyHardConstraintViolatedPVeh(asgn, context, initialPickupDetour,
-                                                                        detourRightAfterTransfer, residualDetourAtEnd,
-                                                                        transferAtExistingStop, routeState)) {
-                return RequestCost::INFTY_COST();
-            }
-
-            addedTripTime += calcAddedTripTimeAffectedByPickupAndTransfer(asgn, detourRightAfterTransfer, routeState);
-
-            return calcCostPVeh(asgn, context, initialPickupDetour, residualDetourAtEnd, actualDepTimeAtPickup,
-                                transferAtExistingStop, addedTripTime);
-        }
+//        template<bool checkHardConstraints, typename RequestContext>
+//        RequestCost calcPartialCostForPVeh(AssignmentWithTransfer &asgn, const RequestContext &context) const {
+//            using namespace time_utils;
+//
+//            assert(asgn.pVeh && asgn.pickup);
+//            if (!asgn.pVeh || !asgn.pickup) {
+//                return RequestCost::INFTY_COST();
+//            }
+//
+//            if (asgn.distToPickup == INFTY || asgn.distFromPickup == INFTY ||
+//                asgn.distToTransferPVeh == INFTY || asgn.distFromTransferPVeh == INFTY) {
+//                return RequestCost::INFTY_COST();
+//            }
+//
+//            const int vehId = asgn.pVeh->vehicleId;
+//            const auto numStops = routeState.numStopsOf(vehId);
+//            const auto actualDepTimeAtPickup = getActualDepTimeAtPickup(asgn, context, routeState);
+//            asgn.depAtPickup = actualDepTimeAtPickup;
+//            assert(actualDepTimeAtPickup >= context.originalRequest.requestTime);
+//            const auto initialPickupDetour = calcInitialPickupDetour(asgn, actualDepTimeAtPickup, context, routeState);
+//            assert(initialPickupDetour >= 0);
+//
+//            int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.pickupIdx, asgn.transferIdxPVeh,
+//                                                            initialPickupDetour, routeState);
+//            bool transferAtExistingStop = isTransferAtExistingStopPVeh(asgn, routeState);
+//            asgn.transferAtStopPVeh = transferAtExistingStop;
+//
+//            const auto initalTransferDetour = calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState);
+//            assert(asgn.pickupIdx == asgn.transferIdxPVeh || initalTransferDetour >= 0);
+//
+//            const auto detourRightAfterTransfer = calcDetourRightAfterTransferPVeh(asgn, initialPickupDetour,
+//                                                                                   initalTransferDetour, routeState);
+//            // The detourRightAfterTransfer is greater than or equal to zero by definition of the method
+//
+//            const auto residualDetourAtEnd = calcResidualTotalDetourForStopAfterDropoff(asgn.pVeh->vehicleId,
+//                                                                                        asgn.transferIdxPVeh,
+//                                                                                        numStops - 1,
+//                                                                                        detourRightAfterTransfer,
+//                                                                                        routeState);
+//            // The residualDetourAtEnd is greater than or equal to zero by definition of the method
+//
+//            if (checkHardConstraints && isAnyHardConstraintViolatedPVeh(asgn, context, initialPickupDetour,
+//                                                                        detourRightAfterTransfer, residualDetourAtEnd,
+//                                                                        transferAtExistingStop, routeState)) {
+//                return RequestCost::INFTY_COST();
+//            }
+//
+//            addedTripTime += calcAddedTripTimeAffectedByPickupAndTransfer(asgn, detourRightAfterTransfer, routeState);
+//            assert(addedTripTime >= 0);
+//
+//            return calcCostPVeh(asgn, context, initialPickupDetour, residualDetourAtEnd, actualDepTimeAtPickup,
+//                                transferAtExistingStop, addedTripTime);
+//        }
+//
+//        template<bool checkHardConstraints, typename RequestContext>
+//        RequestCost
+//        calcPartialCostForPVehLowerBound(AssignmentWithTransfer &asgn, const RequestContext &context) const {
+//            using namespace time_utils;
+//
+//            assert(asgn.pVeh && asgn.pickup);
+//            if (!asgn.pVeh || !asgn.pickup) {
+//                return RequestCost::INFTY_COST();
+//            }
+//
+//            if (asgn.distToPickup == INFTY || asgn.distFromPickup == INFTY || asgn.distToTransferPVeh == INFTY ||
+//                asgn.distFromTransferPVeh == INFTY) {
+//                return RequestCost::INFTY_COST();
+//            }
+//
+//
+//            const int vehId = asgn.pVeh->vehicleId;
+//            const auto numStops = routeState.numStopsOf(vehId);
+//            const auto actualDepTimeAtPickup = getActualDepTimeAtPickup(asgn, context, routeState);
+//            const auto initialPickupDetour = std::max(
+//                    calcInitialPickupDetour(asgn, actualDepTimeAtPickup, context, routeState), 0);
+//            int addedTripTime = std::max(
+//                    calcAddedTripTimeInInterval(vehId, asgn.pickupIdx, asgn.transferIdxPVeh, initialPickupDetour,
+//                                                routeState), 0);
+//
+//            const bool transferAtExistingStop = isTransferAtExistingStopPVeh(asgn, routeState);
+//
+//            const auto initalTransferDetour = std::max(
+//                    calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState), 0);
+//
+//            const auto detourRightAfterTransfer = calcDetourRightAfterTransferPVeh(asgn, initialPickupDetour,
+//                                                                                   initalTransferDetour, routeState);
+//            const auto residualDetourAtEnd = calcResidualTotalDetourForStopAfterDropoff(asgn.pVeh->vehicleId,
+//                                                                                        asgn.transferIdxPVeh,
+//                                                                                        numStops - 1,
+//                                                                                        detourRightAfterTransfer,
+//                                                                                        routeState);
+//
+//            if (checkHardConstraints && isAnyHardConstraintViolatedPVeh(asgn, context, initialPickupDetour,
+//                                                                        detourRightAfterTransfer, residualDetourAtEnd,
+//                                                                        transferAtExistingStop, routeState)) {
+//                return RequestCost::INFTY_COST();
+//            }
+//
+//            addedTripTime += calcAddedTripTimeAffectedByPickupAndTransfer(asgn, detourRightAfterTransfer, routeState);
+//
+//            return calcCostPVeh(asgn, context, initialPickupDetour, residualDetourAtEnd, actualDepTimeAtPickup,
+//                                transferAtExistingStop, addedTripTime);
+//        }
 
         // Calculate the cost for a passenger moving to their destination independently without using a vehicle.
         template<typename RequestContext>
@@ -989,156 +1143,129 @@ namespace karri {
 
     private:
 
-        template<typename RequestContext>
-        RequestCost calcCost(const Assignment &asgn,
-                             const RequestContext &context, const int initialPickupDetour,
-                             const int residualDetourAtEnd, const int depTimeAtPickup,
-                             const bool dropoffAtExistingStop, const int addedTripTimeForExistingPassengers) const {
-            if (!asgn.vehicle || !asgn.pickup || !asgn.dropoff)
-                return RequestCost::INFTY_COST();
+//        template<typename RequestContext>
+//        RequestCost calcCostPVeh(AssignmentWithTransfer &asgn,
+//                                 const RequestContext &context, const int initialPickupDetour,
+//                                 const int residualDetourAtEnd, const int depTimeAtPickup,
+//                                 const bool transferAtExistingStop,
+//                                 const int addedTripTimeForExistingPassengers) const {
+//
+//            if (!asgn.pVeh || !asgn.pickup) {
+//                return RequestCost::INFTY_COST();
+//            }
+//
+//            using namespace time_utils;
+//
+//            const auto arrTimeAtTransfer = getArrTimeAtTransfer(depTimeAtPickup, asgn, initialPickupDetour,
+//                                                                transferAtExistingStop, routeState);
+//            asgn.arrAtTransferPoint = arrTimeAtTransfer;
+//            assert(asgn.pickupPairedLowerBoundUsed || asgn.pickupBNSLowerBoundUsed ||
+//                   asgn.arrAtTransferPoint > asgn.depAtPickup);
+//
+//            const int pickupIdx = asgn.pickupIdx;
+//            const bool pickupAtExistingStop = isPickupAtExistingStop(*asgn.pickup, asgn.pVeh->vehicleId,
+//                                                                     context.originalRequest.requestTime, pickupIdx,
+//                                                                     routeState);
+//            (void) pickupAtExistingStop;
+//
+//            assert(asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed ||
+//                   asgn.pickupIdx != asgn.transferIdxPVeh || transferAtExistingStop ||
+//                   asgn.arrAtTransferPoint != asgn.depAtPickup);
+//            const int tripTime = arrTimeAtTransfer - context.originalRequest.requestTime;
+//
+//            const auto walkingCostPVeh = F::calcWalkingCost(asgn.pickup->walkingDist,
+//                                                            InputConfig::getInstance().pickupRadius);
+//            const auto tripCostPVeh = F::calcTripCost(tripTime, context);
+//            asgn.waitTimeAtPickup = depTimeAtPickup - context.originalRequest.requestTime;
+//            const auto waitTimeViolationCost = F::calcWaitViolationCost(depTimeAtPickup, context);
+//            assert(addedTripTimeForExistingPassengers >= 0);
+//            const auto changeInTripCostsOfOthers = F::calcChangeInTripCostsOfExistingPassengers(
+//                    addedTripTimeForExistingPassengers);
+//            assert(changeInTripCostsOfOthers >= 0);
+//            const auto vehCostPVeh = F::calcVehicleCost(residualDetourAtEnd);
+//
+//            RequestCost costPVeh;
+//            costPVeh.walkingCost = walkingCostPVeh;
+//            costPVeh.tripCost = tripCostPVeh;
+//            costPVeh.waitTimeViolationCost = waitTimeViolationCost;
+//            costPVeh.changeInTripCostsOfOthers = changeInTripCostsOfOthers;
+//            costPVeh.vehCost = vehCostPVeh;
+//
+//            assert(walkingCostPVeh >= 0 && tripCostPVeh >= 0 && waitTimeViolationCost >= 0 &&
+//                   changeInTripCostsOfOthers >= 0 && vehCostPVeh >= 0);
+//
+//            const int total =
+//                    vehCostPVeh + walkingCostPVeh + tripCostPVeh + waitTimeViolationCost + changeInTripCostsOfOthers;
+//            assert(total >= 0);
+//
+//            costPVeh.total = total;
+//
+//            assert(costPVeh.total >= 0);
+//            return costPVeh;
+//        }
+//
+//        template<typename RequestContext>
+//        RequestCost
+//        calcFinalCost(AssignmentWithTransfer &asgn, const RequestCost &costPVeh, const RequestContext &context,
+//                      const int initialTransferDetour,
+//                      const int residualDetourAtEnd, const int actualDepTimeAtTransfer,
+//                      const bool dropoffAtExistingStop, const int addedTripTime) const {
+//            if (!asgn.dVeh || !asgn.pVeh || !asgn.pickup || !asgn.dropoff) {
+//                return RequestCost::INFTY_COST();
+//            }
+//
+//            using namespace time_utils;
+//
+//            const int arrTimeAtDropoff = getArrTimeAtDropoff(actualDepTimeAtTransfer, asgn, initialTransferDetour,
+//                                                             dropoffAtExistingStop, routeState);
+//            const int tripTime = arrTimeAtDropoff - asgn.arrAtTransferPoint + asgn.dropoff->walkingDist;
+//            asgn.tripTimeDVeh = tripTime;
+//            asgn.arrAtDropoff = arrTimeAtDropoff;
+//            asgn.requestTime = context.originalRequest.requestTime;
+//
+//            const int walkingCost = F::calcWalkingCost(asgn.dropoff->walkingDist,
+//                                                       InputConfig::getInstance().dropoffRadius);
+//            const int tripCost = F::calcTripCost(tripTime, context);
+//            const int waitTimeViolationCost = F::calcWaitViolationCost(asgn.arrAtTransferPoint, actualDepTimeAtTransfer,
+//                                                                       asgn.waitTimeAtPickup, context);
+//            const int changeInTripCostsOfOthers = F::calcChangeInTripCostsOfExistingPassengers(addedTripTime);
+//            const int vehCost = F::calcVehicleCost(residualDetourAtEnd);
+//
+//            if (walkingCost >= INFTY || tripCost >= INFTY || waitTimeViolationCost >= INFTY ||
+//                changeInTripCostsOfOthers >= INFTY || vehCost >= INFTY) {
+//                return RequestCost::INFTY_COST();
+//            }
+//
+//            RequestCost cost;
+//            cost.walkingCost = costPVeh.walkingCost + walkingCost;
+//            cost.tripCost = costPVeh.tripCost + tripCost;
+//            cost.waitTimeViolationCost = costPVeh.waitTimeViolationCost + waitTimeViolationCost;
+//            cost.changeInTripCostsOfOthers = costPVeh.changeInTripCostsOfOthers + changeInTripCostsOfOthers;
+//            cost.vehCost = costPVeh.vehCost + vehCost;
+//            assert(cost.walkingCost >= 0 && cost.tripCost >= 0 && cost.waitTimeViolationCost >= 0 &&
+//                   cost.changeInTripCostsOfOthers >= 0 && cost.vehCost >= 0);
+//
+//            if (cost.walkingCost >= INFTY || cost.tripCost >= INFTY ||
+//                cost.waitTimeViolationCost >= INFTY || cost.changeInTripCostsOfOthers >= INFTY ||
+//                cost.vehCost >= INFTY) {
+//                return RequestCost::INFTY_COST();
+//            }
+//
+//            int total = (costPVeh.total + vehCost + walkingCost + tripCost + waitTimeViolationCost +
+//                         changeInTripCostsOfOthers);
+//            assert(total >= 0);
+//            cost.total = total;
+//            return cost;
+//        }
 
-            using namespace time_utils;
-            const auto arrTimeAtDropoff = getArrTimeAtDropoff(depTimeAtPickup, asgn, initialPickupDetour,
-                                                              dropoffAtExistingStop, routeState);
-            const int tripTime = arrTimeAtDropoff - context.originalRequest.requestTime + asgn.dropoff->walkingDist;
-
-            const auto walkingCost =
-                    F::calcWalkingCost(asgn.pickup->walkingDist, InputConfig::getInstance().pickupRadius) +
-                    F::calcWalkingCost(asgn.dropoff->walkingDist, InputConfig::getInstance().dropoffRadius);
-            const auto tripCost = F::calcTripCost(tripTime, context);
-            const auto waitTimeViolationCost = F::calcWaitViolationCost(depTimeAtPickup, context);
-            const auto changeInTripCostsOfOthers = F::calcChangeInTripCostsOfExistingPassengers(
-                    addedTripTimeForExistingPassengers);
-            const auto vehCost = F::calcVehicleCost(residualDetourAtEnd);
-
-            RequestCost cost;
-            cost.walkingCost = walkingCost;
-            cost.tripCost = tripCost;
-            cost.waitTimeViolationCost = waitTimeViolationCost;
-            cost.changeInTripCostsOfOthers = changeInTripCostsOfOthers;
-            cost.vehCost = vehCost;
-            cost.total = vehCost + walkingCost + tripCost + waitTimeViolationCost + changeInTripCostsOfOthers;
-
-            return cost;
-        }
-
-        template<typename RequestContext>
-        RequestCost calcCostPVeh(AssignmentWithTransfer &asgn,
-                                 const RequestContext &context, const int initialPickupDetour,
-                                 const int residualDetourAtEnd, const int depTimeAtPickup,
-                                 const bool transferAtExistingStop,
-                                 const int addedTripTimeForExistingPassengers) const {
-
-            if (!asgn.pVeh || !asgn.pickup) {
-                return RequestCost::INFTY_COST();
-            }
-
-            using namespace time_utils;
-
-            const auto arrTimeAtTransfer = getArrTimeAtTransfer(depTimeAtPickup, asgn, initialPickupDetour,
-                                                                transferAtExistingStop, routeState);
-            asgn.arrAtTransferPoint = arrTimeAtTransfer;
-            assert(asgn.pickupPairedLowerBoundUsed || asgn.pickupBNSLowerBoundUsed ||
-                   asgn.arrAtTransferPoint > asgn.depAtPickup);
-
-            const int pickupIdx = asgn.pickupIdx;
-            const bool pickupAtExistingStop = isPickupAtExistingStop(*asgn.pickup, asgn.pVeh->vehicleId,
-                                                                     context.originalRequest.requestTime, pickupIdx,
-                                                                     routeState);
-            (void) pickupAtExistingStop;
-
-            assert(asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed ||
-                   asgn.pickupIdx != asgn.transferIdxPVeh || transferAtExistingStop ||
-                   asgn.arrAtTransferPoint != asgn.depAtPickup);
-            const int tripTime = arrTimeAtTransfer - context.originalRequest.requestTime;
-
-            const auto walkingCostPVeh = F::calcWalkingCost(asgn.pickup->walkingDist,
-                                                            InputConfig::getInstance().pickupRadius);
-            const auto tripCostPVeh = F::calcTripCost(tripTime, context);
-            asgn.waitTimeAtPickup = depTimeAtPickup - context.originalRequest.requestTime;
-            const auto waitTimeViolationCost = F::calcWaitViolationCost(depTimeAtPickup, context);
-            assert(addedTripTimeForExistingPassengers >= 0);
-            const auto changeInTripCostsOfOthers = F::calcChangeInTripCostsOfExistingPassengers(
-                    addedTripTimeForExistingPassengers);
-            assert(changeInTripCostsOfOthers >= 0);
-            const auto vehCostPVeh = F::calcVehicleCost(residualDetourAtEnd);
-
-            RequestCost costPVeh;
-            costPVeh.walkingCost = walkingCostPVeh;
-            costPVeh.tripCost = tripCostPVeh;
-            costPVeh.waitTimeViolationCost = waitTimeViolationCost;
-            costPVeh.changeInTripCostsOfOthers = changeInTripCostsOfOthers;
-            costPVeh.vehCost = vehCostPVeh;
-
-            assert(walkingCostPVeh >= 0 && tripCostPVeh >= 0 && waitTimeViolationCost >= 0 &&
-                   changeInTripCostsOfOthers >= 0 && vehCostPVeh >= 0);
-
-            const int total =
-                    vehCostPVeh + walkingCostPVeh + tripCostPVeh + waitTimeViolationCost + changeInTripCostsOfOthers;
-            assert(total >= 0);
-
-            costPVeh.total = total;
-
-            assert(costPVeh.total >= 0);
-            return costPVeh;
-        }
-
-        template<typename RequestContext>
-        RequestCost
-        calcFinalCost(AssignmentWithTransfer &asgn, const RequestCost& costPVeh, const RequestContext &context, const int initialTransferDetour,
-                      const int residualDetourAtEnd, const int actualDepTimeAtTransfer,
-                      const bool dropoffAtExistingStop, const int addedTripTime) const {
-            if (!asgn.dVeh || !asgn.pVeh || !asgn.pickup || !asgn.dropoff) {
-                return RequestCost::INFTY_COST();
-            }
-
-            using namespace time_utils;
-
-            const int arrTimeAtDropoff = getArrTimeAtDropoff(actualDepTimeAtTransfer, asgn, initialTransferDetour,
-                                                             dropoffAtExistingStop, routeState);
-            const int tripTime = arrTimeAtDropoff - asgn.arrAtTransferPoint + asgn.dropoff->walkingDist;
-            asgn.tripTimeDVeh = tripTime;
-            asgn.arrAtDropoff = arrTimeAtDropoff;
-            asgn.requestTime = context.originalRequest.requestTime;
-
-            const int walkingCost = F::calcWalkingCost(asgn.dropoff->walkingDist,
-                                                       InputConfig::getInstance().dropoffRadius);
-            const int tripCost = F::calcTripCost(tripTime, context);
-            const int waitTimeViolationCost = F::calcWaitViolationCost(asgn.arrAtTransferPoint, actualDepTimeAtTransfer,
-                                                                       asgn.waitTimeAtPickup, context);
-            const int changeInTripCostsOfOthers = F::calcChangeInTripCostsOfExistingPassengers(addedTripTime);
-            const int vehCost = F::calcVehicleCost(residualDetourAtEnd);
-
-            if (walkingCost >= INFTY || tripCost >= INFTY || waitTimeViolationCost >= INFTY ||
-                changeInTripCostsOfOthers >= INFTY || vehCost >= INFTY) {
-                return RequestCost::INFTY_COST();
-            }
-
-            RequestCost cost;
-            cost.walkingCost = costPVeh.walkingCost + walkingCost;
-            cost.tripCost = costPVeh.tripCost + tripCost;
-            cost.waitTimeViolationCost = costPVeh.waitTimeViolationCost + waitTimeViolationCost;
-            cost.changeInTripCostsOfOthers = costPVeh.changeInTripCostsOfOthers + changeInTripCostsOfOthers;
-            cost.vehCost = costPVeh.vehCost + vehCost;
-            assert(cost.walkingCost >= 0 && cost.tripCost >= 0 && cost.waitTimeViolationCost >= 0 &&
-                   cost.changeInTripCostsOfOthers >= 0 && cost.vehCost >= 0);
-
-            if (cost.walkingCost >= INFTY || cost.tripCost >= INFTY ||
-                cost.waitTimeViolationCost >= INFTY || cost.changeInTripCostsOfOthers >= INFTY ||
-                cost.vehCost >= INFTY) {
-                return RequestCost::INFTY_COST();
-            }
-
-            int total = (costPVeh.total + vehCost + walkingCost + tripCost + waitTimeViolationCost +
-                         changeInTripCostsOfOthers);
-            assert(total >= 0);
-            cost.total = total;
-            return cost;
-        }
 
         const RouteState &routeState;
+        const Fleet &fleet;
         const int stopTime;
+
+        time_utils::DetourComputer detourComputer;
     };
+
 
     static constexpr int PSG_COST_SCALE = KARRI_PSG_COST_SCALE; // CMake compile time parameter
     static constexpr int VEH_COST_SCALE = KARRI_VEH_COST_SCALE; // CMake compile time parameter
