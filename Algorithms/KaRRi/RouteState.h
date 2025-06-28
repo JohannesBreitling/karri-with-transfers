@@ -1543,7 +1543,7 @@ namespace karri {
                 const auto stopIndex = stopPositionOf(stopId);
                 const auto startOfVeh = pos[vehId].start;
 
-                for (int i = startOfVeh + stopIndex; i >= startOfVeh; --i) {
+                for (int i = startOfVeh + stopIndex; i > startOfVeh; --i) {
                     if (maxArrTimes[i] <= propagatedMaxArrTime)
                         break; // Stop propagating if known maxArrTime at i is stricter already
 
@@ -1558,8 +1558,8 @@ namespace karri {
                         lastStopIdsInRoutesToProcessAndPropagatedMaxArrTime.emplace_back(dependentStopId, maxDepTime);
                     }
 
-                    if (i == startOfVeh)
-                        break; // First stop of the route, no previous stop to propagate to
+//                    if (i == startOfVeh)
+//                        break; // First stop of the route, no previous stop to propagate to
 
                     const auto lengthOfLegFromPrevious = schedArrTimes[i] - schedDepTimes[i - 1];
                     propagatedMaxArrTime = maxArrTimes[i] - lengthOfLegFromPrevious - stopTime;
