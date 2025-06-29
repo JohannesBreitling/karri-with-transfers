@@ -216,15 +216,6 @@ namespace karri {
             if (allTransferEdges.empty())
                 return;
 
-            const auto initTime = innerTimer.elapsed<std::chrono::nanoseconds>();
-
-            // Calculate the distances from all last stops (pickup ord, bns) to the potential transfers
-            innerTimer.restart();
-            const auto lastStopToTransfersDistances = strategy.calculateDistancesFromLastStopToAllTransfers(
-                    relevantLastStopLocs, allTransferEdges);
-            const int64_t searchTimeLastStopToTransfer = innerTimer.elapsed<std::chrono::nanoseconds>();
-
-            innerTimer.restart();
             const auto pVehIdsALS = pickupALSStrategy.findPickupsAfterLastStop();
             const auto searchTimePickupALS = innerTimer.elapsed<std::chrono::nanoseconds>();
 
@@ -237,6 +228,18 @@ namespace karri {
             for (const auto &dropoff: requestState.dropoffs) {
                 dropoffLocs.push_back(dropoff.loc);
             }
+
+
+            // Initialize the transfer strategy with the collected transfer edges.
+            strategy.init(allTransferEdges);
+
+            const auto initTime = innerTimer.elapsed<std::chrono::nanoseconds>();
+
+            // Calculate the distances from all last stops (pickup ord, bns) to the potential transfers
+            innerTimer.restart();
+            const auto lastStopToTransfersDistances = strategy.calculateDistancesFromLastStopToAllTransfers(
+                    relevantLastStopLocs, allTransferEdges);
+            const int64_t searchTimeLastStopToTransfer = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             // Calculate the distances from all pickups to the potential transfers
             innerTimer.restart();

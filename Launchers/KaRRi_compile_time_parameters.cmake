@@ -202,10 +202,10 @@ else(KARRI_TRANSFER_CH_ELLIPSE_RECONSTRUCTOR_USE_SIMD)
 endif (KARRI_TRANSFER_CH_ELLIPSE_RECONSTRUCTOR_USE_SIMD)
 
 
-set(KARRI_TRANSFER_DIRECT_DISTANCES_LOG_K 0 CACHE STRING "Given value i, KaRRi runs 2^i direct transfer distance searches simultaneously as bundled search.")
+set(KARRI_TRANSFER_DIRECT_DISTANCES_LOG_K 3 CACHE STRING "Given value i, KaRRi runs 2^i direct transfer distance searches simultaneously as bundled search.")
 target_compile_definitions(karri PRIVATE KARRI_TRANSFER_DIRECT_DISTANCES_LOG_K=${KARRI_TRANSFER_DIRECT_DISTANCES_LOG_K})
 
-option(KARRI_TRANSFER_DIRECT_DISTANCES_USE_SIMD "Use SIMD instructions for bundled direct transfer distance searches." OFF)
+option(KARRI_TRANSFER_DIRECT_DISTANCES_USE_SIMD "Use SIMD instructions for bundled direct transfer distance searches." ON)
 if (KARRI_TRANSFER_DIRECT_DISTANCES_USE_SIMD)
     target_compile_definitions(karri PRIVATE KARRI_TRANSFER_DIRECT_DISTANCES_USE_SIMD=true)
 else(KARRI_TRANSFER_DIRECT_DISTANCES_USE_SIMD)
@@ -226,6 +226,16 @@ target_compile_definitions(karri PRIVATE KARRI_TRANSFER_TALS_PHAST=2)
 ## Set the strategy here...
 set(KARRI_TRANSFER_TALS_STRAT KARRI_TRANSFER_TALS_PHAST CACHE STRING "Strategy for computing shortest path in the transfer ALS case.")
 target_compile_definitions(karri PRIVATE KARRI_TRANSFER_TALS_STRAT=${KARRI_TRANSFER_TALS_STRAT})
+
+set(KARRI_TRANSFER_TALS_LOG_K 3 CACHE STRING "Given value i, KaRRi runs 2^i TALS searches simultaneously as bundled search.")
+target_compile_definitions(karri PRIVATE KARRI_TRANSFER_TALS_LOG_K=${KARRI_TRANSFER_TALS_LOG_K})
+
+option(KARRI_TRANSFER_TALS_USE_SIMD "Use SIMD instructions for bundled TALS searches." ON)
+if (KARRI_TRANSFER_TALS_USE_SIMD)
+    target_compile_definitions(karri PRIVATE KARRI_TRANSFER_TALS_USE_SIMD=true)
+else(KARRI_TRANSFER_TALS_USE_SIMD)
+    target_compile_definitions(karri PRIVATE KARRI_TRANSFER_TALS_USE_SIMD=false)
+endif (KARRI_TRANSFER_TALS_USE_SIMD)
 
 ## Parallelize PHAST queries for computation of detour ellipses?
 option(KARRI_TRANSFER_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE "Parallelize PHAST queries for computation of detour ellipses. If set, use -max-num-threads." OFF)

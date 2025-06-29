@@ -147,6 +147,9 @@ namespace karri {
                 dropoffLocs.push_back(dropoff.loc);
             }
 
+            // Initialize the transfer strategy with the collected transfer edges.
+            strategy.init(allTransferEdges);
+
             const auto initTime = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             // Calculate the distances from the relevant last stops to the transfer points and from the transfer points to the dropoffs
@@ -155,8 +158,7 @@ namespace karri {
             // relALSDropoffs.getVehiclesWithRelevantPDLocs() to the j-th edge in transferEdges
             innerTimer.restart();
             const auto lastStopToTransfersDistances = strategy.calculateDistancesFromLastStopToAllTransfers(
-                    relevantLastStopLocs,
-                    allTransferEdges);
+                    relevantLastStopLocs, allTransferEdges);
             const auto searchTimeLastStopToTransfer = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             innerTimer.restart();

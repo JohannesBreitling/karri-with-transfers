@@ -42,7 +42,9 @@
 class LightweightSubset {
  public:
   // Constructs an empty subset of a finite set of the specified size.
-  explicit LightweightSubset(const int size) : hasElement(size) {}
+  explicit LightweightSubset(const int size) : hasElement(size) {
+      elements.reserve(size);
+  }
 
   // Returns an iterator referring to the first element in the subset.
   std::vector<int32_t>::const_iterator begin() const noexcept {

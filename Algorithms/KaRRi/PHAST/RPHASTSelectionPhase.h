@@ -117,8 +117,6 @@ public:
               pruneUpSearch(prune) {
         if constexpr (WithPruning) {
             upSearchDistances.resize(fullGraph.numVertices());
-        } else {
-            upBfsQueue.reserve(fullGraph.numVertices());
         }
         KASSERT(validateVerticesInIncreasingRankOrder(fullGraph));
     }
@@ -140,6 +138,9 @@ public:
         return result;
     }
 
+    // Given a set of CH ranks of vertices, this constructs a PHAST selection for the subgraph induced by these
+    // vertices. It is the responsibility of the caller to ensure that the ranks induce a valid search graph.
+    // Given ranks should be original CH ranks in any order. Selection will be ordered by decreasing rank.
     RPHASTSelection runForKnownVertices(const std::vector<int> &subgraphVertices) {
         verticesInSubgraph.clear();
         for (const auto &v: subgraphVertices) {
@@ -170,7 +171,8 @@ public:
         std::sort(verticesInSubgraph.begin(), verticesInSubgraph.end(), std::greater<>());
 
         RPHASTSelection result;
-        result.subGraph = constructEdgeInducedOrderedSubgraph(verticesInSubgraph, subgraphEdges, result.fullToSubMapping);
+        result.subGraph = constructEdgeInducedOrderedSubgraph(verticesInSubgraph, subgraphEdges,
+                                                              result.fullToSubMapping);
         result.subToFullMapping.resize(verticesInSubgraph.size());
         for (const auto &v: verticesInSubgraph) {
             result.subToFullMapping[result.fullToSubMapping[v]] = v;
@@ -211,20 +213,15 @@ private:
 
     void findVerticesUsingBfs(const std::vector<int> &targets) {
         verticesInSubgraph.clear();
-        upBfsQueue.resize(0);
         for (const auto &t: targets) {
-            if (verticesInSubgraph.insert(t)) {
-                upBfsQueue.push_back(t);
-            }
+            verticesInSubgraph.insert(t);
         }
-        LIGHT_KASSERT(upBfsQueue.capacity() >= fullGraph.numVertices());
-        for (auto it = upBfsQueue.begin(); it != upBfsQueue.end(); ++it) {
+
+        for (auto it = verticesInSubgraph.begin(); it != verticesInSubgraph.end(); ++it) {
             const auto v = *it;
             FORALL_INCIDENT_EDGES(fullGraph, v, e) {
                 const auto w = fullGraph.edgeHead(e);
-                if (verticesInSubgraph.insert(w)) {
-                    upBfsQueue.push_back(w);
-                }
+                verticesInSubgraph.insert(w);
             }
         }
     }
@@ -410,7 +407,7 @@ private:
 
 //    std::vector<int> verticesInSubgraph;
 
-    std::vector<int> upBfsQueue;
+//    std::vector<int> upBfsQueue;
 
     using PriorityQueue = AddressableQuadHeap;
     PriorityQueue upSearchPriorityQueue; // The priority queue of unsettled vertices in the upward selection search.

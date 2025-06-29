@@ -80,22 +80,23 @@ public:
     
     
     void run(const RPHASTSelection &selection, const int source, const int offset = 0) {
-        sanityCheckTargetGraphValidity(selection);
-        runUpwardSearchAndInitializeDownwardDistances(selection, source, offset);
-        runDownwardSweep(selection);
+        std::array<int, K> sources;
+        std::array<int, K> offsets;
+        sources.fill(source);
+        offsets.fill(offset);
+        run(selection, sources, offsets);
     }
 
-    // void run(const RPHASTSelection &selection, const std::array<int, K> &sources, const std::array<int, K> &offsets = {}) {
-    //     sanityCheckTargetGraphValidity(selection);
-    //     runUpwardSearchAndInitializeDownwardDistances(selection, sources, offsets);
-    //     runDownwardSweep(selection);
-    // }
+     void run(const RPHASTSelection &selection, const std::array<int, K> &sources, const std::array<int, K> &offsets = {}) {
+         KASSERT(sanityCheckTargetGraphValidity(selection));
+         runUpwardSearchAndInitializeDownwardDistances(selection, sources, offsets);
+         runDownwardSweep(selection);
+     }
 
     // Returns distance from i-th source to vertex v found in last call to run().
     // Vertex ID of v has to be ID in subgraph of selection passed to last call of run().
     int getDistance(const int v, const int i = 0) const {
         KASSERT(v >= 0 && v < distances.size());
-//        return distances.readDistance(v)[i];
         return distances[v][i];
     }
 
@@ -103,7 +104,6 @@ public:
     // Vertex ID of v has to be ID in subgraph of selection passed to last call of run().
     DistanceLabel getDistances(const int v) const {
         KASSERT(v >= 0 && v < distances.size());
-//        return distances.readDistance(v);
         return distances[v];
     }
 
@@ -127,51 +127,28 @@ public:
 
 private:
 
-    // void runUpwardSearchAndInitializeDownwardDistances(const RPHASTSelection &selection,
-    //                                                    const std::array<int, K> &sources,
-    //                                                    const std::array<int, K> &offsets = {}) {
-    //     KASSERT(selection.fullToSubMapping.size() == sourceGraph.numVertices());
-    //     distances.resize(selection.subGraph.numVertices());
-    //     if (upDists.size() < selection.subGraph.numVertices() + 1) {
-    //         upDists.resize(selection.subGraph.numVertices() + 1, INFTY);
-    //     }
-    //     KASSERT(std::all_of(upDists.begin(), upDists.end(), [](const auto &dist) { return allSet(dist == INFTY); }));
-    //     if constexpr (StoreMeetingVertices) {
-    //         meetingVertices.resize(selection.subGraph.numVertices());
-    //     }
+     void runUpwardSearchAndInitializeDownwardDistances(const RPHASTSelection &selection,
+                                                        const std::array<int, K> &sources,
+                                                        const std::array<int, K> &offsets = {}) {
+         KASSERT(selection.fullToSubMapping.size() == sourceGraph.numVertices());
+         distances.resize(selection.subGraph.numVertices());
+         if (upDists.size() < selection.subGraph.numVertices() + 1) {
+             upDists.resize(selection.subGraph.numVertices() + 1, INFTY);
+         }
+         KASSERT(std::all_of(upDists.begin(), upDists.end(), [](const auto &dist) { return allSet(dist == INFTY); }));
+         if constexpr (StoreMeetingVertices) {
+             meetingVertices.resize(selection.subGraph.numVertices());
+         }
 
-    //     upwardSearch.getPruningCriterion().setSourceToTargetMapping(&selection.fullToSubMapping);
-    //     upwardSearch.runWithOffset(sources, offsets);
+         upwardSearch.getPruningCriterion().setSourceToTargetMapping(&selection.fullToSubMapping);
+         upwardSearch.runWithOffset(sources, offsets);
 
-    //     // All vertices which are not present in target graph have distance INFTY.
-    //     upDists[selection.subGraph.numVertices()] = INFTY;
+         // All vertices which are not present in target graph have distance INFTY.
+         upDists[selection.subGraph.numVertices()] = INFTY;
 
-    //     numVerticesSettled = upwardSearch.getNumVerticesSettled();
-    //     numEdgesRelaxed = upwardSearch.getNumEdgeRelaxations();
-    // }
-
-    void runUpwardSearchAndInitializeDownwardDistances(const RPHASTSelection &selection,
-                                                        const int source,
-                                                        const int offset = 0) {
-        KASSERT(selection.fullToSubMapping.size() == sourceGraph.numVertices());
-        distances.resize(selection.subGraph.numVertices());
-        if (upDists.size() < selection.subGraph.numVertices() + 1) {
-            upDists.resize(selection.subGraph.numVertices() + 1, INFTY);
-        }
-        KASSERT(std::all_of(upDists.begin(), upDists.end(), [](const auto &dist) { return allSet(dist == INFTY); }));
-        if constexpr (StoreMeetingVertices) {
-            meetingVertices.resize(selection.subGraph.numVertices());
-        }
-
-        upwardSearch.getPruningCriterion().setSourceToTargetMapping(&selection.fullToSubMapping);
-        upwardSearch.runWithOffset(source, offset);
-
-        // All vertices which are not present in target graph have distance INFTY.
-        upDists[selection.subGraph.numVertices()] = INFTY;
-
-        numVerticesSettled = upwardSearch.getNumVerticesSettled();
-        numEdgesRelaxed = upwardSearch.getNumEdgeRelaxations();
-    }
+         numVerticesSettled = upwardSearch.getNumVerticesSettled();
+         numEdgesRelaxed = upwardSearch.getNumEdgeRelaxations();
+     }
 
     void runDownwardSweep(const RPHASTSelection &selection) {
         if constexpr (WithPruning) {
@@ -225,16 +202,29 @@ private:
         numVerticesSettled += numVertices;
     }
 
-    void sanityCheckTargetGraphValidity(const RPHASTSelection &selection) {
+    bool sanityCheckTargetGraphValidity(const RPHASTSelection &selection) {
         KASSERT(selection.subToFullMapping.size() == selection.subGraph.numVertices());
+        if (selection.subToFullMapping.size() != selection.subGraph.numVertices()) {
+            return false;
+        }
         KASSERT(selection.fullToSubMapping.size() == sourceGraph.numVertices());
+        if (selection.fullToSubMapping.size() != sourceGraph.numVertices()) {
+            return false;
+        }
         int numValidMapping = 0;
         FORALL_VERTICES(sourceGraph, v) {
             const auto w = selection.fullToSubMapping[v];
             numValidMapping += (w < selection.subGraph.numVertices());
             KASSERT(w >= 0 && w < selection.subGraph.numVertices() + 1);
+            if (w < 0 || w >= selection.subGraph.numVertices() + 1) {
+                return false;
+            }
         }
         KASSERT(numValidMapping == selection.subGraph.numVertices());
+        if (numValidMapping != selection.subGraph.numVertices()) {
+            return false;
+        }
+        return true;
     }
 
 

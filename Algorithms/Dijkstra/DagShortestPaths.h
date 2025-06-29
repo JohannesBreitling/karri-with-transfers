@@ -99,12 +99,24 @@ class DagShortestPaths {
   }
 
 
-  // Runs a shortest-path search from s, with the distance of s initialized to the given offset.
-  void runWithOffset(const int s, const int offset) {
-    init(s, offset);
-    while (!queue.empty())
-      settleNextVertex();
-  }
+    // Runs a shortest-path search from s, with the distance of s initialized to the given offset.
+    void runWithOffset(const int s, const int offset) {
+        std::array<int, K> sources;
+        std::array<int, K> offsets;
+        sources.fill(s);
+        offsets.fill(offset);
+        init(sources, offsets);
+        while (!queue.empty())
+            settleNextVertex();
+    }
+
+    // Runs a shortest-path search from multiple sources s, with the distances of the sources initialized to the given
+    // offsets.
+    void runWithOffset(const std::array<int, K> &sources, const std::array<int, K> &offsets) {
+        init(sources, offsets);
+        while (!queue.empty())
+            settleNextVertex();
+    }
 
   // Returns the shortest-path distance to t.
   int getDistance(const int t) {
@@ -136,15 +148,26 @@ class DagShortestPaths {
   }
 
  private:
-  // Resets the distance labels and inserts the source into the queue.
-  void init(const int s, const int offset = 0) {
-    distanceLabels.init();
-    queue.clear();
-    distanceLabels[s] = offset;
-    parent.setVertex(s, s, true);
-    parent.setEdge(s, INVALID_EDGE, true);
-    queue.insert(s, s);
-  }
+    // Resets the distance labels and inserts the source into the queue.
+    void init(const std::array<int, K> &sources, const std::array<int, K> &offsets = {}) {
+        numVerticesSettled = 0;
+        numEdgeRelaxations = 0;
+        distanceLabels.init();
+        queue.clear();
+
+        for (auto i = 0; i < K; ++i) {
+            const auto s = sources[i];
+            distanceLabels[s][i] = offsets[i];
+            parent.setVertex(s, s, true);
+            parent.setEdge(s, INVALID_EDGE, true);
+        }
+
+        for (auto i = 0; i < K; ++i) {
+            const auto s = sources[i];
+            if (!queue.contains(s))
+                queue.insert(s, s);
+        }
+    }
 
   // Removes the next vertex from the queue, relaxes its outgoing edges, and returns its ID.
   int settleNextVertex() {

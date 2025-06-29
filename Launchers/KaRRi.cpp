@@ -685,9 +685,13 @@ int main(int argc, char *argv[]) {
                                                              reqState);
 
 
+        using TALSLabelSet = std::conditional_t<KARRI_TRANSFER_TALS_USE_SIMD,
+                SimdLabelSet<KARRI_TRANSFER_TALS_LOG_K, ParentInfo::NO_PARENT_INFO>,
+                BasicLabelSet<KARRI_TRANSFER_TALS_LOG_K, ParentInfo::NO_PARENT_INFO>>;
+
 #if KARRI_TRANSFER_HEURISTIC_LEVEL < 2
 
-        using OptimalTransferStrategyALSImpl = OptimalPHASTStrategyALS<VehicleInputGraph, VehCHEnv, RPHASTEnvironment>;
+        using OptimalTransferStrategyALSImpl = OptimalPHASTStrategyALS<VehicleInputGraph, VehCHEnv, RPHASTEnvironment, TALSLabelSet, std::ofstream>;
         OptimalTransferStrategyALSImpl optimalTransferALSStrategy(routeState, fleet, vehicleInputGraph, *vehChEnv,
                                                                   rphastEnv);
 
