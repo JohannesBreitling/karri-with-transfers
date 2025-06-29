@@ -111,6 +111,7 @@ public:
             : fullGraph(fullGraph),
               ch(ch),
               verticesInSubgraph(fullGraph.numVertices()),
+              helper(fullGraph.numVertices()),
               upSearchPriorityQueue(fullGraph.numVertices()),
               upSearchLevels(fullGraph.numVertices(), -1),
               upSearchDistances(0),
@@ -194,10 +195,24 @@ private:
         findVerticesUsingBfs(targets);
 
         // Order vertices in subgraph by decreasing rank.
-        auto itBegin = verticesInSubgraph.begin();
-        auto itEnd = verticesInSubgraph.end();
+        static constexpr int SORT_THRESHOLD_DIVIDER = 4;
+        if (verticesInSubgraph.size() >= fullGraph.numVertices() / SORT_THRESHOLD_DIVIDER) {
+            // If the subgraph is large, we scan every vertex in the full graph to get the subgraph vertices in order
+            helper.clear();
+            for (int v = fullGraph.numVertices() - 1; v >= 0; --v) {
+                if (verticesInSubgraph.contains(v)) {
+                    helper.insert(v);
+                }
+            }
+            verticesInSubgraph.swap(helper);
+        } else {
+            // If the subgraph is small enough, we sort vertices using std::sort.
+            auto itBegin = verticesInSubgraph.begin();
+            auto itEnd = verticesInSubgraph.end();
 
-        std::sort(itBegin, itEnd, std::greater<>());
+            std::sort(itBegin, itEnd, std::greater<>());
+        }
+
     }
 
     void findVerticesInSubgraphOrderedByLevels(const std::vector<int> &targets, const std::vector<int> &offsets) {
@@ -404,6 +419,7 @@ private:
     const SearchGraph &fullGraph;
     const CH &ch;
     LightweightSubset verticesInSubgraph;
+    LightweightSubset helper;
 
 //    std::vector<int> verticesInSubgraph;
 

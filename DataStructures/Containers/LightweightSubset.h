@@ -46,6 +46,11 @@ class LightweightSubset {
       elements.reserve(size);
   }
 
+  void swap(LightweightSubset &other) noexcept {
+    elements.swap(other.elements);
+    hasElement.swap(other.hasElement);
+  }
+
   // Returns an iterator referring to the first element in the subset.
   std::vector<int32_t>::const_iterator begin() const noexcept {
     return elements.begin();
