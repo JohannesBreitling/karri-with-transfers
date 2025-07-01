@@ -258,10 +258,6 @@ namespace karri {
                 // Pickup BNS
                 for (const auto pVehId: relBNSPickups.getVehiclesWithRelevantPDLocs()) {
 
-                    if (requestState.originalRequest.requestId == 757 && dVehId == 37 && pVehId == 129) {
-                        std::cout << "";
-                    }
-
                     KASSERT(postponedAssignments.empty());
                     // pVeh an dVeh can not be the same vehicles
                     if (dVehId == pVehId)
@@ -291,7 +287,7 @@ namespace karri {
                                     const int tpLoc = edge.edge;
                                     KASSERT(isEdgeRel.isSet(tpLoc));
 
-                                    // If the pickup or dropoff conincides with the transfer, we skip the assignment
+                                    // If the pickup or dropoff coincides with the transfer, we skip the assignment
                                     if (pickupPDLoc->loc == tpLoc || tpLoc == dropoff.loc)
                                         continue;
 
