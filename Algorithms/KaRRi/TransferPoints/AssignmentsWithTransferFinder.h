@@ -25,8 +25,6 @@
 #pragma once
 
 #include "Algorithms/KaRRi/TransferPoints/OrdinaryTransfers/OrdinaryTransferFinder.h"
-#include "Algorithms/KaRRi/TransferPoints/TransfersALS/TransfersALSPVeh/TransferALSPVehFinder.h"
-#include "Algorithms/KaRRi/TransferPoints/TransfersALS/TransfersALSDVeh/TransferALSDVehFinder.h"
 
 #include "Algorithms/KaRRi/TimeUtils.h"
 #include "Algorithms/KaRRi/BaseObjects/AssignmentWithTransfer.h"
@@ -131,7 +129,7 @@ namespace karri {
             for (const int pVehId: relBNSPickups.getVehiclesWithRelevantPDLocs()) {
                 const int earliestRelevantStopIdx = 0;
                 const auto stopIds = routeState.stopIdsFor(pVehId);
-                for (int i = earliestRelevantStopIdx; i < routeState.numStopsOf(pVehId) - 1; ++i) {
+                for (int i = earliestRelevantStopIdx; i < routeState.numStopsOf(pVehId); ++i) {
                     if (!stopSeen.isSet(stopIds[i])) {
                         stopSeen.set(stopIds[i]);
                         pVehStopIds.push_back(stopIds[i]);
@@ -142,7 +140,7 @@ namespace karri {
             for (const int pVehId: relORDPickups.getVehiclesWithRelevantPDLocs()) {
                 const int earliestRelevantStopIdx = relORDPickups.relevantSpotsFor(pVehId)[0].stopIndex;
                 const auto stopIds = routeState.stopIdsFor(pVehId);
-                for (int i = earliestRelevantStopIdx; i < routeState.numStopsOf(pVehId) - 1; ++i) {
+                for (int i = earliestRelevantStopIdx; i < routeState.numStopsOf(pVehId); ++i) {
                     if (!stopSeen.isSet(stopIds[i])) {
                         stopSeen.set(stopIds[i]);
                         pVehStopIds.push_back(stopIds[i]);
@@ -166,7 +164,7 @@ namespace karri {
             for (const int dVehId: relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
                 const auto numStops = routeState.numStopsOf(dVehId);
                 const auto& rel = relORDDropoffs.relevantSpotsFor(dVehId);
-                const int latestRelevantStopIdx = std::min(numStops - 2, rel[rel.size() - 1].stopIndex);
+                const int latestRelevantStopIdx = std::min(numStops - 1, rel[rel.size() - 1].stopIndex);
                 const auto stopIds = routeState.stopIdsFor(dVehId);
                 for (int i = 0; i < latestRelevantStopIdx + 1; ++i) {
                     if (!stopSeen.isSet(stopIds[i])) {
@@ -177,7 +175,7 @@ namespace karri {
             }
 
             for (const int dVehId: relALSDropoffs.getVehiclesWithRelevantPDLocs()) {
-                const int latestRelevantStopIdx = routeState.numStopsOf(dVehId) - 2;
+                const int latestRelevantStopIdx = routeState.numStopsOf(dVehId) - 1;
                 const auto stopIds = routeState.stopIdsFor(dVehId);
                 for (int i = 0; i < latestRelevantStopIdx + 1; ++i) {
                     if (!stopSeen.isSet(stopIds[i])) {

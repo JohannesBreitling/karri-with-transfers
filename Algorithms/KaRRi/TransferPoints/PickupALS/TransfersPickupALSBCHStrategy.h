@@ -173,7 +173,7 @@ namespace karri::Transfers {
             return distance;
         }
 
-        Subset findPickupsAfterLastStop() {
+        const Subset& findPickupsAfterLastStop() {
             runBchSearches();
             filterVehiclesBasedOnParetoDominance();
             return vehiclesSeenForPickups;

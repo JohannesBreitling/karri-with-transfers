@@ -2,6 +2,7 @@
 /// MIT License
 ///
 /// Copyright (c) 2025 Johannes Breitling <johannes.breitling@student.kit.edu>
+/// Copyright (c) 2025 Moritz Laupichler <moritz.laupichler@kit.edu>
 ///
 /// Permission is hereby granted, free of charge, to any person obtaining a copy
 /// of this software and associated documentation files (the "Software"), to deal
@@ -29,8 +30,22 @@
 
 namespace karri {
 
-    template<typename TransferALSStrategyT, typename TransfersPickupALSStrategyT, typename CurVehLocToPickupSearchesT, typename InsertionAsserterT>
+    template<typename InputGraphT, typename VehCHEnvT, typename TransferALSStrategyT, typename TransfersPickupALSStrategyT, typename CurVehLocToPickupSearchesT, typename InsertionAsserterT>
     class TransferALSPVehFinder {
+
+
+        struct TPDistances {
+            int distToTransferPVeh = INFTY;
+            int distToTransferDVeh = INFTY;
+            int distFromTransferDVeh = INFTY;
+
+            static bool dominates(const TPDistances &lhs, const TPDistances &rhs) {
+                return lhs.distToTransferPVeh < rhs.distToTransferPVeh &&
+                       lhs.distToTransferDVeh < rhs.distToTransferDVeh &&
+                       lhs.distFromTransferDVeh < rhs.distFromTransferDVeh;
+            }
+        };
+
 
         // The pVeh drives the detour to the transfer point
         // This implies, that the pVeh drives from its last stop to a stop of the dVeh and drops off the customer
@@ -41,6 +56,8 @@ namespace karri {
         using RelevantPDLoc = RelevantPDLocs::RelevantPDLoc;
 
         TransferALSPVehFinder(
+                const InputGraphT &inputGraph,
+                VehCHEnvT &vehChEnv,
                 TransferALSStrategyT &strategy,
                 TransfersPickupALSStrategyT &pickupALSStrategy,
                 CurVehLocToPickupSearchesT &searches,
@@ -52,7 +69,9 @@ namespace karri {
                 RequestState &requestState,
                 CostCalculator &calc,
                 InsertionAsserterT &asserter
-        ) : strategy(strategy),
+        ) : inputGraph(inputGraph),
+            vehCh(vehChEnv.getCH()),
+            strategy(strategy),
             pickupALSStrategy(pickupALSStrategy),
             searches(searches),
             relORDPickups(relORDPickups),
@@ -62,20 +81,14 @@ namespace karri {
             routeState(routeState),
             requestState(requestState),
             calc(calc),
-            asserter(asserter) {}
+            asserter(asserter),
+            relPVehToInternalIdx(fleet.size(), INVALID_INDEX),
+            dVehStopsFlags(fleet.size()),
+            isEdgeRel(inputGraph.numEdges()),
+            relEdgesToInternalIdx(inputGraph.numEdges()),
+            bestCost(INFTY) {}
 
         void init() {
-            totalTime = 0;
-
-            numCandidateVehiclesPickupBNS = 0;
-            numCandidateVehiclesPickupORD = 0;
-            numCandidateVehiclesPickupALS = 0;
-
-            numCandidateVehiclesDropoffORD = 0;
-            numCandidateVehiclesDropoffALS = 0;
-
-            numPickups = 0;
-            numDropoffs = 0;
 
             numAssignmentsTriedPickupBNS = 0;
             numAssignmentsTriedPickupORD = 0;
@@ -83,85 +96,178 @@ namespace karri {
             numAssignmentsTriedDropoffORD = 0;
             numAssignmentsTriedDropoffALS = 0;
 
-            tryAssignmentsTime = 0;
-
             numTransferPoints = 0;
-
-            searchTimePickupALS = 0;
-            searchTimeLastStopToTransfer = 0;
-            searchTimePickupToTransfer = 0;
         }
 
         template<typename EllipsesT>
-        void findAssignments(const RelevantDropoffsAfterLastStop& relALSDropoffs,  const EllipsesT&) {
+        void findAssignments(const RelevantDropoffsAfterLastStop &relALSDropoffs, const EllipsesT &ellipseContainer) {
             Timer total;
+            Timer innerTimer;
 
-            // Reset the last stop distances
-            lastStopDistances = std::map<int, std::map<int, std::vector<int>>>{};
+            bestCost = INFTY;
+            bestAssignment = AssignmentWithTransfer();
 
-            //* Calculate the distances from the last stop of the pickup vehicles to all possible stops of the dropoff vehicles (for the case that the pickup is ORD or BNS)
+            //* Collect the full ellipses of possible transfer points
+            // Collect all stop ids of last stops of potential pickup vehicles (without als, as for pickup als we first have to search to the pickups and the from the pickups)
 
+            relPVehToInternalIdx.clear(); // Reset all back to INVALID_INDEX
 
-            //* More versatile calculation of the last stop distances
-            std::vector<int> relevantPVehIds;
-            std::vector<int> relevantDVehIds;
+            std::vector<int> relevantLastStopLocs;
 
-            std::vector<bool> pVehIdFlags(fleet.size(), false);
-            std::vector<bool> dVehIdFlags(fleet.size(), false);
-
+            int numRelPVehs = 0;
             for (const auto pVehId: relORDPickups.getVehiclesWithRelevantPDLocs()) {
-                relevantPVehIds.push_back(pVehId);
-                pVehIdFlags[pVehId] = true;
+                relPVehToInternalIdx[pVehId] = numRelPVehs++;
+
+                const auto numStops = routeState.numStopsOf(pVehId);
+                const auto lastStopLoc = routeState.stopLocationsFor(pVehId)[numStops - 1];
+                relevantLastStopLocs.push_back(lastStopLoc);
             }
 
             for (const auto pVehId: relBNSPickups.getVehiclesWithRelevantPDLocs()) {
-                if (!pVehIdFlags[pVehId]) {
-                    relevantPVehIds.push_back(pVehId);
-                    pVehIdFlags[pVehId] = true;
-                }
+                if (relPVehToInternalIdx[pVehId] != INVALID_INDEX)
+                    continue;
+                relPVehToInternalIdx[pVehId] = numRelPVehs++;
+
+                const auto numStops = routeState.numStopsOf(pVehId);
+                const auto lastStopLocs = routeState.stopLocationsFor(pVehId)[numStops - 1];
+                relevantLastStopLocs.push_back(lastStopLocs);
             }
 
-            if (!relevantPVehIds.empty()) {
-                for (const auto dVehId: relALSDropoffs.getVehiclesWithRelevantPDLocs()) {
-                    relevantDVehIds.push_back(dVehId);
-                    dVehIdFlags[dVehId] = true;
-                }
+            if (dVehStopsFlags.size() <= routeState.getMaxStopId())
+                dVehStopsFlags.resize(routeState.getMaxStopId() + 1);
+            dVehStopsFlags.reset();
+            allTransferEdges.clear();
+            minDVehCostForTransferEdge.clear();
+            isEdgeRel.reset();
+            for (const auto dVehId: relALSDropoffs.getVehiclesWithRelevantPDLocs()) {
+                const auto numStops = routeState.numStopsOf(dVehId);
+                if (numStops <= 1)
+                    continue;
 
-                for (const auto dVehId: relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
-                    if (!dVehIdFlags[dVehId]) {
-                        relevantDVehIds.push_back(dVehId);
-                        dVehIdFlags[dVehId] = true;
+                const auto &stopIds = routeState.stopIdsFor(dVehId);
+                for (int i = 0; i < numStops; i++) {
+                    const auto stopId = stopIds[i];
+                    if (dVehStopsFlags.isSet(stopId))
+                        continue;
+                    dVehStopsFlags.set(stopId);
+                    const auto &ellipse = ellipseContainer.getEdgesInEllipse(stopId);
+                    const int vehWaitTimeFromTransferToEndOfRoute =
+                            time_utils::getTotalVehWaitTimeInInterval(dVehId, i, numStops - 1, routeState);
+                    for (const auto &e: ellipse) {
+                        const auto loc = e.edge;
+                        if (!isEdgeRel.isSet(loc)) {
+                            relEdgesToInternalIdx[loc] = static_cast<int>(allTransferEdges.size());
+                            isEdgeRel.set(loc);
+                            allTransferEdges.push_back(loc);
+                            minDVehCostForTransferEdge.push_back(INFTY);
+                        }
+                        auto &minCost = minDVehCostForTransferEdge[relEdgesToInternalIdx[loc]];
+                        minCost = std::min(minCost,
+                                           computeMinDVehCostForTransferEdge(e, dVehId, i, numStops - 1,
+                                                                             vehWaitTimeFromTransferToEndOfRoute));
                     }
                 }
             }
 
-            if (!relevantPVehIds.empty() && !relevantDVehIds.empty()) {
-                Timer lastStopSearchesTimer;
-                lastStopDistances = strategy.calculateDistancesFromLastStopsToAllStops(relevantPVehIds,
-                                                                                       relevantDVehIds);
-                searchTimeLastStopToTransfer += lastStopSearchesTimer.elapsed<std::chrono::nanoseconds>();
+            for (const auto dVehId: relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
+                const auto numStops = routeState.numStopsOf(dVehId);
+                if (numStops <= 1)
+                    continue;
+
+                const auto &rel = relORDDropoffs.relevantSpotsFor(dVehId);
+                const int latestRelevantStopIdx = std::min(numStops - 1, rel[rel.size() - 1].stopIndex);
+                const int earliestRelevantStopIdx = rel[0].stopIndex;
+                const auto &stopIds = routeState.stopIdsFor(dVehId);
+                for (int i = 0; i <= latestRelevantStopIdx; ++i) {
+                    const auto stopId = stopIds[i];
+                    if (dVehStopsFlags.isSet(stopId))
+                        continue;
+                    dVehStopsFlags.set(stopId);
+                    const auto &ellipse = ellipseContainer.getEdgesInEllipse(stopId);
+                    const int vehWaitTimeFromTransferToEndOfRoute =
+                            time_utils::getTotalVehWaitTimeInInterval(dVehId, i, numStops - 1, routeState);
+                    for (const auto &e: ellipse) {
+                        const auto loc = e.edge;
+                        if (!isEdgeRel.isSet(loc)) {
+                            relEdgesToInternalIdx[loc] = static_cast<int>(allTransferEdges.size());
+                            isEdgeRel.set(loc);
+                            allTransferEdges.push_back(loc);
+                            minDVehCostForTransferEdge.push_back(INFTY);
+                        }
+                        auto &minCost = minDVehCostForTransferEdge[relEdgesToInternalIdx[loc]];
+                        minCost = std::min(minCost,
+                                           computeMinDVehCostForTransferEdge(e, dVehId, i, earliestRelevantStopIdx,
+                                                                             vehWaitTimeFromTransferToEndOfRoute));
+                    }
+                }
             }
 
-            numCandidateVehiclesPickupBNS += relBNSPickups.getVehiclesWithRelevantPDLocs().size();
-            numCandidateVehiclesPickupORD += relORDPickups.getVehiclesWithRelevantPDLocs().size();
-            numCandidateVehiclesDropoffORD += relORDDropoffs.getVehiclesWithRelevantPDLocs().size();
-            numCandidateVehiclesDropoffALS += relALSDropoffs.getVehiclesWithRelevantPDLocs().size();
+            if (allTransferEdges.empty())
+                return;
 
-            findAssignmentsWithPickupBNS(relALSDropoffs);
+            std::vector<int> pickupLocs;
+            for (const auto &pickup: requestState.pickups) {
+                pickupLocs.push_back(pickup.loc);
+            }
 
-            findAssignmentsWithPickupORD(relALSDropoffs);
+            std::vector<int> dropoffLocs;
+            for (const auto &dropoff: requestState.dropoffs) {
+                dropoffLocs.push_back(dropoff.loc);
+            }
 
-            findAssignmentsWithPickupALS(relALSDropoffs);
+            // Initialize the transfer strategy with the collected transfer edges.
+            strategy.init(allTransferEdges);
+
+            const auto initTime = innerTimer.elapsed<std::chrono::nanoseconds>();
+
+            innerTimer.restart();
+            const auto &pVehIdsALS = pickupALSStrategy.findPickupsAfterLastStop();
+            const auto searchTimePickupALS = innerTimer.elapsed<std::chrono::nanoseconds>();
+
+            if (relevantLastStopLocs.empty() && pVehIdsALS.empty())
+                return;
+
+            // Calculate the distances from all last stops (pickup ord, bns) to the potential transfers
+            innerTimer.restart();
+            const auto lastStopToTransfersDistances = strategy.calculateDistancesFromLastStopToAllTransfers(
+                    relevantLastStopLocs, allTransferEdges);
+            const int64_t searchTimeLastStopToTransfer = innerTimer.elapsed<std::chrono::nanoseconds>();
+
+            // Calculate the distances from all pickups to the potential transfers
+            innerTimer.restart();
+            // pickupToTransfersDistances[i][j] stores the distance from i-th pickup to the j-th edge in transferEdges
+            const auto pickupToTransfersDistances = strategy.calculateDistancesFromPickupsToAllTransfers(pickupLocs,
+                                                                                                         allTransferEdges);
+            const int64_t searchTimePickupToTransfer = innerTimer.elapsed<std::chrono::nanoseconds>();
+
+            // Calculate the distances from all transfers to the dropoffs
+            innerTimer.restart();
+            // transferToDropoffDistances[i][j] stores the distance from the j-th edge in transferEdges to the i-th dropoff
+            const auto transfersToDropoffsDistances = strategy.calculateDistancesFromAllTransfersToDropoffs(
+                    allTransferEdges, dropoffLocs);
+            const auto searchTimeTransferToDropoff = innerTimer.elapsed<std::chrono::nanoseconds>();
+
+            innerTimer.restart();
+            findAssignmentsWithPickupBNS(relALSDropoffs, lastStopToTransfersDistances, transfersToDropoffsDistances,
+                                         ellipseContainer);
+            findAssignmentsWithPickupORD(relALSDropoffs, lastStopToTransfersDistances, transfersToDropoffsDistances,
+                                         ellipseContainer);
+            findAssignmentsWithPickupALS(pVehIdsALS, relALSDropoffs, pickupToTransfersDistances,
+                                         transfersToDropoffsDistances, ellipseContainer);
+            const auto tryAssignmentsTime = innerTimer.elapsed<std::chrono::nanoseconds>();
+
+            KASSERT(bestCost >= INFTY || asserter.assertAssignment(bestAssignment));
 
             // Write the stats
             auto &stats = requestState.stats().transferALSPVehStats;
             stats.totalTime = total.elapsed<std::chrono::nanoseconds>();
+            stats.initTime = initTime;
 
-            stats.numCandidateVehiclesPickupBNS += numCandidateVehiclesPickupBNS;
-            stats.numCandidateVehiclesPickupORD += numCandidateVehiclesPickupORD;
-            stats.numCandidateVehiclesPickupALS += numCandidateVehiclesPickupALS;
-            stats.numCandidateVehiclesDropoffORD += numCandidateVehiclesDropoffORD;
-            stats.numCandidateVehiclesDropoffALS += numCandidateVehiclesDropoffALS;
+            stats.numCandidateVehiclesPickupBNS += relBNSPickups.getVehiclesWithRelevantPDLocs().size();
+            stats.numCandidateVehiclesPickupORD += relORDPickups.getVehiclesWithRelevantPDLocs().size();
+            stats.numCandidateVehiclesPickupALS += pVehIdsALS.size();
+            stats.numCandidateVehiclesDropoffORD += relORDDropoffs.getVehiclesWithRelevantPDLocs().size();
+            stats.numCandidateVehiclesDropoffALS += relALSDropoffs.getVehiclesWithRelevantPDLocs().size();
 
             stats.numAssignmentsTriedPickupBNS += numAssignmentsTriedPickupBNS;
             stats.numAssignmentsTriedPickupORD += numAssignmentsTriedPickupORD;
@@ -176,106 +282,196 @@ namespace karri {
             stats.searchTimePickupALS += searchTimePickupALS;
             stats.searchTimeLastStopToTransfer += searchTimeLastStopToTransfer;
             stats.searchTimePickupToTransfer += searchTimePickupToTransfer;
+            stats.searchTimeTransferToDropoff += searchTimeTransferToDropoff;
         }
 
     private:
-        void findAssignmentsWithPickupORD(const RelevantDropoffsAfterLastStop& relALSDropoffs) {
+
+        int computeMinDVehCostForTransferEdge(const EdgeInEllipse &e, const int vehId,
+                                              const int transferIdx,
+                                              const int earliestDropoffIdx,
+                                              const int vehWaitTimeFromTransferToEndOfRoute) const {
+
+            using namespace time_utils;
+            const int minTransferDetour =
+                    e.distToTail + inputGraph.travelTime(e.edge) + InputConfig::getInstance().stopTime +
+                    e.distFromHead -
+                    calcLengthOfLegStartingAt(transferIdx, vehId, routeState);
+            KASSERT(minTransferDetour >= 0);
+            const int minResDetour = std::max(0, minTransferDetour - vehWaitTimeFromTransferToEndOfRoute);
+            int minTripTime = transferIdx == earliestDropoffIdx ? 0 : e.distFromHead;
+            int minAddedTripTime = 0;
+            if (transferIdx < earliestDropoffIdx) {
+                const int minArrStopBeforeDropoff =
+                        routeState.schedArrTimesFor(vehId)[earliestDropoffIdx] + minResDetour;
+                const int maxDepStopAfterTransfer =
+                        routeState.schedDepTimesFor(vehId)[transferIdx + 1] + minTransferDetour;
+                minTripTime += std::max(0, minArrStopBeforeDropoff - maxDepStopAfterTransfer);
+                minAddedTripTime += calcAddedTripTimeInInterval(vehId, transferIdx, earliestDropoffIdx,
+                                                                minTransferDetour, routeState);
+            }
+
+            using F = CostCalculator::CostFunction;
+            return F::calcVehicleCost(minResDetour) + F::calcTripCost(minTripTime, requestState) +
+                   F::calcChangeInTripCostsOfExistingPassengers(minAddedTripTime);
+
+        }
+
+
+        void findAssignmentsWithPickupORD(const RelevantDropoffsAfterLastStop &relALSDropoffs,
+                                          const auto &lastStopToTransfersDistances,
+                                          const auto &transfersToDropoffsDistances,
+                                          const EdgeEllipseContainer &ellipseContainer) {
             //* In this case we consider all vehicles that are able to perform the pickup ORD
             if (relORDPickups.getVehiclesWithRelevantPDLocs().empty())
                 return;
 
             // Loop over all possible vehicles and pickups
-
-            std::vector<AssignmentWithTransfer> postponedAssignments; // placeholder
+            std::vector<AssignmentWithTransfer> placeholder;
             for (const auto pVehId: relORDPickups.getVehiclesWithRelevantPDLocs()) {
-                auto *pVeh = &fleet[pVehId];
+                const auto *pVeh = &fleet[pVehId];
+                const auto &thisLastStopToTransfersDistances = lastStopToTransfersDistances.getDistancesFor(
+                        relPVehToInternalIdx[pVehId]);
 
                 for (const auto &pickup: relORDPickups.relevantSpotsFor(pVehId)) {
-                    tryDropoffORD(pVeh, &pickup, postponedAssignments);
-
-                    if (!relALSDropoffs.getVehiclesWithRelevantPDLocs().empty())
-                        tryDropoffALS(pVeh, &pickup, relALSDropoffs, postponedAssignments);
+                    tryDropoffORD(pVeh, &pickup, placeholder, thisLastStopToTransfersDistances,
+                                  transfersToDropoffsDistances, ellipseContainer);
+                    tryDropoffALS(pVeh, &pickup, relALSDropoffs, placeholder, thisLastStopToTransfersDistances,
+                                  ellipseContainer);
                 }
-                KASSERT(postponedAssignments.empty());
             }
+            KASSERT(placeholder.empty());
         }
 
-        void findAssignmentsWithPickupBNS(const RelevantDropoffsAfterLastStop& relALSDropoffs) {
+        void findAssignmentsWithPickupBNS(const RelevantDropoffsAfterLastStop &relALSDropoffs,
+                                          const auto &lastStopToTransfersDistances,
+                                          const auto &transfersToDropoffsDistances,
+                                          const EdgeEllipseContainer &ellipseContainer) {
             //* In this case we consider all vehicles that are able to perform the pickup BNS
             if (relBNSPickups.getVehiclesWithRelevantPDLocs().empty())
                 return;
 
-            std::vector<AssignmentWithTransfer> postponedAssignments;
             // Loop over all possible vehicles and pickups
+            std::vector<AssignmentWithTransfer> postponedAssignments;
             for (const auto pVehId: relBNSPickups.getVehiclesWithRelevantPDLocs()) {
+                postponedAssignments.clear();
                 auto *pVeh = &fleet[pVehId];
+                const auto &thisLastStopToTransfersDistances = lastStopToTransfersDistances.getDistancesFor(
+                        relPVehToInternalIdx[pVehId]);
 
-                for (const auto &pickup: relORDPickups.relevantSpotsFor(pVehId)) {
-                    tryDropoffORD(pVeh, &pickup, postponedAssignments);
-                    if (!relALSDropoffs.getVehiclesWithRelevantPDLocs().empty())
-                        tryDropoffALS(pVeh, &pickup, relALSDropoffs, postponedAssignments);
+
+                for (const auto &pickup: relBNSPickups.relevantSpotsFor(pVehId)) {
+                    tryDropoffORD(pVeh, &pickup, postponedAssignments, thisLastStopToTransfersDistances,
+                                  transfersToDropoffsDistances, ellipseContainer);
+                    tryDropoffALS(pVeh, &pickup, relALSDropoffs, postponedAssignments, thisLastStopToTransfersDistances,
+                                  ellipseContainer);
                 }
 
-                if (postponedAssignments.empty())
-                    continue;
-
-                finishAssignments(pVeh, postponedAssignments);
+                finishAssignmentsWithPickupBNSLowerBound(pVeh, postponedAssignments);
             }
         }
 
 
-        void findAssignmentsWithPickupALS(const RelevantDropoffsAfterLastStop& relALSDropoffs) {
-            //* In this case we consider all vehicles that are able to perform the pickup ALS
+        void findAssignmentsWithPickupALS(const Subset &pVehIdsALS,
+                                          const RelevantDropoffsAfterLastStop &relALSDropoffs,
+                                          const auto &pickupToTransfersDistances,
+                                          const auto &transfersToDropoffsDistances,
+                                          const EdgeEllipseContainer &ellipseContainer) {
 
-            Timer pickupALSTimer;
-            const auto pVehIds = pickupALSStrategy.findPickupsAfterLastStop();
-            searchTimePickupALS += pickupALSTimer.elapsed<std::chrono::nanoseconds>();
-
-            numCandidateVehiclesPickupALS += pVehIds.size();
-
-            if (pVehIds.empty())
+            if (pVehIdsALS.empty())
                 return;
 
-            //* More versatile distance calculation
-            std::vector<int> relevantDVehIds;
-            for (const auto dVehId: relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
-                relevantDVehIds.push_back(dVehId);
+            using F = CostCalculator::CostFunction;
+            std::vector<int> minCostFromDepAtPickup(requestState.numPickups(), INFTY);
+            for (const auto &pickup: requestState.pickups) {
+                const auto &thisPickupToTransfersDistances = pickupToTransfersDistances.getDistancesFor(pickup.id);
+                auto &minCost = minCostFromDepAtPickup[pickup.id];
+                for (const auto &e: allTransferEdges) {
+                    const int distToTransfer = thisPickupToTransfersDistances[relEdgesToInternalIdx[e]];
+                    const int minCostTransfer = minDVehCostForTransferEdge[relEdgesToInternalIdx[e]] +
+                                                F::calcVehicleCost(distToTransfer) +
+                                                F::calcTripCost(distToTransfer, requestState);
+                    minCost = std::min(minCost, minCostTransfer);
+                }
             }
 
-
-            for (const auto dVehId: relALSDropoffs.getVehiclesWithRelevantPDLocs()) {
-                relevantDVehIds.push_back(dVehId);
-            }
-
-            if (relevantDVehIds.empty())
-                return;
-
-            // Calculate the distances from all pickups to all stops of relevant dropoff vehicles
-            Timer pickupToTransferSearchTimer;
-            transferDistances = strategy.calculateDistancesFromAllPickupsToAllStops(requestState.pickups,
-                                                                                    relevantDVehIds);
-            searchTimePickupToTransfer = pickupToTransferSearchTimer.elapsed<std::chrono::nanoseconds>();
-
-            for (const auto pVehId: pVehIds) {
+            for (const auto pVehId: pVehIdsALS) {
                 const auto *pVeh = &fleet[pVehId];
 
                 for (const auto &pickup: requestState.pickups) {
                     // Get the distance from the last stop of the pVeh to the pickup
                     const int distanceToPickup = pickupALSStrategy.getDistanceToPickup(pVehId, pickup.id);
                     if (distanceToPickup >= INFTY)
+                        continue; // Pickup is not reachable
+
+                    const int minDistToTransfer = pickupToTransfersDistances.getMinDistanceFor(pickup.id);
+                    if (minDistToTransfer >= INFTY)
+                        continue; // No transfer is reachable from this pickup
+
+                    // Prune if lower bound for cost of pickup vehicle with this pickup is worse than best known cost
+                    using namespace time_utils;
+
+                    const auto stopIdx = routeState.numStopsOf(pVehId) - 1;
+                    const auto depAtPickup = getActualDepTimeAtPickup(pVehId, stopIdx, distanceToPickup,
+                                                                      pickup, requestState, routeState);
+                    const auto vehTimeTillDepAtPickup =
+                            depAtPickup - getVehDepTimeAtStopForRequest(pVehId, stopIdx, requestState, routeState);
+                    const auto psgTimeTillDepAtPickup = depAtPickup - requestState.originalRequest.requestTime;
+                    const int lowerBoundCost =
+                            minCostFromDepAtPickup[pickup.id] + F::calcVehicleCost(vehTimeTillDepAtPickup) +
+                            F::calcTripCost(psgTimeTillDepAtPickup, requestState);
+                    if (lowerBoundCost > requestState.getBestCost()) {
                         continue;
-                    
-                    assert(asserter.assertLastStopDistance(pVehId, pickup.loc) == distanceToPickup);
-                    KASSERT(!relALSDropoffs.getVehiclesWithRelevantPDLocs().empty() || !relORDDropoffs.getVehiclesWithRelevantPDLocs().empty());
-                    tryDropoffORDForPickupALS(pVeh, &pickup, distanceToPickup);
-                    if (!relALSDropoffs.getVehiclesWithRelevantPDLocs().empty())
-                        tryDropoffALSForPickupALS(pVeh, &pickup, distanceToPickup, relALSDropoffs);
+                    }
+
+                    // KASSERT(asserter.assertLastStopDistance(pVehId, pickup.loc) == distanceToPickup);
+                    KASSERT(!relALSDropoffs.getVehiclesWithRelevantPDLocs().empty() ||
+                            !relORDDropoffs.getVehiclesWithRelevantPDLocs().empty());
+                    const auto &thisPickupToTransfersDistances = pickupToTransfersDistances.getDistancesFor(pickup.id);
+                    KASSERT(minDistToTransfer == *std::min_element(thisPickupToTransfersDistances.begin(),
+                                                                   thisPickupToTransfersDistances.end()));
+
+
+                    tryDropoffORDForPickupALS(pVeh, &pickup, distanceToPickup, thisPickupToTransfersDistances,
+                                              transfersToDropoffsDistances, ellipseContainer);
+                    tryDropoffALSForPickupALS(pVeh, &pickup, distanceToPickup, thisPickupToTransfersDistances,
+                                              relALSDropoffs, ellipseContainer);
                 }
             }
         }
 
 
-        void tryDropoffORDForPickupALS(const Vehicle *pVeh, const PDLoc *pickup, const int distanceToPickup) {
+        // Checks if the new transfer point distance is dominated by any of the existing optimal distances.
+        // If yes, returns false. If no, adds the new distance to the list of optimal distances, removes any
+        // distances that are dominated by the new distance, and returns true.
+        static bool checkPareto(const TPDistances &newTpDist, std::vector<TPDistances> &optimalDistances) {
+            // Check if newTpDist is dominated by any of the existing distances
+            for (const auto &existingDist: optimalDistances) {
+                if (TPDistances::dominates(existingDist, newTpDist)) {
+                    return false; // newTpDist is dominated, do not add it
+                }
+            }
+
+            // Add newTpDist to the list of optimal distances
+            optimalDistances.push_back(newTpDist);
+
+            // Remove any distances that are dominated by the newTpDist
+            for (int i = 0; i < optimalDistances.size();) {
+                if (TPDistances::dominates(newTpDist, optimalDistances[i])) {
+                    std::swap(optimalDistances[i], optimalDistances.back());
+                    optimalDistances.pop_back();
+                    continue;
+                }
+                ++i;
+            }
+
+            return true;
+        }
+
+        void tryDropoffORDForPickupALS(const Vehicle *pVeh, const PDLoc *pickup, const int distanceToPickup,
+                                       const auto &thisPickupToTransfersDistances,
+                                       const auto &transfersToDropoffsDistances,
+                                       const EdgeEllipseContainer &ellipseContainer) {
             const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
 
             if (distanceToPickup >= INFTY)
@@ -285,69 +481,154 @@ namespace karri {
             for (const auto dVehId: relORDDropoffs.getVehiclesWithRelevantPDLocs()) {
                 const auto *dVeh = &fleet[dVehId];
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
+                // const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
+                const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
+                const auto schedDepTimesDVeh = routeState.schedDepTimesFor(dVehId);
+                const auto schedArrTimesDVeh = routeState.schedArrTimesFor(dVehId);
+                const auto occupanciesDVeh = routeState.occupanciesFor(dVehId);
                 const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
 
                 if (dVehId == pVeh->vehicleId)
                     continue;
 
                 // Calculate the distances from the pickup to the stops of the dropoff vehicle
-                Timer searchTimer;
-                const auto &distancesToTransfer = transferDistances[dVehId][pickup->id];
-
-                for (const auto &dropoff: relORDDropoffs.relevantSpotsFor(dVehId)) {
+                for (const auto &relDropoff: relORDDropoffs.relevantSpotsFor(dVehId)) {
                     // Try all possible transfer points
-                    if (dropoff.stopIndex == numStopsDVeh - 1)
+                    if (relDropoff.stopIndex == numStopsDVeh - 1)
                         continue;
 
-                    for (int i = dropoff.stopIndex; i > 0; i--) {
-                        assert(numStopsDVeh - 1 == distancesToTransfer.size());
+                    const auto *dropoff = &requestState.dropoffs[relDropoff.pdId];
+                    const auto &transfersToThisDropoffDistances = transfersToDropoffsDistances.getDistancesFor(
+                            relDropoff.pdId);
 
-                        // Build the transfer point
-                        const int transferLoc = stopLocationsDVeh[i];
-                        const int distancePVehToTransfer = distancesToTransfer[i - 1];
+                    // Compute part of cost lower bound that depends only on the dropoff
+                    using namespace time_utils;
+                    const bool dropoffAtExistingStop = isDropoffAtExistingStop(dVehId, INVALID_INDEX,
+                                                                               relDropoff.stopIndex,
+                                                                               dropoff->loc, routeState);
+                    const int minInitialDropoffDetour =
+                            calcInitialDropoffDetour(dVehId, relDropoff.stopIndex, relDropoff.distToPDLoc,
+                                                     relDropoff.distFromPDLocToNextStop,
+                                                     dropoffAtExistingStop, routeState);
+                    const int minDropoffCostWithoutTrip =
+                            calc.calcMinKnownDropoffSideCostWithoutTripTime(*dVeh, relDropoff.stopIndex,
+                                                                            minInitialDropoffDetour,
+                                                                            dropoff->walkingDist, requestState);
 
-                        TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh - 1, i,
-                                                         distancePVehToTransfer, 0, 0, 0);
-                        numTransferPoints++;
-
-                        // Build the assignment
-                        AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
-
-                        asgn.pickupIdx = numStopsPVeh - 1;
-                        asgn.dropoffIdx = dropoff.stopIndex;
-                        asgn.transferIdxPVeh = numStopsPVeh - 1;
-                        asgn.transferIdxDVeh = i;
-
-                        asgn.pickup = pickup;
-                        const auto *dropoffPDLoc = &requestState.dropoffs[dropoff.pdId];
-                        asgn.dropoff = dropoffPDLoc;
-
-                        asgn.distToDropoff = dropoff.distToPDLoc;
-                        asgn.distFromDropoff = dropoff.distFromPDLocToNextStop;
-
-                        asgn.pickupType = AFTER_LAST_STOP;
-                        asgn.dropoffType = ORDINARY;
-                        asgn.transferTypePVeh = AFTER_LAST_STOP;
-                        asgn.transferTypeDVeh = ORDINARY;
-
-                        // If the pickup or dropoff conincides with the transfer, we skip the assignment
-                        if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
+                    for (int i = relDropoff.stopIndex; i > 0; i--) {
+                        if (i >= numStopsDVeh - 1)
                             continue;
 
-                        finishDistances(asgn, distancePVehToTransfer, distanceToPickup, dropoff.distToPDLoc, 0);
-                        assert(asgn.distFromPickup == 0);
-                        assert(asgn.distFromTransferPVeh == 0);
-                        assert(asgn.distFromDropoff > 0);
+                        // If occupancy exceeds capacity at this leg, we do not have to consider this or earlier stops
+                        // of the route, as this leg needs to be traversed.
+                        if (occupanciesDVeh[i] + requestState.originalRequest.numRiders > dVeh->capacity)
+                            break;
 
-                        // Try the finished assignment with ORD dropoff
-                        tryFinishedAssignment(asgn);
+                        // Compute lower bound for costs with transfer between i and i + 1, considering trip time
+                        // from stop i + 1 to the dropoff and detour to the dropoff. This lower bound also holds for
+                        // any stop before i so if it is worse than the best known cost, we can stop for this vehicle.
+                        const auto minTripTimeToStopBeforeDropoff =
+                                schedArrTimesDVeh[relDropoff.stopIndex] - schedDepTimesDVeh[i + 1];
+                        const int minTripTimeToDropoff =
+                                std::max(requestState.minDirectPDDist, minTripTimeToStopBeforeDropoff +
+                                                                       relDropoff.distToPDLoc) + dropoff->walkingDist;
+                        const int minCostFromHere =
+                                CostCalculator::CostFunction::calcTripCost(minTripTimeToDropoff, requestState) +
+                                minDropoffCostWithoutTrip;
+                        if (minCostFromHere > requestState.getBestCost())
+                            break;
+
+                        const int stopId = stopIdsDVeh[i];
+                        const auto &transferEdges = ellipseContainer.getEdgesInEllipse(stopId);
+
+                        paretoOptimalTps.clear();
+
+                        for (int tpIdx = 0; tpIdx < transferEdges.size(); tpIdx++) {
+                            const auto edge = transferEdges[tpIdx];
+                            const int transferLoc = edge.edge;
+                            KASSERT(isEdgeRel.isSet(transferLoc));
+
+                            // If the pickup or dropoff conincides with the transfer, we skip the assignment
+                            if (pickup->loc == transferLoc || transferLoc == dropoff->loc)
+                                continue;
+
+                            const int edgeOffset = inputGraph.travelTime(transferLoc);
+
+                            if (minDVehCostForTransferEdge[relEdgesToInternalIdx[transferLoc]] >=
+                                requestState.getBestCost())
+                                continue;
+
+                            const int distancePVehToTransfer = thisPickupToTransfersDistances[relEdgesToInternalIdx[transferLoc]];
+
+                            if (i > 0) { // Cannot pareto check for transfer BNS because we only know lower bounds
+                                const bool transferAtStopDVeh = transferLoc == stopLocationsDVeh[i];
+                                const int distToTransferDVeh = transferAtStopDVeh ? 0 : edge.distToTail + edgeOffset;
+                                const int distNextLegAfterTransferDVeh = i == relDropoff.stopIndex ?
+                                                                         transfersToThisDropoffDistances[relEdgesToInternalIdx[transferLoc]]
+                                                                                                   : edge.distFromHead;
+                                const bool notDominated = checkPareto(
+                                        TPDistances(distancePVehToTransfer, distToTransferDVeh,
+                                                    distNextLegAfterTransferDVeh),
+                                        paretoOptimalTps);
+                                if (!notDominated)
+                                    continue;
+                            }
+
+                            // Build the transfer point
+                            TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh - 1, i,
+                                                             distancePVehToTransfer, 0, edge.distToTail + edgeOffset,
+                                                             edge.distFromHead);
+
+                            numTransferPoints++;
+                            // Build the assignment
+                            AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
+
+                            asgn.pickupIdx = numStopsPVeh - 1;
+                            asgn.dropoffIdx = relDropoff.stopIndex;
+                            asgn.transferIdxPVeh = numStopsPVeh - 1;
+                            asgn.transferIdxDVeh = i;
+
+                            asgn.pickup = pickup;
+                            asgn.dropoff = dropoff;
+
+                            asgn.distToDropoff = relDropoff.distToPDLoc;
+                            asgn.distFromDropoff = relDropoff.distFromPDLocToNextStop;
+
+                            asgn.pickupType = AFTER_LAST_STOP;
+                            asgn.dropoffType = ORDINARY;
+                            asgn.transferTypePVeh = AFTER_LAST_STOP;
+                            asgn.transferTypeDVeh = ORDINARY;
+
+
+                            finishDistances(asgn, distancePVehToTransfer, distanceToPickup, relDropoff.distToPDLoc, 0);
+
+                            // If transfer and dropoff are paired, vehicle drives directly from transfer to dropoff.
+                            // Set according distances.
+                            if (asgn.transferIdxDVeh == asgn.dropoffIdx) {
+                                asgn.distFromTransferDVeh = 0;
+                                asgn.distToDropoff = transfersToThisDropoffDistances[relEdgesToInternalIdx[transferLoc]];
+                            }
+
+                            assert(asgn.distFromPickup == 0);
+                            assert(asgn.distFromTransferPVeh == 0);
+                            assert(asgn.distFromDropoff > 0);
+
+                            // Try the finished assignment with ORD dropoff
+                            tryFinishedAssignment(asgn);
+                        }
                     }
                 }
             }
         }
 
         void tryDropoffALSForPickupALS(const Vehicle *pVeh, const PDLoc *pickup, const int distanceToPickup,
-                                       const RelevantDropoffsAfterLastStop &relALSDropoffs) {
+                                       const auto &thisPickupToTransfersDistances,
+                                       const RelevantDropoffsAfterLastStop &relALSDropoffs,
+                                       const EdgeEllipseContainer &ellipseContainer) {
+
+            if (relALSDropoffs.getVehiclesWithRelevantPDLocs().empty())
+                return;
+
             // In this case we consider all the vehicles that are able to perform the dropoff ALS
             const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
 
@@ -355,69 +636,138 @@ namespace karri {
                 return;
 
             // Loop over all the possible dropoff vehicles and dropoffs
+            if (relALSDropoffs.getVehiclesWithRelevantPDLocs().size() == 0)
+                return;
+
             for (const auto dVehId: relALSDropoffs.getVehiclesWithRelevantPDLocs()) {
                 const auto *dVeh = &fleet[dVehId];
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
+                // const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
+                const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
+                const auto schedDepTimesDVeh = routeState.schedDepTimesFor(dVehId);
+                const auto occupanciesDVeh = routeState.occupanciesFor(dVehId);
                 const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
+                const auto schedArrTimeAtLastStopDVeh = routeState.schedArrTimesFor(dVehId)[numStopsDVeh - 1];
+                const auto lastStopLoc = routeState.stopLocationsFor(dVehId)[numStopsDVeh - 1];
 
                 if (dVehId == pVeh->vehicleId)
                     continue;
 
                 // Calculate the distances from the pickup to the stops of the dropoff vehicle
-                Timer searchTimer;
-                const auto &distancesToTransfer = transferDistances[dVehId][pickup->id];
-                assert(numStopsDVeh - 1 == distancesToTransfer.size());
+                for (const auto dropoffEntry: relALSDropoffs.relevantSpotsFor(dVehId)) {
+                    const auto &dropoff = requestState.dropoffs[dropoffEntry.dropoffId];
 
-                for (const auto& dropoffEntry : relALSDropoffs.relevantSpotsFor(dVehId)) {
-                    const auto& dropoff = requestState.dropoffs[dropoffEntry.dropoffId];
+                    using namespace time_utils;
+                    const bool dropoffAtExistingStop = dropoff.loc == lastStopLoc;
+                    const int minInitialDropoffDetour = calcInitialDropoffDetour(dVehId, numStopsDVeh - 1,
+                                                                                 numStopsDVeh - 1, 0,
+                                                                                 dropoffAtExistingStop, routeState);
+                    const int minDropoffCostWithoutTrip =
+                            calc.calcMinKnownDropoffSideCostWithoutTripTime(*dVeh, numStopsDVeh - 1,
+                                                                            minInitialDropoffDetour,
+                                                                            dropoff.walkingDist, requestState);
 
                     // Try all possible transfer points
-                    for (int i = 1; i < numStopsDVeh; i++) {
-                        // Build the transfer point
-                        const int transferLoc = stopLocationsDVeh[i];
-                        const int distancePVehToTransfer = distancesToTransfer[i - 1];
+                    for (int i = numStopsDVeh - 2; i >= 1; --i) {
 
-                        TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh, i,
-                                                         distancePVehToTransfer, 0, 0, 0);
-                        numTransferPoints++;
+                        // If occupancy exceeds capacity at this leg, we do not have to consider this or earlier stops
+                        // of the route, as this leg needs to be traversed.
+                        if (occupanciesDVeh[i] + requestState.originalRequest.numRiders > dVeh->capacity)
+                            break;
 
-                        // Build the assignment
-                        AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
+                        // Compute lower bound for costs with transfer between i and i + 1, considering trip time
+                        // from stop i + 1 to the dropoff and detour to the dropoff. This lower bound also holds for
+                        // any stop before i so if it is worse than the best known cost, we can stop for this vehicle.
+                        const auto minTripTimeToLastStop = schedArrTimeAtLastStopDVeh - schedDepTimesDVeh[i + 1];
+                        const int minTripTimeToDropoff = std::max(requestState.minDirectPDDist,
+                                                                  minTripTimeToLastStop + dropoffEntry.distToDropoff) +
+                                                         dropoff.walkingDist;
+                        const int minCostFromHere =
+                                CostCalculator::CostFunction::calcTripCost(minTripTimeToDropoff, requestState) +
+                                minDropoffCostWithoutTrip;
+                        if (minCostFromHere > requestState.getBestCost())
+                            break;
 
-                        asgn.pickup = pickup;
-                        asgn.dropoff = &dropoff;
+                        const int stopId = stopIdsDVeh[i];
+                        const auto &transferEdges = ellipseContainer.getEdgesInEllipse(stopId);
 
-                        asgn.pickupIdx = numStopsPVeh - 1;
-                        asgn.dropoffIdx = numStopsDVeh - 1;
-                        asgn.transferIdxPVeh = numStopsPVeh - 1;
-                        asgn.transferIdxDVeh = i;
+                        paretoOptimalTps.clear();
 
-                        const int distanceToDropoff = dropoffEntry.distToDropoff;
-                        KASSERT(distanceToDropoff > 0 && distanceToDropoff < INFTY);
+                        for (int tpIdx = 0; tpIdx < transferEdges.size(); tpIdx++) {
+                            const auto edge = transferEdges[tpIdx];
+                            const int transferLoc = edge.edge;
+                            KASSERT(isEdgeRel.isSet(transferLoc));
 
-                        asgn.pickupType = AFTER_LAST_STOP;
-                        asgn.dropoffType = AFTER_LAST_STOP;
-                        asgn.transferTypePVeh = AFTER_LAST_STOP;
-                        asgn.transferTypeDVeh = ORDINARY;
+                            // If the pickup or dropoff conincides with the transfer, we skip the assignment
+                            if (pickup->loc == transferLoc || transferLoc == dropoff.loc)
+                                continue;
 
-                        // If the pickup or dropoff conincides with the transfer, we skip the assignment
-                        if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
-                            continue;
+                            if (minDVehCostForTransferEdge[relEdgesToInternalIdx[transferLoc]] >=
+                                requestState.getBestCost())
+                                continue;
 
-                        finishDistances(asgn, distancePVehToTransfer, distanceToPickup, 0, distanceToDropoff);
-                        assert(asgn.distFromPickup == 0);
-                        assert(asgn.distFromTransferPVeh == 0);
-                        assert(asgn.distFromDropoff == 0);
+                            const int edgeOffset = inputGraph.travelTime(transferLoc);
+                            const int distancePVehToTransfer = thisPickupToTransfersDistances[relEdgesToInternalIdx[transferLoc]];
+                            // KASSERT(distancePVehToTransfer == asserter.getDistanceBetweenLocations(pickup->loc, transferLoc));
+                            KASSERT(distancePVehToTransfer > 0 || transferLoc == pickup->loc);
 
-                        // Try the finished assignment with ORD dropoff
-                        tryFinishedAssignment(asgn);
+                            if (i > 0) { // Cannot pareto check for transfer BNS because we only know lower bounds
+                                const bool transferAtStopDVeh = transferLoc == stopLocationsDVeh[i];
+                                const int distToTransferDVeh = transferAtStopDVeh ? 0 : edge.distToTail + edgeOffset;
+                                KASSERT(i != numStopsDVeh - 1);
+                                const int distNextLegAfterTransferDVeh = edge.distFromHead;
+                                const bool notDominated = checkPareto(
+                                        TPDistances(distancePVehToTransfer, distToTransferDVeh,
+                                                    distNextLegAfterTransferDVeh),
+                                        paretoOptimalTps);
+                                if (!notDominated)
+                                    continue;
+                            }
+
+                            // Build the transfer point
+                            TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh - 1, i,
+                                                             distancePVehToTransfer, 0, edge.distToTail + edgeOffset,
+                                                             edge.distFromHead);
+
+                            numTransferPoints++;
+
+                            // Build the assignment
+                            AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
+
+                            asgn.pickup = pickup;
+                            asgn.dropoff = &dropoff;
+
+                            asgn.pickupIdx = numStopsPVeh - 1;
+                            asgn.dropoffIdx = numStopsDVeh - 1;
+                            asgn.transferIdxPVeh = numStopsPVeh - 1;
+                            asgn.transferIdxDVeh = i;
+
+                            const int distanceToDropoff = dropoffEntry.distToDropoff;
+                            KASSERT(distanceToDropoff > 0 && distanceToDropoff < INFTY);
+
+                            asgn.pickupType = AFTER_LAST_STOP;
+                            asgn.dropoffType = AFTER_LAST_STOP;
+                            asgn.transferTypePVeh = AFTER_LAST_STOP;
+                            asgn.transferTypeDVeh = ORDINARY;
+
+                            finishDistances(asgn, distancePVehToTransfer, distanceToPickup, 0, distanceToDropoff);
+                            assert(asgn.distFromPickup == 0);
+                            assert(asgn.distFromTransferPVeh == 0);
+                            assert(asgn.distFromDropoff == 0);
+
+                            // Try the finished assignment with ORD dropoff
+                            tryFinishedAssignment(asgn);
+                        }
                     }
                 }
             }
         }
 
         void tryDropoffORD(const Vehicle *pVeh, const RelevantPDLoc *pickup,
-                           std::vector<AssignmentWithTransfer> &postponedAssignments) {
+                           std::vector<AssignmentWithTransfer> &postponedAssignments,
+                           const auto &thisLastStopToTransfersDistances,
+                           const auto &transfersToDropoffsDistances,
+                           const EdgeEllipseContainer &ellipseContainer) {
             const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
             const auto *pickupPDLoc = &requestState.pickups[pickup->pdId];
             int distanceToPickup = pickup->distToPDLoc;
@@ -440,70 +790,152 @@ namespace karri {
 
                 const auto *dVeh = &fleet[dVehId];
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
+                const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
+                const auto schedDepTimesDVeh = routeState.schedDepTimesFor(dVehId);
+                const auto schedArrTimesDVeh = routeState.schedArrTimesFor(dVehId);
+                const auto occupanciesDVeh = routeState.occupanciesFor(dVehId);
                 const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
 
                 for (const auto &dropoff: relORDDropoffs.relevantSpotsFor(dVehId)) {
                     const auto *dropoffPDLoc = &requestState.dropoffs[dropoff.pdId];
+                    const auto &transfersToThisDropoffDistances = transfersToDropoffsDistances.getDistancesFor(
+                            dropoff.pdId);
 
                     if (dropoff.stopIndex == numStopsDVeh - 1)
                         continue;
 
-                    // Try all possible transfer points
+                    // Compute part of cost lower bound that depends only on the dropoff
+                    using namespace time_utils;
+                    const bool dropoffAtExistingStop = isDropoffAtExistingStop(dVehId, INVALID_INDEX, dropoff.stopIndex,
+                                                                               dropoffPDLoc->loc, routeState);
+                    const int minInitialDropoffDetour =
+                            calcInitialDropoffDetour(dVehId, dropoff.stopIndex, dropoff.distToPDLoc,
+                                                     dropoff.distFromPDLocToNextStop,
+                                                     dropoffAtExistingStop, routeState);
+                    const int minDropoffCostWithoutTrip =
+                            calc.calcMinKnownDropoffSideCostWithoutTripTime(*dVeh, dropoff.stopIndex,
+                                                                            minInitialDropoffDetour,
+                                                                            dropoffPDLoc->walkingDist, requestState);
+
                     for (int i = dropoff.stopIndex; i > 0; i--) {
-
-                        // Build the transfer point
-                        const int transferLoc = stopLocationsDVeh[i];
-                        const int distancePVehToTransfer = lastStopDistances[pVeh->vehicleId][dVeh->vehicleId][i - 1];
-
-                        TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh, i,
-                                                         distancePVehToTransfer, 0, 0, 0);
-
-                        // Build the assignment
-                        AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
-
-                        asgn.pickupIdx = pickup->stopIndex;
-                        asgn.dropoffIdx = dropoff.stopIndex;
-                        asgn.transferIdxPVeh = numStopsPVeh - 1;
-                        asgn.transferIdxDVeh = i;
-
-                        asgn.pickupBNSLowerBoundUsed = bnsLowerBoundUsed;
-
-                        asgn.pickup = pickupPDLoc;
-                        asgn.dropoff = dropoffPDLoc;
-
-                        assert(asgn.pickupIdx < asgn.transferIdxPVeh);
-
-                        asgn.distToPickup = distanceToPickup;
-                        asgn.distFromPickup = pickup->distFromPDLocToNextStop;
-                        asgn.distToDropoff = dropoff.distToPDLoc;
-                        asgn.distFromDropoff = dropoff.distFromPDLocToNextStop;
-
-                        asgn.pickupType = pickup->stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
-                        asgn.dropoffType = ORDINARY;
-                        asgn.transferTypePVeh = AFTER_LAST_STOP;
-                        asgn.transferTypeDVeh = ORDINARY;
-
-                        // If the pickup or dropoff conincides with the transfer, we skip the assignment
-                        if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
+                        if (i >= numStopsDVeh - 1)
                             continue;
 
-                        finishDistances(asgn, 0, distancePVehToTransfer, dropoff.distToPDLoc, 0);
+                        // If occupancy exceeds capacity at this leg, we do not have to consider this or earlier stops
+                        // of the route, as this leg needs to be traversed.
+                        if (occupanciesDVeh[i] + requestState.originalRequest.numRiders > dVeh->capacity)
+                            break;
 
-                        // Try the assignment with ORD dropoff
-                        tryPotentiallyUnfinishedAssignment(asgn, postponedAssignments);
+                        // Compute lower bound for costs with transfer between i and i + 1, considering trip time
+                        // from stop i + 1 to the dropoff and detour to the dropoff. This lower bound also holds for
+                        // any stop before i so if it is worse than the best known cost, we can stop for this vehicle.
+                        const auto minTripTimeToStopBeforeDropoff =
+                                schedArrTimesDVeh[dropoff.stopIndex] - schedDepTimesDVeh[i + 1];
+                        const int minTripTimeToDropoff =
+                                std::max(requestState.minDirectPDDist, minTripTimeToStopBeforeDropoff +
+                                                                       dropoff.distToPDLoc) + dropoffPDLoc->walkingDist;
+                        const int minCostFromHere =
+                                CostCalculator::CostFunction::calcTripCost(minTripTimeToDropoff, requestState) +
+                                minDropoffCostWithoutTrip;
+                        if (minCostFromHere > requestState.getBestCost())
+                            break;
+
+                        const int stopId = stopIdsDVeh[i];
+                        const auto &transferPoints = ellipseContainer.getEdgesInEllipse(stopId);
+
+                        paretoOptimalTps.clear();
+
+                        // Loop over all possible transfer points
+                        for (int tpIdx = 0; tpIdx < transferPoints.size(); tpIdx++) {
+                            // Build the transfer point
+                            const auto edge = transferPoints[tpIdx];
+                            const int transferLoc = edge.edge;
+                            KASSERT(isEdgeRel.isSet(transferLoc));
+
+                            // If the pickup or dropoff coincides with the transfer, we skip it
+                            if (pickupPDLoc->loc == transferLoc || transferLoc == dropoffPDLoc->loc)
+                                continue;
+
+                            const auto edgeOffset = inputGraph.travelTime(transferLoc);
+                            const int distancePVehToTransfer = thisLastStopToTransfersDistances[relEdgesToInternalIdx[transferLoc]];
+
+                            if (i > 0) { // Cannot pareto check for transfer BNS because we only know lower bounds
+                                const bool transferAtStopDVeh = transferLoc == stopLocationsDVeh[i];
+                                const int distToTransferDVeh = transferAtStopDVeh ? 0 : edge.distToTail + edgeOffset;
+                                const int distNextLegAfterTransferDVeh = i == dropoff.stopIndex ?
+                                                                         transfersToThisDropoffDistances[relEdgesToInternalIdx[transferLoc]]
+                                                                                                : edge.distFromHead;
+                                const bool notDominated = checkPareto(
+                                        TPDistances(distancePVehToTransfer, distToTransferDVeh,
+                                                    distNextLegAfterTransferDVeh),
+                                        paretoOptimalTps);
+                                if (!notDominated)
+                                    continue;
+                            }
+
+                            TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh, i,
+                                                             distancePVehToTransfer, 0, edge.distToTail + edgeOffset,
+                                                             edge.distFromHead);
+
+                            ++numTransferPoints;
+
+                            // Build the assignment
+                            AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
+
+                            asgn.pickupIdx = pickup->stopIndex;
+                            asgn.dropoffIdx = dropoff.stopIndex;
+                            asgn.transferIdxPVeh = numStopsPVeh - 1;
+                            asgn.transferIdxDVeh = i;
+
+                            asgn.pickupBNSLowerBoundUsed = bnsLowerBoundUsed;
+
+                            asgn.pickup = pickupPDLoc;
+                            asgn.dropoff = dropoffPDLoc;
+
+                            assert(asgn.pickupIdx < asgn.transferIdxPVeh);
+
+                            asgn.distToPickup = distanceToPickup;
+                            asgn.distFromPickup = pickup->distFromPDLocToNextStop;
+                            asgn.distToDropoff = dropoff.distToPDLoc;
+                            asgn.distFromDropoff = dropoff.distFromPDLocToNextStop;
+
+                            asgn.pickupType = pickup->stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
+                            asgn.dropoffType = ORDINARY;
+                            asgn.transferTypePVeh = AFTER_LAST_STOP;
+                            asgn.transferTypeDVeh = ORDINARY;
+
+
+                            finishDistances(asgn, 0, distancePVehToTransfer, dropoff.distToPDLoc, 0);
+
+                            // If transfer and dropoff are paired, vehicle drives directly from transfer to dropoff.
+                            // Set according distances.
+                            if (asgn.transferIdxDVeh == asgn.dropoffIdx) {
+                                asgn.distFromTransferDVeh = 0;
+                                asgn.distToDropoff = transfersToThisDropoffDistances[relEdgesToInternalIdx[transferLoc]];
+                            }
+
+                            // Try the assignment with ORD dropoff
+                            tryPotentiallyUnfinishedAssignment(asgn, postponedAssignments);
+                        }
                     }
                 }
             }
         }
 
         void tryDropoffALS(const Vehicle *pVeh, const RelevantPDLoc *pickup,
-                           const RelevantDropoffsAfterLastStop& relALSDropoffs,
-                           std::vector<AssignmentWithTransfer>& postponedAssignments) {
+                           const RelevantDropoffsAfterLastStop &relALSDropoffs,
+                           std::vector<AssignmentWithTransfer> &postponedAssignments,
+                           const auto &thisLastStopToTransfersDistances,
+                           const EdgeEllipseContainer &ellipseContainer
+        ) {
+
+            if (relALSDropoffs.getVehiclesWithRelevantPDLocs().empty())
+                return;
+
             const auto numStopsPVeh = routeState.numStopsOf(pVeh->vehicleId);
+            const auto *pickupPDLoc = &requestState.pickups[pickup->pdId];
 
             // In this case we consider all the vehicles that are able to perform the dropoff ALS
-            KASSERT(!relALSDropoffs.getVehiclesWithRelevantPDLocs().empty());
-
             bool bnsLowerBoundUsed = false;
             int distanceToPickup = pickup->distToPDLoc;
 
@@ -524,64 +956,122 @@ namespace karri {
 
                 const auto *dVeh = &fleet[dVehId];
                 const auto numStopsDVeh = routeState.numStopsOf(dVehId);
+                // const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
+                const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
+                const auto schedDepTimesDVeh = routeState.schedDepTimesFor(dVehId);
+                const auto occupanciesDVeh = routeState.occupanciesFor(dVehId);
                 const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
+                const auto schedArrTimeAtLastStopDVeh = routeState.schedArrTimesFor(dVehId)[numStopsDVeh - 1];
+                const auto lastStopLoc = routeState.stopLocationsFor(dVehId)[numStopsDVeh - 1];
 
                 for (const auto &dropoffEntry: relALSDropoffs.relevantSpotsFor(dVehId)) {
-                    const auto& dropoff = requestState.dropoffs[dropoffEntry.dropoffId];
-                    assert(numStopsDVeh - 1 == lastStopDistances[pVeh->vehicleId][dVeh->vehicleId].size());
+                    const auto &dropoff = requestState.dropoffs[dropoffEntry.dropoffId];
 
-                    // Try all possible transfer points
-                    for (int i = 1; i < numStopsDVeh; i++) {
-                        // Build the transfer point
-                        const int transferLoc = stopLocationsDVeh[i];
-                        const int distancePVehToTransfer = lastStopDistances[pVeh->vehicleId][dVeh->vehicleId][i - 1];
+                    using namespace time_utils;
+                    const bool dropoffAtExistingStop = dropoff.loc == lastStopLoc;
+                    const int minInitialDropoffDetour = calcInitialDropoffDetour(dVehId, numStopsDVeh - 1,
+                                                                                 numStopsDVeh - 1, 0,
+                                                                                 dropoffAtExistingStop, routeState);
+                    const int minDropoffCostWithoutTrip =
+                            calc.calcMinKnownDropoffSideCostWithoutTripTime(*dVeh, numStopsDVeh - 1,
+                                                                            minInitialDropoffDetour,
+                                                                            dropoff.walkingDist, requestState);
 
-                        TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh, i,
-                                                         distancePVehToTransfer, 0, 0, 0);
-                        if (tp.loc == dropoff.loc)
-                            continue;
+                    for (int i = numStopsDVeh - 2; i >= 1; --i) {
 
-                        numTransferPoints++;
+                        // If occupancy exceeds capacity at this leg, we do not have to consider this or earlier stops
+                        // of the route, as this leg needs to be traversed.
+                        if (occupanciesDVeh[i] + requestState.originalRequest.numRiders > dVeh->capacity)
+                            break;
 
-                        // Build the assignment
-                        AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
+                        // Compute lower bound for costs with transfer between i and i + 1, considering trip time
+                        // from stop i + 1 to the dropoff and detour to the dropoff. This lower bound also holds for
+                        // any stop before i so if it is worse than the best known cost, we can stop for this vehicle.
+                        const auto minTripTimeToLastStop = schedArrTimeAtLastStopDVeh - schedDepTimesDVeh[i + 1];
+                        const int minTripTimeToDropoff = std::max(requestState.minDirectPDDist,
+                                                                  minTripTimeToLastStop + dropoffEntry.distToDropoff) +
+                                                         dropoff.walkingDist;
+                        const int minCostFromHere =
+                                CostCalculator::CostFunction::calcTripCost(minTripTimeToDropoff, requestState) +
+                                minDropoffCostWithoutTrip;
+                        if (minCostFromHere > requestState.getBestCost())
+                            break;
 
-                        asgn.pickupIdx = pickup->stopIndex;
-                        asgn.dropoffIdx = numStopsDVeh - 1;
-                        asgn.transferIdxPVeh = numStopsPVeh - 1;
-                        asgn.transferIdxDVeh = i;
+                        const int stopId = stopIdsDVeh[i];
+                        const auto &transferPoints = ellipseContainer.getEdgesInEllipse(stopId);
 
-                        assert(asgn.pickupIdx < numStopsPVeh - 1);
+                        paretoOptimalTps.clear();
 
-                        asgn.pickupBNSLowerBoundUsed = bnsLowerBoundUsed;
+                        for (int tpIdx = 0; tpIdx < transferPoints.size(); tpIdx++) {
+                            const auto edge = transferPoints[tpIdx];
+                            const int transferLoc = edge.edge;
+                            KASSERT(isEdgeRel.isSet(transferLoc));
 
-                        const auto *pickupPDLoc = &requestState.pickups[pickup->pdId];
-                        asgn.pickup = pickupPDLoc;
-                        asgn.dropoff = &dropoff;
+                            // If the pickup or dropoff conincides with the transfer, we skip the assignment
+                            if (pickupPDLoc->loc == transferLoc || transferLoc == dropoff.loc)
+                                continue;
 
-                        asgn.distToPickup = distanceToPickup;
-                        asgn.distFromPickup = pickup->distFromPDLocToNextStop;
+                            const auto edgeOffset = inputGraph.travelTime(transferLoc);
+                            const int distancePVehToTransfer = thisLastStopToTransfersDistances[relEdgesToInternalIdx[transferLoc]];
 
-                        const int distanceToDropoff = dropoffEntry.distToDropoff;
-                        assert(distanceToDropoff > 0);
+                            if (i > 0) { // Cannot pareto check for transfer BNS because we only know lower bounds
+                                const bool transferAtStopDVeh = transferLoc == stopLocationsDVeh[i];
+                                const int distToTransferDVeh = transferAtStopDVeh ? 0 : edge.distToTail + edgeOffset;
+                                KASSERT(i != numStopsDVeh - 1);
+                                const int distNextLegAfterTransferDVeh = edge.distFromHead;
+                                const bool notDominated = checkPareto(
+                                        TPDistances(distancePVehToTransfer, distToTransferDVeh,
+                                                    distNextLegAfterTransferDVeh),
+                                        paretoOptimalTps);
+                                if (!notDominated)
+                                    continue;
+                            }
 
-                        asgn.dropoffType = AFTER_LAST_STOP;
-                        asgn.pickupType = pickup->stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
-                        asgn.transferTypePVeh = AFTER_LAST_STOP;
-                        asgn.transferTypeDVeh = ORDINARY;
+                            TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh, i,
+                                                             distancePVehToTransfer, 0, edge.distToTail + edgeOffset,
+                                                             edge.distFromHead);
+                            if (tp.loc == dropoff.loc)
+                                continue;
 
-                        // If the pickup or dropoff conincides with the transfer, we skip the assignment
-                        if (asgn.pickup->loc == asgn.transfer.loc || asgn.transfer.loc == asgn.dropoff->loc)
-                            continue;
+                            numTransferPoints++;
 
-                        finishDistances(asgn, 0, distancePVehToTransfer, 0, distanceToDropoff);
-                        assert(asgn.distFromTransferPVeh == 0);
-                        assert(asgn.distFromDropoff == 0);
-                        assert(asgn.distFromPickup > 0 || asgn.pickupIdx == asgn.transferIdxPVeh);
-                        assert(asgn.distFromTransferDVeh > 0 || asgn.transferIdxDVeh == asgn.dropoffIdx);
+                            // Build the assignment
+                            AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
 
-                        // Try the assignment with ALS dropoff
-                        tryPotentiallyUnfinishedAssignment(asgn, postponedAssignments);
+                            asgn.pickupIdx = pickup->stopIndex;
+                            asgn.dropoffIdx = numStopsDVeh - 1;
+                            asgn.transferIdxPVeh = numStopsPVeh - 1;
+                            asgn.transferIdxDVeh = i;
+
+                            assert(asgn.pickupIdx < numStopsPVeh - 1);
+
+                            asgn.pickupBNSLowerBoundUsed = bnsLowerBoundUsed;
+
+                            asgn.pickup = pickupPDLoc;
+                            asgn.dropoff = &dropoff;
+
+                            asgn.distToPickup = distanceToPickup;
+                            asgn.distFromPickup = pickup->distFromPDLocToNextStop;
+
+                            const int distanceToDropoff = dropoffEntry.distToDropoff;
+                            assert(distanceToDropoff > 0);
+
+                            asgn.dropoffType = AFTER_LAST_STOP;
+                            asgn.pickupType = pickup->stopIndex == 0 ? BEFORE_NEXT_STOP : ORDINARY;
+                            asgn.transferTypePVeh = AFTER_LAST_STOP;
+                            asgn.transferTypeDVeh = ORDINARY;
+
+                            finishDistances(asgn, 0, distancePVehToTransfer, 0, distanceToDropoff);
+                            assert(asgn.distFromTransferPVeh == 0);
+                            assert(asgn.distFromDropoff == 0);
+
+                            // These assertions do not work due to edges with travel time 0
+//                            assert(asgn.distFromPickup > 0 || asgn.pickupIdx == asgn.transferIdxPVeh);
+//                            assert(asgn.distFromTransferDVeh > 0 || asgn.transferIdxDVeh == asgn.dropoffIdx);
+
+                            // Try the assignment with ALS dropoff
+                            tryPotentiallyUnfinishedAssignment(asgn, postponedAssignments);
+                        }
                     }
                 }
             }
@@ -616,9 +1106,11 @@ namespace karri {
                                                   : 0;
 
             const bool pickupAtStop = asgn.pickup->loc == stopLocationsPVeh[pickupIdx];
-            const bool transferAtStopPVeh = asgn.transfer.loc == stopLocationsPVeh[transferIdxPVeh] && asgn.transferIdxPVeh > asgn.pickupIdx;
+            const bool transferAtStopPVeh =
+                    asgn.transfer.loc == stopLocationsPVeh[transferIdxPVeh] && asgn.transferIdxPVeh > asgn.pickupIdx;
             const bool transferAtStopDVeh = asgn.transfer.loc == stopLocationsDVeh[transferIdxDVeh];
-            const bool dropoffAtStop = asgn.dropoff->loc == stopLocationsDVeh[dropoffIdx] && asgn.dropoffIdx > asgn.transferIdxDVeh;
+            const bool dropoffAtStop =
+                    asgn.dropoff->loc == stopLocationsDVeh[dropoffIdx] && asgn.dropoffIdx > asgn.transferIdxDVeh;
 
             const bool pairedPVeh = pickupIdx == transferIdxPVeh;
             const bool pairedDVeh = transferIdxDVeh == dropoffIdx;
@@ -644,14 +1136,14 @@ namespace karri {
                 asgn.distFromPickup = legPickup;
 
             // Distance to transfer pVeh
-            if (transferAtStopPVeh)
-                asgn.distToTransferPVeh = 0;
-
             if (pairedPVeh)
                 asgn.distToTransferPVeh = pairedDistancePVeh;
 
-            if (!pickupAfterLastStop && transferAfterLastStopPVeh && !transferAtStopPVeh)
+            if (!pickupAfterLastStop && transferAfterLastStopPVeh)
                 asgn.distToTransferPVeh = alsDistancePVeh;
+
+            if (transferAtStopPVeh)
+                asgn.distToTransferPVeh = 0;
 
             // Distance from transfer pVeh
             if (transferAtStopPVeh)
@@ -672,8 +1164,10 @@ namespace karri {
             if (pairedDVeh || transferAfterLastStopDVeh)
                 asgn.distFromTransferDVeh = 0;
 
-            if (!pairedDVeh && transferAtStopDVeh)
+            if (!pairedDVeh && transferAtStopDVeh) {
+                KASSERT(legTransferDVeh > 0);
                 asgn.distFromTransferDVeh = legTransferDVeh;
+            }
 
             // Distance to dropoff
             if (pairedDVeh && !dropoffAfterLastStop)
@@ -693,15 +1187,15 @@ namespace karri {
             if (dropoffAfterLastStop)
                 asgn.distFromDropoff = 0;
 
-            assert(asgn.distFromDropoff > 0 || dropoffAfterLastStop);
-            assert(asgn.distFromTransferPVeh > 0 || transferAfterLastStopPVeh);
-            assert(asgn.distFromPickup > 0 || asgn.pickupIdx == asgn.transferIdxPVeh);
-            assert(asgn.distFromTransferDVeh > 0 || asgn.transferIdxDVeh == asgn.dropoffIdx);
-
-            assert(asgn.distToPickup > 0 || asgn.distFromPickup > 0 || asgn.distToTransferPVeh > 0 ||
-                   asgn.distFromTransferPVeh > 0);
-            assert(asgn.distToTransferDVeh > 0 || asgn.distFromTransferDVeh > 0 || asgn.distToDropoff > 0 ||
-                   asgn.distFromDropoff > 0);
+            // These assertions do not work due to edges with travel time 0
+//            KASSERT(asgn.distFromDropoff > 0 || dropoffAfterLastStop);
+//            KASSERT(asgn.distFromTransferPVeh > 0 || transferAfterLastStopPVeh);
+//            KASSERT(asgn.distFromPickup > 0 || asgn.pickupIdx == asgn.transferIdxPVeh);
+//            KASSERT(asgn.distFromTransferDVeh > 0 || asgn.transferIdxDVeh == asgn.dropoffIdx);
+//            KASSERT(asgn.distToPickup > 0 || asgn.distFromPickup > 0 || asgn.distToTransferPVeh > 0 ||
+//                   asgn.distFromTransferPVeh > 0);
+//            KASSERT(asgn.distToTransferDVeh > 0 || asgn.distFromTransferDVeh > 0 || asgn.distToDropoff > 0 ||
+//                   asgn.distFromDropoff > 0);
         }
 
         // Skip unecessary assignments (e.g. if the pickup or dropoff is already at the next stop)
@@ -751,34 +1245,40 @@ namespace karri {
             if (canSkipAssignment(asgn))
                 return;
             trackAssignmentTypeStatistic(asgn);
-            Timer time;
             const auto cost = calc.calc(asgn, requestState);
             requestState.tryFinishedTransferAssignmentWithKnownCost(asgn, cost);
-            tryAssignmentsTime += time.elapsed<std::chrono::nanoseconds>();
+            if (cost.total < bestCost) {
+                bestAssignment = asgn;
+                bestCost = cost.total;
+            }
         }
 
-        void tryPotentiallyUnfinishedAssignment(AssignmentWithTransfer& asgn,
-                                                std::vector<AssignmentWithTransfer>& postponedAssignments) {
+        void tryPotentiallyUnfinishedAssignment(AssignmentWithTransfer &asgn,
+                                                std::vector<AssignmentWithTransfer> &postponedAssignments) {
+
             if (canSkipAssignment(asgn))
                 return;
-            trackAssignmentTypeStatistic(asgn);
-            Timer time;
+
             if (!asgn.isFinished()) {
 //                const auto lowerBound = calc.calcLowerBound(asgn, requestState);
                 const auto lowerBound = calc.calc(asgn, requestState);
                 if (lowerBound.total >= requestState.getBestCost())
                     return;
+
                 postponedAssignments.push_back(asgn);
             } else {
-                const auto cost = calc.calc(asgn, requestState);
-                requestState.tryFinishedTransferAssignmentWithKnownCost(asgn, cost);
+                tryFinishedAssignment(asgn);
             }
-            tryAssignmentsTime += time.elapsed<std::chrono::nanoseconds>();
         }
 
-        void finishAssignments(const Vehicle *pVeh, std::vector<AssignmentWithTransfer>& postponedAssignments) {
+        void finishAssignmentsWithPickupBNSLowerBound(const Vehicle *pVeh,
+                                                      std::vector<AssignmentWithTransfer> &postponedAssignments) {
+
+            if (postponedAssignments.empty())
+                return;
+
             for (const auto &asgn: postponedAssignments) {
-                assert(asgn.pickupBNSLowerBoundUsed);
+                KASSERT(asgn.pickupBNSLowerBoundUsed && !asgn.dropoffPairedLowerBoundUsed);
                 searches.addPickupForProcessing(asgn.pickup->id, asgn.distToPickup);
             }
 
@@ -792,11 +1292,16 @@ namespace karri {
                 asgn.distToPickup = distance;
                 asgn.pickupBNSLowerBoundUsed = false;
 
-                assert(asgn.isFinished());
+                KASSERT(asgn.isFinished());
                 tryFinishedAssignment(asgn);
             }
-            postponedAssignments.clear();
         }
+
+        const InputGraphT &inputGraph;
+
+        using VehCHQuery = typename VehCHEnvT::template FullCHQuery<>;
+
+        const CH &vehCh;
 
         TransferALSStrategyT &strategy;
         TransfersPickupALSStrategyT &pickupALSStrategy;
@@ -813,26 +1318,25 @@ namespace karri {
         CostCalculator &calc;
         InsertionAsserterT &asserter;
 
-        // Stores for each pickup vehicle, the distances to all possible stops of dropoff vehicles
-        std::map<int, std::map<int, std::vector<int>>> lastStopDistances;
-        std::map<int, std::map<int, std::vector<int>>> transferDistances;
+        std::vector<int> allTransferEdges;
 
+        // Lower bound on part of cost of assignment using transfer edge for the dropoff vehicle including detour and
+        // trip time starting from transfer.
+        std::vector<int> minDVehCostForTransferEdge;
+
+        TimestampedVector<int> relPVehToInternalIdx; // Maps vehicle IDs of relevant pVehs to consecutive indices
+        FastResetFlagArray<> dVehStopsFlags; // Helper to deduplicate stops of dropoff vehicles
+        FastResetFlagArray<> isEdgeRel; // Helper structure to deduplicate transfer edges
+        std::vector<int> relEdgesToInternalIdx; // Maps transfer edges to consecutive indices
+
+        AssignmentWithTransfer bestAssignment;
+        int bestCost;
+
+        std::vector<TPDistances> paretoOptimalTps;
 
         //* Statistics for the transfer als pveh assignment finder
-        int64_t totalTime;
 
-        // Stats for the PD Locs
-        int64_t numCandidateVehiclesPickupBNS;
-        int64_t numCandidateVehiclesPickupORD;
-        int64_t numCandidateVehiclesPickupALS;
-
-        int64_t numCandidateVehiclesDropoffORD;
-        int64_t numCandidateVehiclesDropoffALS;
-
-        int64_t numPickups;
-        int64_t numDropoffs;
-
-        // Stats for the tried assignments 
+        // Stats for the tried assignments
         int64_t numAssignmentsTriedPickupBNS;
         int64_t numAssignmentsTriedPickupORD;
         int64_t numAssignmentsTriedPickupALS;
@@ -840,14 +1344,7 @@ namespace karri {
         int64_t numAssignmentsTriedDropoffORD;
         int64_t numAssignmentsTriedDropoffALS;
 
-        int64_t tryAssignmentsTime;
-
         // Stats for the transfer search itself
         int64_t numTransferPoints;
-
-        // Search from last stop to all stops
-        int64_t searchTimePickupALS;
-        int64_t searchTimePickupToTransfer;
-        int64_t searchTimeLastStopToTransfer;
     };
 }

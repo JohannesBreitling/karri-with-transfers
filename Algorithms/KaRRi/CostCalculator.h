@@ -71,6 +71,7 @@ namespace karri {
         // Calculates the objective value for a given assignment.
         template<bool checkHardConstraints, typename RequestContext>
         RequestCost calcBase(const Assignment &asgn, const RequestContext &context) {
+
             using namespace time_utils;
             assert(asgn.vehicle && asgn.pickup && asgn.dropoff);
             if (!asgn.vehicle || !asgn.pickup || !asgn.dropoff)
@@ -81,6 +82,8 @@ namespace karri {
                 return RequestCost::INFTY_COST();
             const int vehId = asgn.vehicle->vehicleId;
             const auto actualDepTimeAtPickup = getActualDepTimeAtPickup(asgn, context, routeState);
+            const bool pickupAtExistingStop = isPickupAtExistingStop(*asgn.pickup, vehId, context.now(),
+                                                                    asgn.pickupStopIdx, routeState);
             const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
             if constexpr (checkHardConstraints) {
                 const auto initialPickupDetour = calcInitialPickupDetour(vehId, asgn.pickupStopIdx, asgn.dropoffStopIdx,
@@ -128,11 +131,11 @@ namespace karri {
             const int numStops = routeState.numStopsOf(vehId);
 
             // Count the detour for pickup and/or dropoff after last stop.
-            if (asgn.dropoffStopIdx == numStops - 1) {
+            if (asgn.dropoffStopIdx == numStops - 1 && !dropoffAtExistingStop) {
                 totalResidualDetours += asgn.distToDropoff + stopTime;
-                if (asgn.pickupStopIdx == numStops - 1) {
-                    totalResidualDetours += asgn.distToPickup + stopTime;
-                }
+            }
+            if (asgn.pickupStopIdx == numStops - 1 && !pickupAtExistingStop) {
+                totalResidualDetours += asgn.distToPickup + stopTime;
             }
 
             if (checkHardConstraints && asgn.dropoffStopIdx < numStops - 1) {
@@ -199,6 +202,8 @@ namespace karri {
             const auto numStopsDVeh = routeState.numStopsOf(dVehId);
 
             const auto actualDepTimeAtPickup = getActualDepTimeAtPickup(asgn, context, routeState);
+            const bool pickupAtExistingStop = isPickupAtExistingStop(*asgn.pickup, pVehId, context.now(),
+                                                                     asgn.pickupIdx, routeState);
             const bool transferPVehAtExistingStop = isTransferAtExistingStopPVeh(asgn, routeState);
             const bool dropoffAtExistingStop = isDropoffAtExistingStop(asgn, routeState);
             if constexpr (checkHardConstraints) {
@@ -249,18 +254,25 @@ namespace karri {
             }
 
             // Count the detour for pickup and/or transfer after last stop of pVeh.
-            if (asgn.transferIdxPVeh == numStopsPVeh - 1) {
+            if (asgn.transferIdxPVeh == numStopsPVeh - 1 && !transferPVehAtExistingStop) {
                 totalResidualDetours += asgn.distToTransferPVeh + stopTime;
-                if (asgn.pickupIdx == numStopsPVeh - 1) {
-                    totalResidualDetours += asgn.distToPickup + stopTime;
-                }
             }
+            if (asgn.pickupIdx == numStopsPVeh - 1 && !pickupAtExistingStop) {
+                totalResidualDetours += asgn.distToPickup + stopTime;
+            }
+
+
+            const int riderArrTimeAtTransfer = computeRiderArrTimeAtTransfer(asgn, actualDepTimeAtPickup,
+                                                                             transferPVehAtExistingStop, detourComputer,
+                                                                             routeState);
+            const int depTimeAtTransfer = computeDVehDepTimeAtTransfer(asgn, riderArrTimeAtTransfer, detourComputer,
+                                                                       routeState, context);
 
             // Count the detour for transfer and/or dropoff after last stop of dVeh.
             if (asgn.dropoffIdx == numStopsDVeh - 1) {
                 totalResidualDetours += asgn.distToDropoff + stopTime;
                 if (asgn.transferIdxDVeh == numStopsDVeh - 1) {
-                    totalResidualDetours += asgn.distToTransferDVeh + stopTime;
+                    totalResidualDetours += depTimeAtTransfer - routeState.schedDepTimesFor(dVehId)[numStopsDVeh - 1];
                 }
             }
 
@@ -305,11 +317,6 @@ namespace karri {
             }
 
             // Compute trip time of new rider
-            const int riderArrTimeAtTransfer = computeRiderArrTimeAtTransfer(asgn, actualDepTimeAtPickup,
-                                                                             transferPVehAtExistingStop, detourComputer,
-                                                                             routeState);
-            const int depTimeAtTransfer = computeDVehDepTimeAtTransfer(asgn, riderArrTimeAtTransfer, detourComputer,
-                                                                       routeState, context);
             const int arrTimeAtDropoff = computeArrTimeAtDropoffAfterTransfer(
                     asgn, depTimeAtTransfer, detourComputer, routeState);
 
@@ -1058,8 +1065,8 @@ namespace karri {
         // pickup is used or where the pickup will be inserted. Does not consider any bounds on trip time.
         template<typename RequestContext>
         int calcMinKnownDropoffSideCostWithoutTripTime(const Vehicle &veh, const int dropoffIndex,
-                                        const int initialDropoffDetour, const int walkingDist,
-                                        const RequestContext &context) const {
+                                                       const int initialDropoffDetour, const int walkingDist,
+                                                       const RequestContext &context) const {
             using namespace time_utils;
 
             const auto numStops = routeState.numStopsOf(veh.vehicleId);
@@ -1084,7 +1091,8 @@ namespace karri {
         int calcMinKnownDropoffSideCost(const Vehicle &veh, const int dropoffIndex,
                                         const int initialDropoffDetour, const int walkingDist,
                                         const RequestContext &context) const {
-            return calcMinKnownDropoffSideCostWithoutTripTime(veh, dropoffIndex, initialDropoffDetour, walkingDist, context) +
+            return calcMinKnownDropoffSideCostWithoutTripTime(veh, dropoffIndex, initialDropoffDetour, walkingDist,
+                                                              context) +
                    F::calcTripCost(context.minDirectPDDist + walkingDist, context);
         }
 

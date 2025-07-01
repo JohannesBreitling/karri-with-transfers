@@ -1,6 +1,7 @@
 /// ******************************************************************************
 /// MIT License
 ///
+/// Copyright (c) 2025 Johannes Breitling <johannes.breitling@student.kit.edu>
 /// Copyright (c) 2025 Moritz Laupichler <moritz.laupichler@kit.edu>
 ///
 /// Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -25,41 +26,41 @@
 #pragma once
 
 #include <vector>
-#include "VertexInEllipse.h"
 #include <kassert/kassert.hpp>
+#include "DataStructures/Utilities/IteratorRange.h"
+#include "Tools/Constants.h"
 
 namespace karri {
-    struct EdgeEllipseContainer {
 
-        const std::vector<EdgeInEllipse> &getEdgesInEllipse(const int stopId) const {
-            KASSERT(stopId < static_cast<int>(idxOfStop.size()));
-            const auto idx = idxOfStop[stopId];
-            // KASSERT(idx != INVALID_INDEX);
-            if (idx == INVALID_INDEX)
-                return empty;
+    struct FlatRegular2DDistanceArray {
 
-            return edgeEllipses[idx];
+        ConstantVectorRange<int> getDistancesFor(const int row) const {
+            KASSERT(row >= 0 && (width == 0 || row < distances.size() / width));
+            return {distances.begin() + row * width, distances.begin() + (row + 1) * width};
+        }
+
+        int getMinDistanceFor(const int row) const {
+            KASSERT(row >= 0 && row < minDistancePerRow.size());
+            return minDistancePerRow[row];
         }
 
     private:
 
-        EdgeEllipseContainer() = default;
+        template<typename, typename, typename>
+        friend class CHStrategyALS;
 
-        template<typename, typename, typename, bool, int, typename, typename>
-        friend class CHEllipseReconstructor;
+        template<typename, typename, typename, typename, typename>
+        friend class PHASTStrategyALS;
 
-        friend class OnlyAtStopEllipseReconstructor;
+        // Constructs a 2D distance array with numRows rows and rowWidth distances per row.
+        // No initialization of values takes place.
+        FlatRegular2DDistanceArray(const int numRows, const int rowWidth) : width(rowWidth),
+                                                                            distances(numRows * rowWidth),
+                                                                            minDistancePerRow(numRows, INFTY) {}
 
-        // Maps a stop ID to an internal index in the vector of stop IDs.
-        std::vector<int> idxOfStop;
-        std::vector<std::vector<EdgeInEllipse>> edgeEllipses;
 
-        std::vector<EdgeInEllipse> empty;
-    };
-
-    struct NoOpEdgeEllipseContainer {
-        std::vector<EdgeInEllipse> getEdgesInEllipse(const int) const {
-            return {};
-        }
+        int width; // Number of distances per row
+        std::vector<int> distances;
+        std::vector<int> minDistancePerRow;
     };
 }

@@ -147,7 +147,6 @@ namespace karri {
             numEdgesRelaxed = 0;
 
             EdgeEllipseContainer container;
-            std::fill(container.idxOfStop.begin(), container.idxOfStop.end(), INVALID_INDEX);
             container.idxOfStop.resize(routeState.getMaxStopId() + 1, INVALID_INDEX);
 
             if (stopIds.empty())
@@ -170,6 +169,10 @@ namespace karri {
             for (int i = 0; i < numEllipses; ++i) {
                 const int stopPos = routeState.stopPositionOf(stopIds[i]);
                 const int vehId = routeState.vehicleIdOf(stopIds[i]);
+                if (stopPos == routeState.numStopsOf(vehId) - 1) {
+                    indicesWithoutLeeway.push_back(i);
+                    continue;
+                }
                 const int legLength = time_utils::calcLengthOfLegStartingAt(stopPos, vehId, routeState);
                 const int leeway = routeState.leewayOfLegStartingAt(stopIds[i]);
                 if (leeway == legLength) {
@@ -237,9 +240,23 @@ namespace karri {
                 // TODO: what if there is more than one shortest path?
                 const int stopId = stopIds[indicesWithoutLeeway[i]];
                 const auto stopIdx = routeState.stopPositionOf(stopId);
+                const int vehId = routeState.vehicleIdOf(stopId);
+                const int numStops = routeState.numStopsOf(vehId);
+                const auto &stopLocs = routeState.stopLocationsFor(vehId);
+
+                KASSERT(container.idxOfStop[stopIds[indicesWithoutLeeway[i]]] == indicesWithoutLeeway[i]);
+                auto &edgeEllipse = container.edgeEllipses[indicesWithoutLeeway[i]];
+
+                if (stopIdx == numStops - 1) {
+                    // Special case for last stops: Last stops only contain themselves in their ellipse
+                    KASSERT(edgeEllipse.empty());
+                    edgeEllipse.emplace_back(stopLocs[stopIdx], 0, 0);
+                    stats.withoutLeewaySearchTime += timer.elapsed<std::chrono::nanoseconds>();
+                    continue;
+                }
+
                 KASSERT(routeState.leewayOfLegStartingAt(stopId) ==
                         time_utils::calcLengthOfLegStartingAt(stopIdx, routeState.vehicleIdOf(stopId), routeState));
-                const auto &stopLocs = routeState.stopLocationsFor(routeState.vehicleIdOf(stopId));
                 const auto source = ch.rank(inputGraph.edgeHead(stopLocs[stopIdx]));
                 const auto target = ch.rank(inputGraph.edgeTail(stopLocs[stopIdx + 1]));
                 p2pQuery.run(source, target);
@@ -278,8 +295,6 @@ namespace karri {
                           });
 
                 // Convert ellipse of vertices to ellipse of edges.
-                KASSERT(container.idxOfStop[stopIds[indicesWithoutLeeway[i]]] == indicesWithoutLeeway[i]);
-                auto &edgeEllipse = container.edgeEllipses[indicesWithoutLeeway[i]];
                 convertVertexEllipseIntoEdgeEllipse(vertexEllipse, routeState.leewayOfLegStartingAt(stopId),
                                                     edgeEllipse, distanceFromVertexToNextStopPerThread.local());
                 stats.withoutLeewayConvertToEdgesTime += timer.elapsed<std::chrono::nanoseconds>();

@@ -214,7 +214,26 @@ endif (KARRI_TRANSFER_DIRECT_DISTANCES_USE_SIMD)
 
 
 ### Strategy for calculating shortest paths in the transfer ALS case
-set(TALS_CH 1)
+set(TALS_CH_CODE 1)
+set(TALS_PHAST_CODE 2)
+target_compile_definitions(karri PRIVATE KARRI_TRANSFER_TALS_CH=${TALS_CH_CODE})
+target_compile_definitions(karri PRIVATE KARRI_TRANSFER_TALS_PHAST=${TALS_PHAST_CODE})
+set(KARRI_TRANSFER_TALS_STRAT_ARG_VALUES CH PHAST)
+
+set(KARRI_TRANSFER_TALS_STRAT PHAST CACHE STRING "Strategy for computing shortest path in the transfer ALS case. Possible values: CH, PHAST")
+set_property(CACHE KARRI_TRANSFER_TALS_STRAT PROPERTY STRINGS ${KARRI_TRANSFER_TALS_STRAT_ARG_VALUES})
+list(FIND KARRI_TRANSFER_TALS_STRAT_ARG_VALUES ${KARRI_TRANSFER_TALS_STRAT} index)
+if (index EQUAL -1)
+    message(FATAL_ERROR "KARRI_TRANSFER_TALS_STRAT must be one of ${KARRI_TRANSFER_TALS_STRAT_ARG_VALUES}")
+endif ()
+
+if (${KARRI_TRANSFER_TALS_STRAT} STREQUAL CH)
+    target_compile_definitions(karri PRIVATE KARRI_TRANSFER_TALS_STRAT=${TALS_CH_CODE}) # Use CH
+else()
+    target_compile_definitions(karri PRIVATE KARRI_TRANSFER_TALS_STRAT=${TALS_PHAST_CODE}) # Use PHAST
+endif()
+
+#[[set(TALS_CH 1)
 set(TALS_PHAST 2)
 
 set(KARRI_TRANSFER_TALS_CH TALS_CH CACHE STRING "Transfer ALS using CH Approach.")
@@ -225,7 +244,8 @@ target_compile_definitions(karri PRIVATE KARRI_TRANSFER_TALS_PHAST=2)
 
 ## Set the strategy here...
 set(KARRI_TRANSFER_TALS_STRAT KARRI_TRANSFER_TALS_PHAST CACHE STRING "Strategy for computing shortest path in the transfer ALS case.")
-target_compile_definitions(karri PRIVATE KARRI_TRANSFER_TALS_STRAT=${KARRI_TRANSFER_TALS_STRAT})
+message("TALS strat: ${KARRI_TRANSFER_TALS_STRAT}")
+target_compile_definitions(karri PRIVATE KARRI_TRANSFER_TALS_STRAT=${KARRI_TRANSFER_TALS_STRAT})]]
 
 set(KARRI_TRANSFER_TALS_LOG_K 3 CACHE STRING "Given value i, KaRRi runs 2^i TALS searches simultaneously as bundled search.")
 target_compile_definitions(karri PRIVATE KARRI_TRANSFER_TALS_LOG_K=${KARRI_TRANSFER_TALS_LOG_K})

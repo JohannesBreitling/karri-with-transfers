@@ -627,7 +627,7 @@ namespace karri {
             const bool transferAtStop = stopLocations[transferIdx] == transfer;
 
             const int legPickup = schedArrTimes[pickupIdx + 1] - schedDepTimes[pickupIdx];
-            const int legTransfer = schedArrTimes[transferIdx + 1] - schedDepTimes[transferIdx];
+            const int legTransfer = transferIdx == numStops - 1? 0 : schedArrTimes[transferIdx + 1] - schedDepTimes[transferIdx];
 
             //* Pickup distances
             if (pickupAtStop)
