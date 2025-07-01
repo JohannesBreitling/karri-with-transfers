@@ -518,7 +518,6 @@ namespace karri {
                            RequestCost &localBestCost,
                            NumAsgnStats& localNumAsgnStats) {
 
-
             for (const auto &dropoffEntry: relORDDropoffs.relevantSpotsFor(dVehId)) {
                 if (dropoffEntry.stopIndex == routeState.numStopsOf(dVehId) - 1)
                     continue;
@@ -549,7 +548,6 @@ namespace karri {
 
             const auto numStopsDVeh = routeState.numStopsOf(dVehId);
             for (const auto &dropoffEntry: relALSDropoffs.relevantSpotsFor(dVehId)) {
-
                 const auto &transfersToThisDropoffDistances = transfersToDropoffsDistances.getDistancesFor(
                         dropoffEntry.dropoffId);
                 const auto dropoffEntryExtended = RelevantPDLoc(numStopsDVeh - 1, dropoffEntry.dropoffId,
