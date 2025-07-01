@@ -110,11 +110,6 @@ namespace karri {
 
         void init() {
             totalTime = 0;
-            numCandidateVehiclesPickupBNS = 0;
-            numCandidateVehiclesPickupORD = 0;
-            numCandidateVehiclesDropoffBNS = 0;
-            numCandidateVehiclesDropoffORD = 0;
-            numCandidateVehiclesDropoffALS = 0;
             numPartialsTriedPickupBNS = 0;
             numPartialsTriedPickupORD = 0;
             numAssignmentsTriedPickupBNS = 0;
@@ -122,10 +117,8 @@ namespace karri {
             numAssignmentsTriedDropoffBNS = 0;
             numAssignmentsTriedDropoffORD = 0;
             numAssignmentsTriedDropoffALS = 0;
-            tryAssignmentsTime = 0;
             numStopPairs = 0;
             numTransferPoints = 0;
-            intersectEllipsesTime = 0;
         }
 
         // Given stop IDs at which a transfer with an ordinary detour (i.e. a detour between two existing stops) may
@@ -135,20 +128,15 @@ namespace karri {
                              const RelevantDropoffsAfterLastStop &relALSDropoffs,
                              const EllipsesT &ellipseContainer) {
             Timer total;
+            Timer innerTimer;
             if (relORDPickups.getVehiclesWithRelevantPDLocs().empty() &&
                 relBNSPickups.getVehiclesWithRelevantPDLocs().empty())
                 return;
 
-            numCandidateVehiclesPickupBNS += relBNSPickups.getVehiclesWithRelevantPDLocs().size();
-            numCandidateVehiclesPickupORD += relORDPickups.getVehiclesWithRelevantPDLocs().size();
-            numCandidateVehiclesDropoffBNS += relBNSDropoffs.getVehiclesWithRelevantPDLocs().size();
-            numCandidateVehiclesDropoffORD += relORDDropoffs.getVehiclesWithRelevantPDLocs().size();
-            numCandidateVehiclesDropoffALS += relALSDropoffs.getVehiclesWithRelevantPDLocs().size();
-
             // Calculate transfer points
-            Timer intersectEllipsesTimer;
+            innerTimer.restart();
             ellipseIntersector.computeTransferPoints(pVehStopIds, dVehStopIds, ellipseContainer);
-            intersectEllipsesTime += intersectEllipsesTimer.elapsed<std::chrono::nanoseconds>();
+            const auto intersectEllipsesTime = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             // Run selection phase for many-to-many searches used to find distances from pickups to transfers and from
             // transfers to dropoffs.
@@ -175,6 +163,7 @@ namespace karri {
 
 
             // Loop over all the possible combinations of stop pairs between which an ordinary transfer is possible
+            innerTimer.restart();
             std::vector<AssignmentWithTransfer> promisingPartials;
             std::vector<AssignmentWithTransfer> postponedFullAssignments;
             for (const auto &pStopId: pVehStopIds) {
@@ -217,16 +206,17 @@ namespace karri {
                     postponedFullAssignments.clear();
                 }
             }
+            const auto tryAssignmentsTime = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             // Write the statss
             auto &stats = requestState.stats().ordinaryTransferStats;
 
             stats.totalTime = total.elapsed<std::chrono::nanoseconds>();
-            stats.numCandidateVehiclesPickupBNS += numCandidateVehiclesPickupBNS;
-            stats.numCandidateVehiclesPickupORD += numCandidateVehiclesPickupORD;
-            stats.numCandidateVehiclesDropoffBNS += numCandidateVehiclesDropoffBNS;
-            stats.numCandidateVehiclesDropoffORD += numCandidateVehiclesDropoffORD;
-            stats.numCandidateVehiclesDropoffALS += numCandidateVehiclesDropoffALS;
+            stats.numCandidateVehiclesPickupBNS += relBNSPickups.getVehiclesWithRelevantPDLocs().size();
+            stats.numCandidateVehiclesPickupORD += relORDPickups.getVehiclesWithRelevantPDLocs().size();
+            stats.numCandidateVehiclesDropoffBNS += relBNSDropoffs.getVehiclesWithRelevantPDLocs().size();
+            stats.numCandidateVehiclesDropoffORD += relORDDropoffs.getVehiclesWithRelevantPDLocs().size();
+            stats.numCandidateVehiclesDropoffALS += relALSDropoffs.getVehiclesWithRelevantPDLocs().size();
             stats.numPartialsTriedPickupBNS += numPartialsTriedPickupBNS;
             stats.numPartialsTriedPickupORD += numPartialsTriedPickupORD;
             stats.numAssignmentsTriedPickupBNS += numAssignmentsTriedPickupBNS;
@@ -346,15 +336,9 @@ namespace karri {
                     KASSERT(false);
             }
 
-            const auto pickupVehCost = calc.calc(asgn, requestState);
+            const auto lowerBoundCost = calc.calcLowerBoundForPartialOrdinaryTransfer<true>(asgn, requestState);
 
-//            if (unfinished) {
-//                pickupVehCost = calc.calcPartialCostForPVehLowerBound<true>(asgn, requestState);
-//            } else {
-//                pickupVehCost = calc.calcPartialCostForPVeh<true>(asgn, requestState);
-//            }
-
-            if (pickupVehCost.total >= requestState.getBestCost())
+            if (lowerBoundCost.total >= requestState.getBestCost())
                 return;
 
             promisingPartials.push_back(asgn);
@@ -676,8 +660,6 @@ namespace karri {
             const int transferIdx = asgn.transferIdxDVeh;
             const int dropoffIdx = asgn.dropoffIdx;
 
-            assert(transferIdx < numStops - 1);
-
             const int transfer = asgn.transfer.loc;
             const int dropoff = asgn.dropoff->loc;
 
@@ -688,9 +670,9 @@ namespace karri {
             const bool transferAtStop = stopLocations[transferIdx] == transfer;
             const bool dropoffAtStop = stopLocations[dropoffIdx] == dropoff;
 
-            const int legTransfer = schedArrTimes[transferIdx + 1] - schedDepTimes[transferIdx];
+            const int legTransfer = transferIdx == numStops - 1? 0 : schedArrTimes[transferIdx + 1] - schedDepTimes[transferIdx];
             const int legDropoff =
-                    dropoffIdx < numStops - 1 ? schedArrTimes[dropoffIdx + 1] - schedDepTimes[dropoffIdx] : 0;
+                    dropoffIdx == numStops - 1 ? 0 : schedArrTimes[dropoffIdx + 1] - schedDepTimes[dropoffIdx];
 
             //* Transfer distances
             if (transferAtStop)
@@ -770,9 +752,7 @@ namespace karri {
                     assert(false);
             }
 
-            Timer time;
             if (!asgn.isFinished()) {
-//                const auto cost = calc.calcLowerBound(asgn, requestState);
                 const auto cost = calc.calc(asgn, requestState);
                 if (cost.total <= requestState.getBestCost()) {
                     postponedAssignments.push_back(asgn);
@@ -781,7 +761,6 @@ namespace karri {
                 const auto cost = calc.calc(asgn, requestState);
                 requestState.tryFinishedTransferAssignmentWithKnownCost(asgn, cost);
             }
-            tryAssignmentsTime += time.elapsed<std::chrono::nanoseconds>();
         }
 
         bool assertTransferPointCalculation(const TransferPoint tp) {
@@ -888,14 +867,6 @@ namespace karri {
         //* Statistics for the ordinary transfer assignment finder
         int64_t totalTime;
 
-        // Stats for the PD Locs
-        int64_t numCandidateVehiclesPickupBNS;
-        int64_t numCandidateVehiclesPickupORD;
-
-        int64_t numCandidateVehiclesDropoffBNS;
-        int64_t numCandidateVehiclesDropoffORD;
-        int64_t numCandidateVehiclesDropoffALS;
-
         // Stats for the tried assignments
         int64_t numPartialsTriedPickupBNS;
         int64_t numPartialsTriedPickupORD;
@@ -907,12 +878,9 @@ namespace karri {
         int64_t numAssignmentsTriedDropoffORD;
         int64_t numAssignmentsTriedDropoffALS;
 
-        int64_t tryAssignmentsTime;
-
         // Stats for the transfer search itself
         int64_t numStopPairs;
         int64_t numTransferPoints;
-        int64_t intersectEllipsesTime;
 
     };
 }

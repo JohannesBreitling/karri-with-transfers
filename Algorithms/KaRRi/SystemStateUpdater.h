@@ -189,16 +189,7 @@ namespace karri {
                   assignmentsCostLogger(LogManager<LoggerT>::getLogger(stats::AssignmentCostStats::LOGGER_NAME,
                                                                        "request_id," +
                                                                        std::string(
-                                                                               stats::AssignmentCostStats::LOGGER_COLS))),
-                  ordinaryTransferRanksLogger(LogManager<LoggerT>::getLogger("ordinarytransfer_ranks.csv",
-                                                                             "request_id,"
-                                                                             "pickup_vehicle_id,"
-                                                                             "dropoff_vehicle_id,"
-                                                                             "transfer_rank,"
-                                                                             "pveh_prev_stop_rank,"
-                                                                             "pveh_next_stop_rank,"
-                                                                             "dveh_prev_stop_rank,"
-                                                                             "dveh_next_stop_rank\n")) {}
+                                                                               stats::AssignmentCostStats::LOGGER_COLS))) {}
 
 
         void
@@ -538,22 +529,6 @@ namespace karri {
                 const auto transferTypeDVeh = types[bestAsgnWT.transferTypeDVeh];
                 const auto dropoffType = types[bestAsgnWT.dropoffType];
 
-                if (bestAsgnWT.transferTypePVeh == ORDINARY && bestAsgnWT.transferTypeDVeh == ORDINARY) {
-                    // Log CH ranks of transfer and stop pairs for ordinary transfer
-                    const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
-                    const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
-                    ordinaryTransferRanksLogger
-                            << requestState.originalRequest.requestId << ","
-                            << pVehId << ","
-                            << dVehId << ","
-                            << vehCh.rank(inputGraph.edgeHead(bestAsgnWT.transfer.loc)) << ","
-                            << vehCh.rank(inputGraph.edgeHead(stopLocationsPVeh[transferIdxPVeh])) << ","
-                            << vehCh.rank(inputGraph.edgeHead(stopLocationsPVeh[transferIdxPVeh + 1])) << ","
-                            << vehCh.rank(inputGraph.edgeHead(stopLocationsDVeh[transferIdxDVeh])) << ","
-                            << vehCh.rank(inputGraph.edgeHead(stopLocationsDVeh[transferIdxDVeh + 1])) << "\n"
-                            << std::flush;
-                }
-
 
                 bestAssignmentsWithTransferLogger
                         << pVehId << ", "
@@ -784,8 +759,6 @@ namespace karri {
         LoggerT &transferALSDVehPerfLogger;
 
         LoggerT &assignmentsCostLogger;
-
-        LoggerT &ordinaryTransferRanksLogger;
 
     };
 }

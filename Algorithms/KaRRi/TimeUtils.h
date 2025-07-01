@@ -881,7 +881,7 @@ namespace karri::time_utils {
             propagate(afterPickupStopId, afterDropoffStopId, distViaDropoff);
         }
 
-        template<typename RequestContext>
+        template<bool UnknownDropoff = false, typename RequestContext>
         void computeDetours(const AssignmentWithTransfer &asgn, const RequestContext &context) {
             newArrTimes.clear();
             newDepTimes.clear();
@@ -951,7 +951,7 @@ namespace karri::time_utils {
                 const int arrTimeRightAfterTransferDVeh = std::max(
                         routeState.schedArrTimesFor(dVehId)[asgn.transferIdxDVeh + 1],
                         depTimeAtTransfer +
-                        (asgn.transferIdxDVeh < asgn.dropoffIdx ? asgn.distFromTransferDVeh : asgn.distToDropoff +
+                        (UnknownDropoff || asgn.transferIdxDVeh < asgn.dropoffIdx ? asgn.distFromTransferDVeh : asgn.distToDropoff +
                                                                                               stopTime +
                                                                                               asgn.distFromDropoff));
                 const int depTimeRightAfterTransferDVeh = std::max(
@@ -962,10 +962,13 @@ namespace karri::time_utils {
                 newArrTimes[afterTransferDVehStopId] = arrTimeRightAfterTransferDVeh;
                 newDepTimes[afterTransferDVehStopId] = depTimeRightAfterTransferDVeh;
 
-                const auto afterDropoffStopId = (asgn.dropoffIdx == routeState.numStopsOf(dVehId) - 1) ? INVALID_ID :
-                                                routeState.stopIdsFor(dVehId)[asgn.dropoffIdx + 1];
-                const auto dropoffAtStop = isDropoffAtExistingStop(asgn, routeState);
-                const auto distViaDropoff = asgn.distFromDropoff + (dropoffAtStop ? 0 : stopTime + asgn.distToDropoff);
+                int afterDropoffStopId = INVALID_ID;
+                int distViaDropoff = INFTY;
+                if (!UnknownDropoff && asgn.dropoffIdx < routeState.numStopsOf(dVehId) - 1) {
+                    afterDropoffStopId = routeState.stopIdsFor(dVehId)[asgn.dropoffIdx + 1];
+                    const auto dropoffAtStop = isDropoffAtExistingStop(asgn, routeState);
+                    distViaDropoff = asgn.distFromDropoff + (dropoffAtStop ? 0 : stopTime + asgn.distToDropoff);
+                }
 
                 propagate(afterTransferDVehStopId, afterDropoffStopId, distViaDropoff);
             }
