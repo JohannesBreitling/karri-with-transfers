@@ -774,7 +774,7 @@ namespace karri {
             bool bnsLowerBoundUsed = false;
 
             if (pickup->stopIndex == 0) {
-                bnsLowerBoundUsed = searches.knowsDistance(pVeh->vehicleId, pickup->pdId);
+                bnsLowerBoundUsed = !searches.knowsDistance(pVeh->vehicleId, pickup->pdId);
                 distanceToPickup = bnsLowerBoundUsed ? pickup->distToPDLoc : searches.getDistance(pVeh->vehicleId,
                                                                                                   pickup->pdId);
             }
@@ -940,7 +940,7 @@ namespace karri {
             int distanceToPickup = pickup->distToPDLoc;
 
             if (pickup->stopIndex == 0) {
-                bnsLowerBoundUsed = searches.knowsDistance(pVeh->vehicleId, pickup->pdId);
+                bnsLowerBoundUsed = !searches.knowsDistance(pVeh->vehicleId, pickup->pdId);
                 distanceToPickup = bnsLowerBoundUsed ? pickup->distToPDLoc : searches.getDistance(pVeh->vehicleId,
                                                                                                   pickup->pdId);
             }
