@@ -158,6 +158,15 @@ namespace karri {
                                             detourComputer.newDepTimes[stopIdBeforeDropoff]) +
                                    asgn.distToDropoff;
             }
+
+            if (checkHardConstraints && asgn.dropoffStopIdx == numStops - 1) {
+                const int depTimeAtLastStop = std::max(routeState.schedDepTimesFor(vehId)[numStops - 1], context.originalRequest.requestTime);
+                const auto residualDetour = arrTimeAtDropoff + (!dropoffAtExistingStop * stopTime) -
+                        depTimeAtLastStop;
+                if (isServiceTimeConstraintViolated(fleet[vehId], context, residualDetour, routeState))
+                    return RequestCost::INFTY_COST();
+            }
+
             const int tripTime = arrTimeAtDropoff - context.originalRequest.requestTime + asgn.dropoff->walkingDist;
 
             // Apply cost function to time values
@@ -276,6 +285,15 @@ namespace karri {
                 }
             }
 
+            // Check if service time constraint for pickup vehicle is violated for case that transfer is at last stop
+            if (checkHardConstraints && asgn.transferIdxPVeh == numStopsPVeh - 1) {
+                const int depTimeAtLastStop = std::max(routeState.schedDepTimesFor(pVehId)[numStopsPVeh - 1], context.originalRequest.requestTime);
+                const auto residualDetour = riderArrTimeAtTransfer + (!transferPVehAtExistingStop * stopTime) -
+                                            depTimeAtLastStop;
+                if (isServiceTimeConstraintViolated(fleet[pVehId], context, residualDetour, routeState))
+                    return RequestCost::INFTY_COST();
+            }
+
             if constexpr (checkHardConstraints) {
                 // Check rider hard constraints with detour after transfer in pVeh
                 if (asgn.transferIdxPVeh < numStopsPVeh - 1) {
@@ -319,6 +337,15 @@ namespace karri {
             // Compute trip time of new rider
             const int arrTimeAtDropoff = computeArrTimeAtDropoffAfterTransfer(
                     asgn, depTimeAtTransfer, detourComputer, routeState);
+
+            // Check if service time constraint for dVeh is violated for case that dropoff is at last stop
+            if (checkHardConstraints && asgn.dropoffIdx == numStopsDVeh - 1) {
+                const int depTimeAtLastStop = std::max(routeState.schedDepTimesFor(dVehId)[numStopsDVeh - 1], context.originalRequest.requestTime);
+                const auto residualDetour = arrTimeAtDropoff + (!dropoffAtExistingStop * stopTime) -
+                                            depTimeAtLastStop;
+                if (isServiceTimeConstraintViolated(fleet[dVehId], context, residualDetour, routeState))
+                    return RequestCost::INFTY_COST();
+            }
 
             const int tripTime = arrTimeAtDropoff - context.originalRequest.requestTime + asgn.dropoff->walkingDist;
             const int waitTimePickup = actualDepTimeAtPickup - context.originalRequest.requestTime;
