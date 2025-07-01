@@ -703,7 +703,7 @@ namespace karri {
                 const int minCostFromHere =
                         CostCalculator::CostFunction::calcTripCost(minTripTimeToDropoff, requestState) +
                         minDropoffCostWithoutTrip;
-                if (minCostFromHere > requestState.getBestCost())
+                if (minCostFromHere > std::min(localBestCost.total, requestState.getBestCost()))
                     break;
 
                 const int stopId = stopIdsDVeh[i];
