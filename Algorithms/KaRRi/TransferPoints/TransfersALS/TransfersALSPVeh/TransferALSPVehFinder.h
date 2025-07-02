@@ -288,13 +288,6 @@ namespace karri {
                                 transfersToDropoffsDistances, ellipseContainer, local.postponedAssignments,
                                 local.paretoOptimalTps, localCalc, local.bestAsgn, local.bestCost, local.numAsgnStats);
             });
-//            for (const WorkUnit &wu: workUnits) {
-//                auto& local = threadLocalData.local();
-//                auto& localCalc = threadLocalCalc.local();
-//                processWorkUnit(wu, relALSDropoffs, lastStopToTransfersDistances, pickupsToTransfersDistances,
-//                                transfersToDropoffsDistances, ellipseContainer, local.postponedAssignments,
-//                                local.paretoOptimalTps, localCalc, local.bestAsgn, local.bestCost, local.numAsgnStats);
-//            }
 
             std::vector<AssignmentWithTransfer> postponedPBNSAssignments;
             NumAsgnStats globalNumAsgnStats;
@@ -311,7 +304,7 @@ namespace karri {
                 globalNumAsgnStats += local.numAsgnStats;
             }
 
-            finishedPostponedPBNSAssignments(postponedPBNSAssignments, globalNumAsgnStats);
+            finishPostponedPBNSAssignments(postponedPBNSAssignments, globalNumAsgnStats);
 
             // Try best assignment found
             if (globalBestCost.total < INFTY)
@@ -992,7 +985,7 @@ namespace karri {
             }
         }
 
-        void finishedPostponedPBNSAssignments(std::vector<AssignmentWithTransfer> &postponedAssignments,
+        void finishPostponedPBNSAssignments(std::vector<AssignmentWithTransfer> &postponedAssignments,
                                               NumAsgnStats& globalNumAsgnStats) {
 
             // Group postponed assignments by vehicle ID and finish them

@@ -197,8 +197,11 @@ compareBestAssignmentsWithTransfer <- function(file1, file2) {
 }
 
 
-perfStats <- function(file_base, type_name) {
+perfStats <- function(file_base, type_name, remove_last_row = FALSE) {
   stats <- read.csv(paste0(file_base, ".perf_", type_name, ".csv"))
+  if (remove_last_row) {
+    stats <- head(stats, -1)
+  }
   stats <- stats[, ! colnames(stats) %in% c("request_id")]
   stats <- apply(stats, 2, mean)
   stats <- round(stats, 2)

@@ -41,6 +41,34 @@ namespace karri {
             }
         };
 
+        struct WorkUnit {
+            int pVehId = INVALID_ID;
+            int dVehIdxInRelAlsSet = INVALID_ID;
+            INS_TYPES pVehType = NOT_SET;
+        };
+
+        struct NumAsgnStats {
+            int64_t numTransferPoints = 0;
+            int64_t numAssignmentsTriedPickupBNS = 0;
+            int64_t numAssignmentsTriedPickupORD = 0;
+            int64_t numAssignmentsTriedDropoffALS = 0;
+
+            void reset() {
+                numTransferPoints = 0;
+                numAssignmentsTriedPickupBNS = 0;
+                numAssignmentsTriedPickupORD = 0;
+                numAssignmentsTriedDropoffALS = 0;
+            }
+
+            NumAsgnStats &operator+=(const NumAsgnStats &other) {
+                numTransferPoints += other.numTransferPoints;
+                numAssignmentsTriedPickupBNS += other.numAssignmentsTriedPickupBNS;
+                numAssignmentsTriedPickupORD += other.numAssignmentsTriedPickupORD;
+                numAssignmentsTriedDropoffALS += other.numAssignmentsTriedDropoffALS;
+                return *this;
+            }
+        };
+
         // The dVeh drives the detour to the transfer point
         // This implies, that the dVeh drives from its last stop to a stop of the pVeh and picks up the customer
         // The dVeh then will drive to the dropoff and go into idle mode (dropoff ALS)
@@ -72,7 +100,8 @@ namespace karri {
             pVehStopsFlags(fleet.size()),
             isEdgeRel(inputGraph.numEdges()),
             relEdgesToInternalIdx(inputGraph.numEdges()),
-            asserter(asserter) {}
+            asserter(asserter),
+            threadLocalCalc([&] { return CostCalculator(routeState, fleet); }) {}
 
         template<typename EllipsesT>
         void findAssignments(const RelevantDropoffsAfterLastStop &relALSDropoffs, const EllipsesT &ellipseContainer) {
@@ -85,8 +114,6 @@ namespace karri {
             if (relORDPickups.getVehiclesWithRelevantPDLocs().empty() &&
                 relBNSPickups.getVehiclesWithRelevantPDLocs().empty())
                 return;
-
-            bestCost = INFTY;
 
             // Collect the relevant last stops
             std::vector<int> relevantLastStopLocs;
@@ -170,11 +197,53 @@ namespace karri {
             const auto searchTimeTransferToDropoff = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             innerTimer.restart();
-            findAssignmentsWithDropoffALS(relALSDropoffs, ellipseContainer, lastStopToTransfersDistances,
-                                          transferToDropoffDistances);
+
+            const auto workUnits = composeWorkUnits(relALSDropoffs);
+
+            globalBestCost = RequestCost::INFTY_COST();
+            globalBestAssignment = AssignmentWithTransfer();
+
+            for (auto & local : threadLocalData) {
+                local.bestAsgn = AssignmentWithTransfer();
+                local.bestCost = RequestCost::INFTY_COST();
+                local.paretoOptimalTps.clear();
+                local.postponedAssignments.clear();
+                local.numAsgnStats.reset();
+            }
+
+            tbb::parallel_for(0ul, workUnits.size(), [&](const auto i) {
+                const auto& wu = workUnits[i];
+                auto& local = threadLocalData.local();
+                auto& localCalc = threadLocalCalc.local();
+                processWorkUnit(wu, relALSDropoffs, lastStopToTransfersDistances, transferToDropoffDistances,
+                                ellipseContainer, local.postponedAssignments, local.paretoOptimalTps, localCalc,
+                                local.bestAsgn, local.bestCost, local.numAsgnStats);
+            });
+
+            std::vector<AssignmentWithTransfer> postponedPBNSAssignments;
+            NumAsgnStats globalNumAsgnStats;
+            for (auto &local : threadLocalData) {
+                postponedPBNSAssignments.insert(postponedPBNSAssignments.end(),
+                                                std::make_move_iterator(local.postponedAssignments.begin()),
+                                                std::make_move_iterator(local.postponedAssignments.end()));
+
+                if (local.bestCost.total < globalBestCost.total) {
+                    globalBestCost = local.bestCost;
+                    globalBestAssignment = local.bestAsgn;
+                }
+
+                globalNumAsgnStats += local.numAsgnStats;
+            }
+
+            finishPostponedPBNSAssignments(postponedPBNSAssignments, globalNumAsgnStats);
+
+            // Try best assignment found
+            if (globalBestCost.total < INFTY)
+                requestState.tryFinishedTransferAssignmentWithKnownCost(globalBestAssignment, globalBestCost);
+
             const auto tryAssignmentsTime = innerTimer.elapsed<std::chrono::nanoseconds>();
 
-            KASSERT(bestCost >= INFTY || asserter.assertAssignment(bestAssignment));
+            KASSERT(globalBestCost.total >= INFTY || asserter.assertAssignment(globalBestAssignment));
 
             // Write the stats
             auto &stats = requestState.stats().transferALSDVehStats;
@@ -185,28 +254,17 @@ namespace karri {
             stats.numCandidateVehiclesDropoffALS += relALSDropoffs.getVehiclesWithRelevantPDLocs().size();
             stats.numPickups += requestState.numPickups();
             stats.numDropoffs += requestState.numDropoffs();
-            stats.numAssignmentsTriedPickupBNS += numAssignmentsTriedPickupBNS;
-            stats.numAssignmentsTriedPickupORD += numAssignmentsTriedPickupORD;
-            stats.numAssignmentsTriedDropoffALS += numAssignmentsTriedDropoffALS;
+            stats.numAssignmentsTriedPickupBNS += globalNumAsgnStats.numAssignmentsTriedPickupBNS;
+            stats.numAssignmentsTriedPickupORD += globalNumAsgnStats.numAssignmentsTriedPickupORD;
+            stats.numAssignmentsTriedDropoffALS += globalNumAsgnStats.numAssignmentsTriedDropoffALS;
             stats.tryAssignmentsTime += tryAssignmentsTime;
-            stats.numTransferPoints += numTransferPoints;
+            stats.numTransferPoints += globalNumAsgnStats.numTransferPoints;
 
             stats.searchTimeLastStopToTransfer += searchTimeLastStopToTransfer;
             stats.searchTimeTransferToDropoff += searchTimeTransferToDropoff;
         }
 
-        void init() {
-            totalTime = 0;
-
-            numPickups = 0;
-            numDropoffs = 0;
-
-            numAssignmentsTriedPickupBNS = 0;
-            numAssignmentsTriedPickupORD = 0;
-            numAssignmentsTriedDropoffALS = 0;
-
-            numTransferPoints = 0;
-        }
+        void init() {}
 
     private:
 
@@ -237,289 +295,231 @@ namespace karri {
             return true;
         }
 
-        void findAssignmentsWithDropoffALS(const RelevantDropoffsAfterLastStop &relALSDropoffs,
-                                           const EdgeEllipseContainer &ellipseContainer,
-                                           const auto &lastStopToTransfersDistances,
-                                           const auto &transferToDropoffDistances) {
-            // The vehicle set for the dropoff is the set of vehicles for the ALS dropoff
-            // The distance from the last stop to the dropoff is a lower bound for the distance from the last stop to the dropoff via the transfer point
-            const auto &dVehIds = relALSDropoffs.getVehiclesWithRelevantPDLocs();
+        std::vector<WorkUnit> composeWorkUnits(const RelevantDropoffsAfterLastStop &relALSDropoffs) {
+            std::vector<WorkUnit> workUnits;
 
-            std::vector<AssignmentWithTransfer> postponedAssignments;
+            const auto &dVehIds = relALSDropoffs.getVehiclesWithRelevantPDLocs();
             for (int dVehIdxInSet = 0; dVehIdxInSet < dVehIds.size(); ++dVehIdxInSet) {
                 const auto dVehId = *(dVehIds.begin() + dVehIdxInSet);
-                const auto *dVeh = &fleet[dVehId];
-                const auto numStopsDVeh = routeState.numStopsOf(dVehId);
-                const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
-                // const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
-
-                const auto &dVehDistancesToTransfer = lastStopToTransfersDistances.getDistancesFor(dVehIdxInSet);
 
                 // Pickup BNS
                 for (const auto pVehId: relBNSPickups.getVehiclesWithRelevantPDLocs()) {
-
-                    KASSERT(postponedAssignments.empty());
                     // pVeh an dVeh can not be the same vehicles
                     if (dVehId == pVehId)
                         continue;
-
-                    const auto *pVeh = &fleet[pVehId];
-                    const auto numStopsPVeh = routeState.numStopsOf(pVehId);
-                    const auto stopIdsPVeh = routeState.stopIdsFor(pVehId);
-                    const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
-
-                    for (const auto &dropoff: requestState.dropoffs) {
-
-                        const auto &distancesToDropoff = transferToDropoffDistances.getDistancesFor(dropoff.id);
-
-                        for (const auto &pickup: relBNSPickups.relevantSpotsFor(pVehId)) {
-                            assert(pickup.stopIndex == 0);
-                            const auto *pickupPDLoc = &requestState.pickups[pickup.pdId];
-
-                            // TODO: allow paired BNS for pVeh
-                            for (int i = 1; i < numStopsPVeh; i++) {
-                                const int stopId = stopIdsPVeh[i];
-                                const auto &transferPoints = ellipseContainer.getEdgesInEllipse(stopId);
-                                paretoOptimalTps.clear();
-                                for (int tpIdx = 0; tpIdx < transferPoints.size(); tpIdx++) {
-
-                                    const auto edge = transferPoints[tpIdx];
-                                    const int tpLoc = edge.edge;
-                                    KASSERT(isEdgeRel.isSet(tpLoc));
-
-                                    // If the pickup or dropoff coincides with the transfer, we skip the assignment
-                                    if (pickupPDLoc->loc == tpLoc || tpLoc == dropoff.loc)
-                                        continue;
-
-                                    const int tpOffset = inputGraph.travelTime(tpLoc);
-
-                                    const bool transferAtLastStopDVeh = tpLoc == stopLocationsDVeh[numStopsDVeh - 1];
-                                    const bool transferAtStopPVeh =
-                                            tpLoc == stopLocationsPVeh[i] && pickup.stopIndex != i;
-                                    const int distToTransferDVeh = transferAtLastStopDVeh ? 0
-                                                                                      : dVehDistancesToTransfer[relEdgesToInternalIdx[tpLoc]];
-
-                                    static const int stopTime = InputConfig::getInstance().stopTime;
-                                    if (i > 0) {
-                                        // TODO: This will no longer be true if we allow paired BNS for pVeh. Then, we
-                                        //  possibly need to set distToTransferPVeh to the pickup to transfer distance.
-                                        KASSERT(i != pickup.stopIndex);
-                                        const int distToTransferPVeh = transferAtStopPVeh? 0 : edge.distToTail + tpOffset;
-                                        const int distFromTransferPVeh = edge.distFromHead;
-                                        const int distNextLegAfterTransferDVeh = distancesToDropoff[relEdgesToInternalIdx[tpLoc]];
-                                        const int detourPVeh = distToTransferPVeh + !transferAtStopPVeh * stopTime + distFromTransferPVeh;
-                                        const int detourDVeh = distToTransferDVeh + !transferAtLastStopDVeh * stopTime + distNextLegAfterTransferDVeh;
-                                        const int trip = distToTransferPVeh + distNextLegAfterTransferDVeh;
-                                        const bool notDominated = checkPareto(
-                                                TPDistances(detourPVeh, detourDVeh, trip),
-                                                paretoOptimalTps);
-                                        if (!notDominated)
-                                            continue;
-                                    }
-
-
-                                    // Construct the transfer point
-                                    TransferPoint tp = TransferPoint(tpLoc, pVeh, dVeh);
-                                    numTransferPoints++;
-
-                                    tp.distancePVehToTransfer = edge.distToTail + tpOffset;
-                                    tp.distancePVehFromTransfer = edge.distFromHead;
-
-                                    KASSERT(tpLoc == stopLocationsDVeh[numStopsDVeh - 1] || distToTransferDVeh > 0);
-                                    tp.distanceDVehToTransfer = distToTransferDVeh;
-                                    tp.distanceDVehFromTransfer = 0;
-
-                                    tp.stopIdxPVeh = i;
-                                    tp.stopIdxDVeh = numStopsDVeh - 1;
-
-                                    // Build the resulting assignment
-                                    AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
-                                    asgn.pickup = pickupPDLoc;
-                                    asgn.dropoff = &dropoff;
-
-                                    asgn.pickupIdx = pickup.stopIndex;
-                                    asgn.dropoffIdx = numStopsDVeh - 1;
-                                    asgn.transferIdxPVeh = i;
-                                    asgn.transferIdxDVeh = numStopsDVeh - 1;
-
-                                    asgn.distToPickup = pickup.distToPDLoc;
-                                    asgn.distFromPickup = pickup.distFromPDLocToNextStop;
-                                    asgn.distToDropoff = distancesToDropoff[relEdgesToInternalIdx[tpLoc]];
-                                    asgn.distFromDropoff = 0;
-
-                                    // Check transfer at stop pVeh
-                                    if (transferAtStopPVeh) {
-                                        asgn.distToTransferPVeh = 0;
-
-                                        const int nextLeg = asgn.transferIdxPVeh < numStopsPVeh - 1 ?
-                                                            routeState.schedArrTimesFor(pVehId)[asgn.transferIdxPVeh +
-                                                                                                1] -
-                                                            routeState.schedDepTimesFor(pVehId)[asgn.transferIdxPVeh]
-                                                                                                    : 0;
-                                        asgn.distFromTransferPVeh = nextLeg;
-                                    }
-
-                                    KASSERT(asgn.pickupIdx !=
-                                            asgn.transferIdxPVeh); // In the pickup bns case we do not have a paired assignment
-                                    asgn.distToTransferDVeh = distToTransferDVeh;
-                                    asgn.distFromTransferDVeh = 0;
-
-                                    asgn.pickupType = BEFORE_NEXT_STOP;
-                                    asgn.transferTypePVeh = ORDINARY;
-                                    asgn.transferTypeDVeh = AFTER_LAST_STOP;
-                                    asgn.dropoffType = AFTER_LAST_STOP;
-
-
-                                    if (searches.knowsDistance(asgn.pVeh->vehicleId, asgn.pickup->id)) {
-                                        asgn.distToPickup = searches.getDistance(asgn.pVeh->vehicleId, asgn.pickup->id);
-                                    } else {
-                                        asgn.pickupBNSLowerBoundUsed = true;
-                                    }
-
-                                    // Try the potentially unfinished assignment with BNS pickup
-                                    tryPotentiallyUnfinishedAssignment(asgn, postponedAssignments);
-                                }
-                            }
-                        }
-                    }
-
-                    if (postponedAssignments.empty())
-                        continue;
-
-                    finishAssignmentsWithPickupBNSLowerBound(pVeh, postponedAssignments);
+                    workUnits.emplace_back(pVehId, dVehIdxInSet, INS_TYPES::BEFORE_NEXT_STOP);
                 }
-
-                KASSERT(postponedAssignments.empty());
 
                 // Pickup ORD
                 for (const auto pVehId: relORDPickups.getVehiclesWithRelevantPDLocs()) {
                     // pVeh an dVeh can not be the same vehicles
                     if (dVehId == pVehId)
                         continue;
-
-                    const auto *pVeh = &fleet[pVehId];
-                    const auto numStopsPVeh = routeState.numStopsOf(pVehId);
-                    const auto stopIdsPVeh = routeState.stopIdsFor(pVehId);
-                    const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
-
-                    for (const auto &dropoff: requestState.dropoffs) {
-
-                        const auto &distancesToDropoff = transferToDropoffDistances.getDistancesFor(dropoff.id);
-
-                        //* Calculate the distances from the stops of the pVeh to the possible dropoffs
-                        for (const auto &pickup: relORDPickups.relevantSpotsFor(pVehId)) {
-                            const auto *pickupPDLoc = &requestState.pickups[pickup.pdId];
-
-                            // TODO: allow paired ORD for pVeh
-                            for (int i = pickup.stopIndex + 1; i < numStopsPVeh; i++) {
-                                assert(pickup.stopIndex > 0);
-                                const int stopId = stopIdsPVeh[i];
-                                const auto &transferPoints = ellipseContainer.getEdgesInEllipse(stopId);
-                                paretoOptimalTps.clear();
-                                for (int tpIdx = 0; tpIdx < transferPoints.size(); tpIdx++) {
-                                    const auto edge = transferPoints[tpIdx];
-                                    const int tpLoc = edge.edge;
-                                    KASSERT(isEdgeRel.isSet(tpLoc));
-
-                                    // If the pickup or dropoff conincides with the transfer, we skip the assignment
-                                    if (pickupPDLoc->loc == tpLoc || tpLoc == dropoff.loc)
-                                        continue;
-
-                                    const int tpOffset = inputGraph.travelTime(tpLoc);
-
-                                    const bool transferAtLastStopDVeh = tpLoc == stopLocationsDVeh[numStopsDVeh - 1];
-                                    const bool transferAtStopPVeh =
-                                           tpLoc == stopLocationsPVeh[i] && pickup.stopIndex != i;
-                                    const int distToTransferDVeh = transferAtLastStopDVeh ? 0
-                                                                                      : dVehDistancesToTransfer[relEdgesToInternalIdx[tpLoc]];
-
-                                    static const int stopTime = InputConfig::getInstance().stopTime;
-                                    // TODO: This will no longer be true if we allow paired for pVeh. Then, we
-                                    //  possibly need to set distToTransferPVeh to the pickup to transfer distance.
-                                    KASSERT(i != pickup.stopIndex);
-                                    const int distToTransferPVeh = transferAtStopPVeh? 0 : edge.distToTail + tpOffset;
-                                    const int distFromTransferPVeh = edge.distFromHead;
-                                    const int distNextLegAfterTransferDVeh = distancesToDropoff[relEdgesToInternalIdx[tpLoc]];
-                                    const int detourPVeh = distToTransferPVeh + !transferAtStopPVeh * stopTime + distFromTransferPVeh;
-                                    const int detourDVeh = distToTransferDVeh + !transferAtLastStopDVeh * stopTime + distNextLegAfterTransferDVeh;
-                                    const int trip = distToTransferPVeh + distNextLegAfterTransferDVeh;
-                                    const bool notDominated = checkPareto(TPDistances(detourPVeh, detourDVeh, trip),
-                                            paretoOptimalTps);
-                                    if (!notDominated)
-                                        continue;
-
-
-                                    // Construct the transfer point
-                                    TransferPoint tp = TransferPoint(tpLoc, pVeh, dVeh);
-                                    numTransferPoints++;
-
-                                    tp.distancePVehToTransfer = edge.distToTail + tpOffset;
-                                    tp.distancePVehFromTransfer = edge.distFromHead;
-
-                                    KASSERT(distToTransferDVeh > 0 || stopLocationsDVeh[numStopsDVeh - 1] == tpLoc);
-                                    tp.distanceDVehToTransfer = distToTransferDVeh;
-                                    tp.distanceDVehFromTransfer = 0;
-
-                                    tp.stopIdxPVeh = i;
-                                    tp.stopIdxDVeh = numStopsDVeh - 1;
-
-                                    // Build the resulting assignment
-                                    AssignmentWithTransfer asgn = AssignmentWithTransfer(pVeh, dVeh, tp);
-                                    asgn.pickup = pickupPDLoc;
-                                    asgn.dropoff = &dropoff;
-
-                                    asgn.pickupIdx = pickup.stopIndex;
-                                    asgn.dropoffIdx = numStopsDVeh - 1;
-                                    asgn.transferIdxPVeh = i;
-                                    asgn.transferIdxDVeh = numStopsDVeh - 1;
-
-                                    asgn.distToPickup = pickup.distToPDLoc;
-                                    asgn.distFromPickup = pickup.distFromPDLocToNextStop;
-                                    asgn.distToDropoff = distancesToDropoff[relEdgesToInternalIdx[tpLoc]];
-                                    asgn.distFromDropoff = 0;
-
-                                    // Check transfer at stop pVeh
-                                    if (transferAtStopPVeh) {
-                                        asgn.distToTransferPVeh = 0;
-
-                                        const int nextLeg = asgn.transferIdxPVeh < numStopsPVeh - 1 ?
-                                                            routeState.schedArrTimesFor(pVehId)[asgn.transferIdxPVeh +
-                                                                                                1] -
-                                                            routeState.schedDepTimesFor(pVehId)[asgn.transferIdxPVeh]
-                                                                                                    : 0;
-                                        asgn.distFromTransferPVeh = nextLeg;
-                                    }
-
-                                    asgn.distToTransferDVeh = distToTransferDVeh;
-                                    asgn.distFromTransferDVeh = 0;
-
-                                    asgn.pickupType = ORDINARY;
-                                    asgn.transferTypePVeh = ORDINARY;
-                                    asgn.transferTypeDVeh = AFTER_LAST_STOP;
-                                    asgn.dropoffType = AFTER_LAST_STOP;
-
-                                    if (asgn.pickupIdx == asgn.transferIdxPVeh) {
-                                        asgn.pickupPairedLowerBoundUsed = true;
-                                        asgn.distToTransferPVeh = 0;
-                                        asgn.distFromPickup = 0;
-                                    }
-
-                                    // Try the potentially unfinished assignment with ORD pickup
-                                    tryPotentiallyUnfinishedAssignment(asgn, postponedAssignments);
-                                }
-                            }
-                        }
-                    }
+                    workUnits.emplace_back(pVehId, dVehIdxInSet, INS_TYPES::ORDINARY);
                 }
             }
 
-            if (postponedAssignments.empty())
-                return;
-
-            finishAssignmentsWithPickupPairedLowerBound(postponedAssignments);
+            return workUnits;
         }
 
-        // Skip unecessary assignments (e.g. if the pickup or dropoff is already at the next stop)
+        void processWorkUnit(const WorkUnit &wu,
+                             const RelevantDropoffsAfterLastStop &relALSDropoffs,
+                             const auto &lastStopToTransfersDistances,
+                             const auto &transferToDropoffDistances,
+                             const EdgeEllipseContainer &ellipseContainer,
+                             std::vector<AssignmentWithTransfer> &localPostponedPBNSAssignments,
+                             std::vector<TPDistances> &localParetoOptimalTps,
+                             CostCalculator &localCalc,
+                             AssignmentWithTransfer &localBestAssignment,
+                             RequestCost &localBestCost,
+                             NumAsgnStats &localNumAsgnStats) {
+
+            const auto &lastStopDVehToTransfersDistances = lastStopToTransfersDistances.getDistancesFor(
+                    wu.dVehIdxInRelAlsSet);
+            const auto dVehId = *(relALSDropoffs.getVehiclesWithRelevantPDLocs().begin() + wu.dVehIdxInRelAlsSet);
+            KASSERT(dVehId != wu.pVehId);
+
+            static std::vector<AssignmentWithTransfer> placeholderPostponedAssignments;
+            KASSERT(placeholderPostponedAssignments.empty());
+
+            auto &postponedAssignmentsToUse =
+                    wu.pVehType == BEFORE_NEXT_STOP ? localPostponedPBNSAssignments : placeholderPostponedAssignments;
+            const auto &pickupEntries = wu.pVehType == BEFORE_NEXT_STOP ? relBNSPickups.relevantSpotsFor(wu.pVehId)
+                                                                        : relORDPickups.relevantSpotsFor(wu.pVehId);
+
+            for (const auto &dropoff: requestState.dropoffs) {
+
+                const auto &transfersToThisDropoffDistances = transferToDropoffDistances.getDistancesFor(dropoff.id);
+
+                for (const auto &pickupEntry: pickupEntries) {
+                    tryTransfers(wu.pVehId, pickupEntry, dVehId, dropoff, lastStopDVehToTransfersDistances,
+                                 transfersToThisDropoffDistances, ellipseContainer, postponedAssignmentsToUse,
+                                 localParetoOptimalTps, localCalc, localBestAssignment, localBestCost,
+                                 localNumAsgnStats);
+                }
+            }
+        }
+
+        void finishPostponedPBNSAssignments(std::vector<AssignmentWithTransfer> &postponedAssignments,
+                                            NumAsgnStats &globalNumAsgnStats) {
+
+            // Group postponed assignments by vehicle ID and finish them
+            std::sort(postponedAssignments.begin(), postponedAssignments.end(), [&](const AssignmentWithTransfer &a,
+                                                                                    const AssignmentWithTransfer &b) {
+                return a.pVeh->vehicleId < b.pVeh->vehicleId;
+            });
+
+            auto startOfCurrentVeh = postponedAssignments.begin();
+            for (auto it = postponedAssignments.begin(); it != postponedAssignments.end(); ++it) {
+                if (it->pVeh->vehicleId != startOfCurrentVeh->pVeh->vehicleId) {
+                    finishAssignmentsWithPickupBNSLowerBound(*startOfCurrentVeh->pVeh,
+                                                             IteratorRange(startOfCurrentVeh, it), globalNumAsgnStats);
+                    startOfCurrentVeh = it;
+                }
+            }
+            if (startOfCurrentVeh != postponedAssignments.end()) {
+                // Finish the last group of assignments
+                finishAssignmentsWithPickupBNSLowerBound(*startOfCurrentVeh->pVeh,
+                                                         IteratorRange(startOfCurrentVeh, postponedAssignments.end()),
+                                                         globalNumAsgnStats);
+            }
+        }
+
+        using RelevantPDLoc = RelevantPDLocs::RelevantPDLoc;
+
+        void tryTransfers(const int pVehId, const RelevantPDLoc &pickupEntry,
+                          const int dVehId, const PDLoc &dropoff,
+                          const ConstantVectorRange<int> &lastStopDVehToTransferDistances,
+                          const ConstantVectorRange<int> &transfersToThisDropoffDistances,
+                          const EdgeEllipseContainer &ellipseContainer,
+                          std::vector<AssignmentWithTransfer> &postponedPBNSAssignments,
+                          std::vector<TPDistances> &localParetoOptimalTps,
+                          CostCalculator &localCalc,
+                          AssignmentWithTransfer &localBestAssignment,
+                          RequestCost &localBestCost,
+                          NumAsgnStats &localNumAsgnStats) {
+            const auto &pVeh = fleet[pVehId];
+            const auto &dVeh = fleet[dVehId];
+            const int numStopsPVeh = routeState.numStopsOf(pVehId);
+            const auto stopIdsPVeh = routeState.stopIdsFor(pVehId);
+            const auto stopLocationsPVeh = routeState.stopLocationsFor(pVehId);
+            const int numStopsDVeh = routeState.numStopsOf(dVehId);
+            const auto stopLocationsDVeh = routeState.stopLocationsFor(dVehId);
+            const auto &pickup = requestState.pickups[pickupEntry.pdId];
+            const auto pickupBns = pickupEntry.stopIndex < numStopsPVeh - 1 && pickupEntry.stopIndex == 0;
+
+            // TODO: allow paired for pVeh
+            for (int i = pickupEntry.stopIndex + 1; i < numStopsPVeh; i++) {
+                const int stopId = stopIdsPVeh[i];
+                const auto &transferPoints = ellipseContainer.getEdgesInEllipse(stopId);
+                localParetoOptimalTps.clear();
+                for (int tpIdx = 0; tpIdx < transferPoints.size(); tpIdx++) {
+                    const auto edge = transferPoints[tpIdx];
+                    const int tpLoc = edge.edge;
+                    KASSERT(isEdgeRel.isSet(tpLoc));
+
+                    // If the pickup or dropoff coincides with the transfer, we skip the assignment
+                    if (pickup.loc == tpLoc || tpLoc == dropoff.loc)
+                        continue;
+
+                    const int tpOffset = inputGraph.travelTime(tpLoc);
+
+                    const bool transferAtLastStopDVeh = tpLoc == stopLocationsDVeh[numStopsDVeh - 1];
+                    const bool transferAtStopPVeh =
+                            tpLoc == stopLocationsPVeh[i] && pickupEntry.stopIndex != i;
+                    const int distToTransferDVeh = transferAtLastStopDVeh ? 0
+                                                                          : lastStopDVehToTransferDistances[relEdgesToInternalIdx[tpLoc]];
+
+                    static const int stopTime = InputConfig::getInstance().stopTime;
+                    // TODO: This will no longer be true if we allow paired for pVeh. Then, we
+                    //  possibly need to set distToTransferPVeh to the pickup to transfer distance.
+                    KASSERT(i != pickupEntry.stopIndex);
+                    const int distToTransferPVeh = transferAtStopPVeh ? 0 : edge.distToTail + tpOffset;
+                    const int distFromTransferPVeh = edge.distFromHead;
+                    const int distNextLegAfterTransferDVeh = transfersToThisDropoffDistances[relEdgesToInternalIdx[tpLoc]];
+                    const int detourPVeh =
+                            distToTransferPVeh + !transferAtStopPVeh * stopTime + distFromTransferPVeh;
+                    const int detourDVeh = distToTransferDVeh + !transferAtLastStopDVeh * stopTime +
+                                           distNextLegAfterTransferDVeh;
+                    const int trip = distToTransferPVeh + distNextLegAfterTransferDVeh;
+                    const bool notDominated = checkPareto(TPDistances(detourPVeh, detourDVeh, trip),
+                                                          localParetoOptimalTps);
+                    if (!notDominated)
+                        continue;
+
+
+                    // Construct the transfer point
+                    TransferPoint tp = TransferPoint(tpLoc, &pVeh, &dVeh);
+                    localNumAsgnStats.numTransferPoints++;
+
+                    tp.distancePVehToTransfer = edge.distToTail + tpOffset;
+                    tp.distancePVehFromTransfer = edge.distFromHead;
+
+                    KASSERT(distToTransferDVeh > 0 || stopLocationsDVeh[numStopsDVeh - 1] == tpLoc);
+                    tp.distanceDVehToTransfer = distToTransferDVeh;
+                    tp.distanceDVehFromTransfer = 0;
+
+                    tp.stopIdxPVeh = i;
+                    tp.stopIdxDVeh = numStopsDVeh - 1;
+
+                    // Build the resulting assignment
+                    AssignmentWithTransfer asgn = AssignmentWithTransfer(&pVeh, &dVeh, tp);
+                    asgn.pickup = &pickup;
+                    asgn.dropoff = &dropoff;
+
+                    asgn.pickupIdx = pickupEntry.stopIndex;
+                    asgn.dropoffIdx = numStopsDVeh - 1;
+                    asgn.transferIdxPVeh = i;
+                    asgn.transferIdxDVeh = numStopsDVeh - 1;
+
+                    asgn.distToPickup = pickupEntry.distToPDLoc;
+                    asgn.distFromPickup = pickupEntry.distFromPDLocToNextStop;
+                    asgn.distToDropoff = transfersToThisDropoffDistances[relEdgesToInternalIdx[tpLoc]];
+                    asgn.distFromDropoff = 0;
+
+                    // Check transfer at stop pVeh
+                    if (transferAtStopPVeh) {
+                        asgn.distToTransferPVeh = 0;
+
+                        const int nextLeg = asgn.transferIdxPVeh < numStopsPVeh - 1 ?
+                                            routeState.schedArrTimesFor(pVehId)[asgn.transferIdxPVeh +
+                                                                                1] -
+                                            routeState.schedDepTimesFor(pVehId)[asgn.transferIdxPVeh]
+                                                                                    : 0;
+                        asgn.distFromTransferPVeh = nextLeg;
+                    }
+
+                    if (pickupBns) {
+                        if (searches.knowsDistance(asgn.pVeh->vehicleId, asgn.pickup->id)) {
+                            asgn.distToPickup = searches.getDistance(asgn.pVeh->vehicleId, asgn.pickup->id);
+                        } else {
+                            asgn.pickupBNSLowerBoundUsed = true;
+                        }
+                    }
+
+                    asgn.distToTransferDVeh = distToTransferDVeh;
+                    asgn.distFromTransferDVeh = 0;
+
+                    asgn.pickupType = pickupBns ? BEFORE_NEXT_STOP : ORDINARY;
+                    asgn.transferTypePVeh = ORDINARY;
+                    asgn.transferTypeDVeh = AFTER_LAST_STOP;
+                    asgn.dropoffType = AFTER_LAST_STOP;
+
+                    // TODO: replace with actual paired distance computed up front when allowing paired
+//                                    if (asgn.pickupIdx == asgn.transferIdxPVeh) {
+//                                        asgn.pickupPairedLowerBoundUsed = true;
+//                                        asgn.distToTransferPVeh = 0;
+//                                        asgn.distFromPickup = 0;
+//                                    }
+
+                    // Try the potentially unfinished assignment
+                    tryPotentiallyUnfinishedAssignment(asgn, postponedPBNSAssignments, localCalc, localBestAssignment,
+                                                       localBestCost, localNumAsgnStats);
+                }
+            }
+        }
+
+        // Skip unnecessary assignments (e.g. if the pickup or dropoff is already at the next stop)
         bool canSkipAssignment(const AssignmentWithTransfer &asgn) const {
             const int numStopsPVeh = routeState.numStopsOf(asgn.pVeh->vehicleId);
             const auto stopLocationsPVeh = routeState.stopLocationsFor(asgn.pVeh->vehicleId);
@@ -528,118 +528,84 @@ namespace karri {
                        asgn.transfer.loc == stopLocationsPVeh[asgn.transferIdxPVeh + 1]);
         }
 
-        void trackAssignmentTypeStatistic(const AssignmentWithTransfer &asgn) {
+        void trackAssignmentTypeStatistic(const AssignmentWithTransfer &asgn, NumAsgnStats &numAsgnStats) {
             switch (asgn.pickupType) {
                 case BEFORE_NEXT_STOP:
-                    numAssignmentsTriedPickupBNS++;
+                    numAsgnStats.numAssignmentsTriedPickupBNS++;
                     break;
 
                 case ORDINARY:
-                    numAssignmentsTriedPickupORD++;
+                    numAsgnStats.numAssignmentsTriedPickupORD++;
                     break;
 
                 default:
                     assert(false);
             }
-            numAssignmentsTriedDropoffALS++;
+            numAsgnStats.numAssignmentsTriedDropoffALS++;
         }
 
-        void tryFinishedAssignment(AssignmentWithTransfer &asgn) {
+        void tryFinishedAssignment(AssignmentWithTransfer &asgn,
+                                   CostCalculator &localCalc,
+                                   AssignmentWithTransfer &localBestAssignment,
+                                   RequestCost &localBestCost,
+                                   NumAsgnStats &numAsgnStats) {
             KASSERT(asgn.isFinished());
 
             if (canSkipAssignment(asgn))
                 return;
 
-            trackAssignmentTypeStatistic(asgn);
+            trackAssignmentTypeStatistic(asgn, numAsgnStats);
 
-            const auto cost = calc.calc(asgn, requestState);
-            requestState.tryFinishedTransferAssignmentWithKnownCost(asgn, cost);
+            const auto cost = localCalc.calc(asgn, requestState);
 
-            if (cost.total < bestCost) {
-                bestCost = cost.total;
-                bestAssignment = asgn;
+            if (cost.total < localBestCost.total) {
+                localBestCost = cost;
+                localBestAssignment = asgn;
             }
         }
 
         void tryPotentiallyUnfinishedAssignment(AssignmentWithTransfer &asgn,
-                                                std::vector<AssignmentWithTransfer> &postponedAssignments) {
+                                                std::vector<AssignmentWithTransfer> &postponedAssignments,
+                                                CostCalculator &localCalc,
+                                                AssignmentWithTransfer &localBestAssignment,
+                                                RequestCost &localBestCost,
+                                                NumAsgnStats &numAsgnStats) {
 
             if (canSkipAssignment(asgn))
                 return;
 
             if (!asgn.isFinished()) {
-                const auto cost = calc.calc(asgn, requestState);
-                if (cost.total <= requestState.getBestCost()) {
+                const auto cost = localCalc.calc(asgn, requestState);
+                if (cost.total <= std::min(requestState.getBestCost(), localBestCost.total)) {
                     postponedAssignments.push_back(asgn);
                 }
             } else {
-                tryFinishedAssignment(asgn);
+                tryFinishedAssignment(asgn, localCalc, localBestAssignment, localBestCost, numAsgnStats);
             }
         }
 
-        void finishAssignmentsWithPickupBNSLowerBound(const Vehicle *pVeh,
-                                                      std::vector<AssignmentWithTransfer> &postponedAssignments) {
-            std::vector<AssignmentWithTransfer> toCalculate;
-            std::vector<AssignmentWithTransfer> pairedAssignments;
+        void finishAssignmentsWithPickupBNSLowerBound(const Vehicle &pVeh,
+                                                      auto &&postponedAssignments,
+                                                      NumAsgnStats &numAsgnStats) {
+
 
             for (const auto &asgn: postponedAssignments) {
-                KASSERT(asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed);
-                if (asgn.pickupBNSLowerBoundUsed) {
-                    searches.addPickupForProcessing(asgn.pickup->id, asgn.distToPickup);
-                    toCalculate.push_back(asgn);
-                    continue;
-                }
-                pairedAssignments.push_back(asgn);
+                KASSERT(asgn.pickupBNSLowerBoundUsed && !asgn.pickupPairedLowerBoundUsed);
+                searches.addPickupForProcessing(asgn.pickup->id, asgn.distToPickup);
             }
 
-            searches.computeExactDistancesVia(*pVeh);
+            searches.computeExactDistancesVia(pVeh);
 
-            std::vector<AssignmentWithTransfer> assignmentsWithTwoLowerBounds;
-            for (auto &asgn: toCalculate) {
-                assert(searches.knowsCurrentLocationOf(pVeh->vehicleId));
-                assert(searches.knowsDistance(pVeh->vehicleId, asgn.pickup->id));
+            for (auto &asgn: postponedAssignments) {
+                KASSERT(searches.knowsCurrentLocationOf(pVeh.vehicleId));
+                KASSERT(searches.knowsDistance(pVeh.vehicleId, asgn.pickup->id));
 
-                const int distance = searches.getDistance(pVeh->vehicleId, asgn.pickup->id);
+                const int distance = searches.getDistance(pVeh.vehicleId, asgn.pickup->id);
                 asgn.distToPickup = distance;
                 asgn.pickupBNSLowerBoundUsed = false;
 
-                tryPotentiallyUnfinishedAssignment(asgn, assignmentsWithTwoLowerBounds);
+                tryFinishedAssignment(asgn, calc, globalBestAssignment, globalBestCost, numAsgnStats);
             }
-
-            postponedAssignments.clear();
-            for (auto &asgn: pairedAssignments) {
-                KASSERT(asgn.pickupPairedLowerBoundUsed);
-                postponedAssignments.push_back(asgn);
-            }
-
-            for (auto &asgn: assignmentsWithTwoLowerBounds) {
-                KASSERT(asgn.pickupPairedLowerBoundUsed);
-                postponedAssignments.push_back(asgn);
-            }
-        }
-
-        void finishAssignmentsWithPickupPairedLowerBound(std::vector<AssignmentWithTransfer> &postponedAssignments) {
-            for (auto &asgn: postponedAssignments) {
-                KASSERT(asgn.pickupPairedLowerBoundUsed);
-
-                // Calculate the paired distance using a point to point query
-                const int pickupLoc = asgn.pickup->loc;
-                const int transferLoc = asgn.transfer.loc;
-
-                const int pickupRank = vehCh.rank(inputGraph.edgeHead(pickupLoc));
-                const int transferRank = vehCh.rank(inputGraph.edgeTail(transferLoc));
-                const int transferOffset = inputGraph.travelTime(transferLoc);
-
-                vehChQuery.run(pickupRank, transferRank);
-                const int pairedDistance = vehChQuery.getDistance() + transferOffset;
-                asgn.distToTransferPVeh = pairedDistance;
-
-                asgn.pickupPairedLowerBoundUsed = false;
-                KASSERT(asgn.isFinished());
-                tryFinishedAssignment(asgn);
-            }
-
-            postponedAssignments.clear();
         }
 
         InputGraphT inputGraph;
@@ -670,27 +636,20 @@ namespace karri {
 
         InsertionAsserterT &asserter;
 
-        AssignmentWithTransfer bestAssignment;
-        int bestCost;
+        struct ThreadLocalData {
+            AssignmentWithTransfer bestAsgn = AssignmentWithTransfer();
+            RequestCost bestCost = RequestCost::INFTY_COST();
+            std::vector<TPDistances> paretoOptimalTps;
+            std::vector<AssignmentWithTransfer> postponedAssignments;
+            NumAsgnStats numAsgnStats;
+        };
 
-        std::vector<TPDistances> paretoOptimalTps;
+        tbb::enumerable_thread_specific<ThreadLocalData> threadLocalData;
+        tbb::enumerable_thread_specific<CostCalculator> threadLocalCalc;
 
-        //* Statistics for the transfer als dveh assignment finder
-        int64_t totalTime;
 
-        // Stats for the PD Locs
-
-        int64_t numPickups;
-        int64_t numDropoffs;
-
-        // Stats for the tried assignments 
-        int64_t numAssignmentsTriedPickupBNS;
-        int64_t numAssignmentsTriedPickupORD;
-
-        int64_t numAssignmentsTriedDropoffALS;
-
-        // Stats for the transfer search itself
-        int64_t numTransferPoints;
+        AssignmentWithTransfer globalBestAssignment;
+        RequestCost globalBestCost;
 
     };
 }
