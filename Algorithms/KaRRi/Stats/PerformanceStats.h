@@ -579,6 +579,7 @@ namespace karri::stats {
 
         // Search from last stop to all stops
         int64_t searchTimeLastStopToTransfer;
+        int64_t searchTimePickupToTransfer;
         int64_t searchTimeTransferToDropoff;
 
         static constexpr auto LOGGER_NAME = "perf_transf_als_dveh.csv";
@@ -596,6 +597,7 @@ namespace karri::stats {
                 "try_assignments_time,"
                 "num_transfer_points,"
                 "search_time_last_stop_to_transfer,"
+                "search_time_pickup_to_transfer,"
                 "search_time_transfer_to_dropoff\n";
 
         std::string getLoggerRow() const {
@@ -616,6 +618,7 @@ namespace karri::stats {
                << numTransferPoints << ", "
 
                << searchTimeLastStopToTransfer << ", "
+                << searchTimePickupToTransfer << ", "
                << searchTimeTransferToDropoff;
             return ss.str();
         }
@@ -637,7 +640,7 @@ namespace karri::stats {
             numAssignmentsTriedDropoffALS = 0;
             tryAssignmentsTime = 0;
             numTransferPoints = 0;
-
+            searchTimePickupToTransfer = 0;
             searchTimeLastStopToTransfer = 0;
             searchTimeTransferToDropoff = 0;
         }
