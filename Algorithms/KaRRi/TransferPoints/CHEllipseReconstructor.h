@@ -412,6 +412,13 @@ namespace karri {
 
                     // Make sure ellipse at least contains edges on shortest path
 
+                    // If the stop is the last stop of the vehicle, the ellipse should only contain the stop itself.
+                    if (stopIdx == routeState.numStopsOf(vehId) - 1) {
+                        KASSERT(ellipse.size() == 1);
+                        KASSERT(ellipse[0].edge == stopLocs[stopIdx]);
+                        continue;
+                    }
+
                     // If stopId is at position 0 in the route and the stop at position 1 has just been inserted as an
                     // intermediate stop, we never generated target entries for stop at position 0 so the ellipse will be
                     // empty. This is okay, since the vehicle is already at this intermediate stop so we can ignore the

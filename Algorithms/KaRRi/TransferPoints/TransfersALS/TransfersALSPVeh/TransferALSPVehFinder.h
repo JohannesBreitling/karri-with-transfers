@@ -73,7 +73,7 @@ namespace karri {
                 numAssignmentsTriedDropoffALS = 0;
             }
 
-            NumAsgnStats& operator+=(const NumAsgnStats &other) {
+            NumAsgnStats &operator+=(const NumAsgnStats &other) {
                 numTransferPoints += other.numTransferPoints;
                 numAssignmentsTriedPickupBNS += other.numAssignmentsTriedPickupBNS;
                 numAssignmentsTriedPickupORD += other.numAssignmentsTriedPickupORD;
@@ -123,7 +123,7 @@ namespace karri {
             dVehStopsFlags(fleet.size()),
             isEdgeRel(inputGraph.numEdges()),
             relEdgesToInternalIdx(inputGraph.numEdges()),
-            threadLocalCalc([&](){ return CostCalculator(routeState, fleet);}) {}
+            threadLocalCalc([&]() { return CostCalculator(routeState, fleet); }) {}
 
         void init() {}
 
@@ -271,7 +271,7 @@ namespace karri {
             globalBestCost = RequestCost::INFTY_COST();
             globalBestAssignment = AssignmentWithTransfer();
 
-            for (auto & local : threadLocalData) {
+            for (auto &local: threadLocalData) {
                 local.bestAsgn = AssignmentWithTransfer();
                 local.bestCost = RequestCost::INFTY_COST();
                 local.paretoOptimalTps.clear();
@@ -281,9 +281,9 @@ namespace karri {
 
             // Process all work units
             tbb::parallel_for(0ul, workUnits.size(), [&](const auto i) {
-               const auto& wu = workUnits[i];
-                auto& local = threadLocalData.local();
-                auto& localCalc = threadLocalCalc.local();
+                const auto &wu = workUnits[i];
+                auto &local = threadLocalData.local();
+                auto &localCalc = threadLocalCalc.local();
                 processWorkUnit(wu, relALSDropoffs, lastStopToTransfersDistances, pickupsToTransfersDistances,
                                 transfersToDropoffsDistances, ellipseContainer, local.postponedAssignments,
                                 local.paretoOptimalTps, localCalc, local.bestAsgn, local.bestCost, local.numAsgnStats);
@@ -291,7 +291,7 @@ namespace karri {
 
             std::vector<AssignmentWithTransfer> postponedPBNSAssignments;
             NumAsgnStats globalNumAsgnStats;
-            for (auto &local : threadLocalData) {
+            for (auto &local: threadLocalData) {
                 postponedPBNSAssignments.insert(postponedPBNSAssignments.end(),
                                                 std::make_move_iterator(local.postponedAssignments.begin()),
                                                 std::make_move_iterator(local.postponedAssignments.end()));
@@ -408,16 +408,19 @@ namespace karri {
                              CostCalculator &localCalc,
                              AssignmentWithTransfer &localBestAssignment,
                              RequestCost &localBestCost,
-                             NumAsgnStats& localNumAsgnStats) {
+                             NumAsgnStats &localNumAsgnStats) {
             static std::vector<AssignmentWithTransfer> placeholderPostponedAssignments;
             KASSERT(placeholderPostponedAssignments.empty());
             static std::vector<int> placeholderLastStopDistances;
             static ConstantVectorRange<int> placeholderLastStopDistanceRange(
                     placeholderLastStopDistances.begin(), placeholderLastStopDistances.end());
+            static int placeholderMinLastStopDistance  = INFTY;
 
             if (wu.pVehType == ORDINARY || wu.pVehType == BEFORE_NEXT_STOP) {
 
                 const auto &thisLastStopToTransfersDistances = lastStopToTransfersDistances.getDistancesFor(
+                        relPVehToInternalIdx[wu.pVehId]);
+                const int minThisLastStopToTransferDistance = lastStopToTransfersDistances.getMinDistanceFor(
                         relPVehToInternalIdx[wu.pVehId]);
 
                 const auto &pickupEntries = wu.pVehType == ORDINARY ?
@@ -429,14 +432,17 @@ namespace karri {
                 for (const auto &pickupEntry: pickupEntries) {
                     const auto &thisPickupToTransfersDistances = pickupsToTransfersDistances.getDistancesFor(
                             pickupEntry.pdId);
+                    const int minThisPickupToTransferDistance = pickupsToTransfersDistances.getMinDistanceFor(pickupEntry.pdId);
                     if (wu.dVehType == ORDINARY) {
                         tryDropoffORD(wu.pVehId, pickupEntry, wu.dVehId, postponedToUse,
-                                      thisLastStopToTransfersDistances, thisPickupToTransfersDistances,
+                                      thisLastStopToTransfersDistances, minThisLastStopToTransferDistance,
+                                      thisPickupToTransfersDistances, minThisPickupToTransferDistance,
                                       transfersToDropoffsDistances, ellipseContainer, localParetoOptimalTps,
                                       localCalc, localBestAssignment, localBestCost, localNumAsgnStats);
                     } else if (wu.dVehType == AFTER_LAST_STOP) {
                         tryDropoffALS(wu.pVehId, pickupEntry, wu.dVehId, relALSDropoffs, postponedToUse,
-                                      thisLastStopToTransfersDistances, thisPickupToTransfersDistances,
+                                      thisLastStopToTransfersDistances, minThisLastStopToTransferDistance,
+                                      thisPickupToTransfersDistances, minThisPickupToTransferDistance,
                                       transfersToDropoffsDistances, ellipseContainer, localParetoOptimalTps,
                                       localCalc, localBestAssignment, localBestCost, localNumAsgnStats);
                     }
@@ -449,26 +455,28 @@ namespace karri {
                     if (distanceToPickup >= INFTY)
                         continue; // Pickup is not reachable
 
-                    const int minDistToTransfer = pickupsToTransfersDistances.getMinDistanceFor(pickup.id);
-                    if (minDistToTransfer >= INFTY)
+                    const int minThisPickupToTransferDistance = pickupsToTransfersDistances.getMinDistanceFor(pickup.id);
+                    if (minThisPickupToTransferDistance >= INFTY)
                         continue; // No transfer is reachable from this pickup
 
                     KASSERT(!relALSDropoffs.getVehiclesWithRelevantPDLocs().empty() ||
                             !relORDDropoffs.getVehiclesWithRelevantPDLocs().empty());
                     const auto &thisPickupToTransfersDistances = pickupsToTransfersDistances.getDistancesFor(
                             pickup.id);
-                    KASSERT(minDistToTransfer == *std::min_element(thisPickupToTransfersDistances.begin(),
+                    KASSERT(minThisPickupToTransferDistance == *std::min_element(thisPickupToTransfersDistances.begin(),
                                                                    thisPickupToTransfersDistances.end()));
 
                     if (wu.dVehType == ORDINARY) {
                         tryDropoffORDForPickupALS(wu.pVehId, pickup, distanceToPickup, wu.dVehId,
-                                                  placeholderLastStopDistanceRange, thisPickupToTransfersDistances,
+                                                  placeholderLastStopDistanceRange, placeholderMinLastStopDistance,
+                                                  thisPickupToTransfersDistances, minThisPickupToTransferDistance,
                                                   transfersToDropoffsDistances, ellipseContainer, localParetoOptimalTps,
                                                   localCalc, localBestAssignment, localBestCost,
                                                   localNumAsgnStats);
                     } else if (wu.dVehType == AFTER_LAST_STOP) {
                         tryDropoffALSForPickupALS(wu.pVehId, pickup, distanceToPickup, wu.dVehId,
-                                                  placeholderLastStopDistanceRange, thisPickupToTransfersDistances,
+                                                  placeholderLastStopDistanceRange, placeholderMinLastStopDistance,
+                                                  thisPickupToTransfersDistances, minThisPickupToTransferDistance,
                                                   transfersToDropoffsDistances, relALSDropoffs, ellipseContainer,
                                                   localParetoOptimalTps, localCalc, localBestAssignment, localBestCost,
                                                   localNumAsgnStats);
@@ -492,10 +500,12 @@ namespace karri {
             optimalDistances.push_back(newTpDist);
 
             // Remove any distances that are dominated by the newTpDist
-            for (int i = 0; i < optimalDistances.size();) {
+            auto numOpt = optimalDistances.size();
+            for (int i = 0; i < numOpt;) {
                 if (TPDistances::dominates(newTpDist, optimalDistances[i])) {
                     std::swap(optimalDistances[i], optimalDistances.back());
                     optimalDistances.pop_back();
+                    --numOpt;
                     continue;
                 }
                 ++i;
@@ -507,14 +517,16 @@ namespace karri {
         void tryDropoffORD(const int pVehId, const RelevantPDLoc &pickupEntry, const int dVehId,
                            std::vector<AssignmentWithTransfer> &postponedAssignments,
                            const ConstantVectorRange<int> &thisLastStopToTransfersDistances,
+                           const int minThisLastStopToTransferDistance,
                            const ConstantVectorRange<int> &thisPickupToTransfersDistances,
+                           const int minThisPickupToTransferDistance,
                            const FlatRegular2DDistanceArray &transfersToDropoffsDistances,
                            const EdgeEllipseContainer &ellipseContainer,
                            std::vector<TPDistances> &localParetoOptimalTps,
                            CostCalculator &localCalc,
                            AssignmentWithTransfer &localBestAssignment,
                            RequestCost &localBestCost,
-                           NumAsgnStats& localNumAsgnStats) {
+                           NumAsgnStats &localNumAsgnStats) {
 
             for (const auto &dropoffEntry: relORDDropoffs.relevantSpotsFor(dVehId)) {
                 if (dropoffEntry.stopIndex == routeState.numStopsOf(dVehId) - 1)
@@ -522,11 +534,15 @@ namespace karri {
 
                 const auto &transfersToThisDropoffDistances = transfersToDropoffsDistances.getDistancesFor(
                         dropoffEntry.pdId);
+                const int minTransferToThisDropoffDistance =
+                        transfersToDropoffsDistances.getMinDistanceFor(dropoffEntry.pdId);
 
-                tryTransfers(pVehId, pickupEntry, dVehId, dropoffEntry, thisLastStopToTransfersDistances,
-                             thisPickupToTransfersDistances, transfersToThisDropoffDistances, ellipseContainer,
-                             localParetoOptimalTps, postponedAssignments, localCalc, localBestAssignment,
-                             localBestCost, localNumAsgnStats);
+                tryTransfers(pVehId, pickupEntry, dVehId, dropoffEntry,
+                             thisLastStopToTransfersDistances, minThisLastStopToTransferDistance,
+                             thisPickupToTransfersDistances, minThisPickupToTransferDistance,
+                             transfersToThisDropoffDistances, minTransferToThisDropoffDistance,
+                             ellipseContainer, localParetoOptimalTps, postponedAssignments, localCalc,
+                             localBestAssignment, localBestCost, localNumAsgnStats);
             }
 
         }
@@ -535,40 +551,47 @@ namespace karri {
                            const RelevantDropoffsAfterLastStop &relALSDropoffs,
                            std::vector<AssignmentWithTransfer> &postponedAssignments,
                            const ConstantVectorRange<int> &thisLastStopToTransfersDistances,
+                           const int minThisLastStopToTransferDistance,
                            const ConstantVectorRange<int> &thisPickupToTransfersDistances,
+                           const int minThisPickupToTransferDistance,
                            const FlatRegular2DDistanceArray &transfersToDropoffsDistances,
                            const EdgeEllipseContainer &ellipseContainer,
                            std::vector<TPDistances> &localParetoOptimalTps,
                            CostCalculator &localCalc,
                            AssignmentWithTransfer &localBestAssignment,
                            RequestCost &localBestCost,
-                           NumAsgnStats& localNumAsgnStats) {
+                           NumAsgnStats &localNumAsgnStats) {
 
             const auto numStopsDVeh = routeState.numStopsOf(dVehId);
             for (const auto &dropoffEntry: relALSDropoffs.relevantSpotsFor(dVehId)) {
                 const auto &transfersToThisDropoffDistances = transfersToDropoffsDistances.getDistancesFor(
                         dropoffEntry.dropoffId);
+                const int minTransferToThisDropoffDistance =
+                        transfersToDropoffsDistances.getMinDistanceFor(dropoffEntry.dropoffId);
                 const auto dropoffEntryExtended = RelevantPDLoc(numStopsDVeh - 1, dropoffEntry.dropoffId,
                                                                 dropoffEntry.distToDropoff, 0);
                 tryTransfers(pVehId, pickupEntry, dVehId, dropoffEntryExtended,
-                             thisLastStopToTransfersDistances, thisPickupToTransfersDistances,
-                             transfersToThisDropoffDistances, ellipseContainer, localParetoOptimalTps,
-                             postponedAssignments, localCalc, localBestAssignment, localBestCost,
-                             localNumAsgnStats);
+                             thisLastStopToTransfersDistances, minThisLastStopToTransferDistance,
+                             thisPickupToTransfersDistances, minThisPickupToTransferDistance,
+                             transfersToThisDropoffDistances, minTransferToThisDropoffDistance,
+                             ellipseContainer, localParetoOptimalTps, postponedAssignments, localCalc,
+                             localBestAssignment, localBestCost, localNumAsgnStats);
             }
         }
 
         void tryDropoffORDForPickupALS(const int pVehId, const PDLoc &pickup, const int distanceToPickup,
                                        const int dVehId,
                                        const ConstantVectorRange<int> &thisLastStopToTransfersDistances,
+                                       const int minThisLastStopToTransferDistance,
                                        const ConstantVectorRange<int> &thisPickupToTransfersDistances,
+                                       const int minThisPickupToTransferDistance,
                                        const FlatRegular2DDistanceArray &transfersToDropoffsDistances,
                                        const EdgeEllipseContainer &ellipseContainer,
                                        std::vector<TPDistances> &localParetoOptimalTps,
                                        CostCalculator &localCalc,
                                        AssignmentWithTransfer &localBestAssignment,
                                        RequestCost &localBestCost,
-                                       NumAsgnStats& localNumAsgnStats) {
+                                       NumAsgnStats &localNumAsgnStats) {
 
             if (distanceToPickup >= INFTY)
                 return;
@@ -587,18 +610,24 @@ namespace karri {
 
                 const auto &transfersToThisDropoffDistances = transfersToDropoffsDistances.getDistancesFor(
                         dropoffEntry.pdId);
+                const int minTransferToThisDropoffDistance =
+                        transfersToDropoffsDistances.getMinDistanceFor(dropoffEntry.pdId);
 
-                tryTransfers(pVehId, pickupEntry, dVehId, dropoffEntry, thisLastStopToTransfersDistances,
-                             thisPickupToTransfersDistances, transfersToThisDropoffDistances, ellipseContainer,
-                             localParetoOptimalTps, placeholder, localCalc, localBestAssignment, localBestCost,
-                             localNumAsgnStats);
+                tryTransfers(pVehId, pickupEntry, dVehId, dropoffEntry,
+                             thisLastStopToTransfersDistances, minThisLastStopToTransferDistance,
+                             thisPickupToTransfersDistances, minThisPickupToTransferDistance,
+                             transfersToThisDropoffDistances, minTransferToThisDropoffDistance,
+                             ellipseContainer, localParetoOptimalTps, placeholder, localCalc,
+                             localBestAssignment, localBestCost, localNumAsgnStats);
             }
         }
 
         void tryDropoffALSForPickupALS(const int pVehId, const PDLoc &pickup, const int distanceToPickup,
                                        const int dVehId,
                                        const ConstantVectorRange<int> &thisLastStopToTransfersDistances,
+                                       const int minThisLastStopToTransferDistance,
                                        const ConstantVectorRange<int> &thisPickupToTransfersDistances,
+                                       const int minThisPickupToTransferDistance,
                                        const FlatRegular2DDistanceArray &transfersToDropoffsDistances,
                                        const RelevantDropoffsAfterLastStop &relALSDropoffs,
                                        const EdgeEllipseContainer &ellipseContainer,
@@ -606,7 +635,7 @@ namespace karri {
                                        CostCalculator &localCalc,
                                        AssignmentWithTransfer &localBestAssignment,
                                        RequestCost &localBestCost,
-                                       NumAsgnStats& localNumAsgnStats) {
+                                       NumAsgnStats &localNumAsgnStats) {
             KASSERT(distanceToPickup < INFTY);
 
             const auto numStopsPVeh = routeState.numStopsOf(pVehId);
@@ -621,12 +650,16 @@ namespace karri {
 
                 const auto &transfersToThisDropoffDistances = transfersToDropoffsDistances.getDistancesFor(
                         dropoffEntry.dropoffId);
+                const int minTransferToThisDropoffDistance =
+                        transfersToDropoffsDistances.getMinDistanceFor(dropoffEntry.dropoffId);
                 const auto dropoffEntryExtended = RelevantPDLoc(numStopsDVeh - 1, dropoffEntry.dropoffId,
                                                                 dropoffEntry.distToDropoff, 0);
                 tryTransfers(pVehId, pickupEntry, dVehId, dropoffEntryExtended,
-                             thisLastStopToTransfersDistances, thisPickupToTransfersDistances,
-                             transfersToThisDropoffDistances, ellipseContainer, localParetoOptimalTps,
-                             placeholder, localCalc, localBestAssignment, localBestCost, localNumAsgnStats);
+                             thisLastStopToTransfersDistances, minThisLastStopToTransferDistance,
+                             thisPickupToTransfersDistances, minThisPickupToTransferDistance,
+                             transfersToThisDropoffDistances, minTransferToThisDropoffDistance,
+                             ellipseContainer, localParetoOptimalTps, placeholder, localCalc,
+                             localBestAssignment, localBestCost, localNumAsgnStats);
             }
 
         }
@@ -636,17 +669,22 @@ namespace karri {
                           const int dVehId,
                           const RelevantPDLoc &dropoffEntry,
                           const ConstantVectorRange<int> &pVehLastStopToTransfersDistances,
+                          const int minPVehLastStopToTransferDistance,
                           const ConstantVectorRange<int> &thisPickupToTransfersDistances,
+                          const int minThisPickupToTransferDistance,
                           const ConstantVectorRange<int> &transfersToThisDropoffDistances,
+                          const int minTransferToThisDropoffDistance,
                           const EdgeEllipseContainer &ellipseContainer,
                           std::vector<TPDistances> &localParetoOptimalTps,
                           std::vector<AssignmentWithTransfer> &localPostponedAssignments,
                           CostCalculator &localCalc,
                           AssignmentWithTransfer &localBestAssignment,
                           RequestCost &localBestCost,
-                          NumAsgnStats& localNumAsgnStats) {
+                          NumAsgnStats &localNumAsgnStats) {
             const auto *pVeh = &fleet[pVehId];
             const auto numStopsPVeh = routeState.numStopsOf(pVehId);
+            const auto schedArrTimesPVeh = routeState.schedArrTimesFor(pVehId);
+            const auto schedDepTimesPVeh = routeState.schedDepTimesFor(pVehId);
             const auto *dVeh = &fleet[dVehId];
             const auto numStopsDVeh = routeState.numStopsOf(dVehId);
             const auto stopIdsDVeh = routeState.stopIdsFor(dVehId);
@@ -667,8 +705,26 @@ namespace karri {
                                                                                                       pickupEntry.pdId);
             }
 
-            // Compute part of cost lower bound that depends only on the dropoff
             using namespace time_utils;
+            // Compute part of cost lower bound that depends only on the pickup
+            const int depTimeAtPickup = getActualDepTimeAtPickup(pVehId, pickupEntry.stopIndex, distanceToPickup,
+                                                                 pickup, requestState, routeState);
+            const int minInitialPickupDetour =
+                    calcInitialPickupDetour(pVehId, pickupEntry.stopIndex, numStopsPVeh - 1, depTimeAtPickup,
+                                            pickupEntry.distFromPDLocToNextStop, requestState, routeState);
+            const auto pVehVehWaitTimeFromPickupToEndOfRoute =
+                    getTotalVehWaitTimeInInterval(pVehId, pickupEntry.stopIndex, numStopsPVeh - 1, routeState);
+            const auto minResPickupDetour =
+                    std::max(minInitialPickupDetour - pVehVehWaitTimeFromPickupToEndOfRoute, 0) +
+                    (pickupEntry.stopIndex == numStopsPVeh - 1 ? minThisPickupToTransferDistance
+                                                               : minPVehLastStopToTransferDistance);
+            const int minTripTimeUntilTransfer =
+                    pickupEntry.stopIndex == numStopsPVeh - 1 ? minThisPickupToTransferDistance :
+                    pickupEntry.distFromPDLocToNextStop + minPVehLastStopToTransferDistance +
+                    (pickupEntry.stopIndex + 1 < numStopsPVeh - 1 ? schedArrTimesPVeh[numStopsPVeh - 1] -
+                                                                     schedDepTimesPVeh[pickupEntry.stopIndex + 1] : 0);
+
+            // Compute part of cost lower bound that depends only on the dropoff
             const bool dropoffAtExistingStop = isDropoffAtExistingStop(dVehId, INVALID_INDEX,
                                                                        dropoffEntry.stopIndex,
                                                                        dropoff.loc, routeState);
@@ -693,14 +749,17 @@ namespace karri {
                 // Compute lower bound for costs with transfer between i and i + 1, considering trip time
                 // from stop i + 1 to the dropoff and detour to the dropoff. This lower bound also holds for
                 // any stop before i so if it is worse than the best known cost, we can stop for this vehicle.
-                const auto minTripTimeToStopBeforeDropoff =
-                        schedArrTimesDVeh[dropoffEntry.stopIndex] - schedDepTimesDVeh[i + 1];
-                const int minTripTimeToDropoff =
-                        std::max(requestState.minDirectPDDist, minTripTimeToStopBeforeDropoff +
-                                                               dropoffEntry.distToPDLoc) + dropoff.walkingDist;
+                const auto minTripTimeTransferToDropoffViaStops =
+                        i + 1 >= dropoffEntry.stopIndex ? 0 : dropoffEntry.distToPDLoc +
+                                                              schedArrTimesDVeh[dropoffEntry.stopIndex] -
+                                                              schedDepTimesDVeh[i + 1];
+                const int minTripTimeFromTransfer =
+                        std::max(minTransferToThisDropoffDistance, minTripTimeTransferToDropoffViaStops +
+                                                                   dropoffEntry.distToPDLoc) + dropoff.walkingDist;
+                using F = CostCalculator::CostFunction;
                 const int minCostFromHere =
-                        CostCalculator::CostFunction::calcTripCost(minTripTimeToDropoff, requestState) +
-                        minDropoffCostWithoutTrip;
+                        F::calcTripCost(minTripTimeUntilTransfer + minTripTimeFromTransfer, requestState) +
+                        F::calcVehicleCost(minResPickupDetour) + minDropoffCostWithoutTrip;
                 if (minCostFromHere > std::min(localBestCost.total, requestState.getBestCost()))
                     break;
 
@@ -710,9 +769,8 @@ namespace karri {
                 localParetoOptimalTps.clear();
 
                 // Loop over all possible transfer points
-                for (int tpIdx = 0; tpIdx < transferPoints.size(); tpIdx++) {
+                for (auto edge: transferPoints) {
                     // Build the transfer point
-                    const auto edge = transferPoints[tpIdx];
                     const int transferLoc = edge.edge;
                     KASSERT(isEdgeRel.isSet(transferLoc));
 
@@ -923,7 +981,7 @@ namespace karri {
         }
 
         void trackAssignmentTypeStatistic(const AssignmentWithTransfer &asgn,
-                                          NumAsgnStats& stats) {
+                                          NumAsgnStats &stats) {
             switch (asgn.pickupType) {
                 case BEFORE_NEXT_STOP:
                     stats.numAssignmentsTriedPickupBNS++;
@@ -991,7 +1049,7 @@ namespace karri {
         }
 
         void finishPostponedPBNSAssignments(std::vector<AssignmentWithTransfer> &postponedAssignments,
-                                              NumAsgnStats& globalNumAsgnStats) {
+                                            NumAsgnStats &globalNumAsgnStats) {
 
             // Group postponed assignments by vehicle ID and finish them
             std::sort(postponedAssignments.begin(), postponedAssignments.end(), [&](const AssignmentWithTransfer &a,

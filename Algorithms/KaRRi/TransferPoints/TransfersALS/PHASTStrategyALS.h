@@ -74,7 +74,6 @@ namespace karri {
         }
 
 
-
         // Initializes the strategy with the given transfer points.
         // If RunSelectionPhase is true, RPHAST is used, and a selection phase is run for the given transfer points.
         // If it is false, PHAST is used (with no selection specific to the transfer points).
@@ -135,14 +134,16 @@ namespace karri {
 
                 for (int i = batchStart; i < batchEnd; ++i) {
                     const int idxOffset = i * result.width;
+                    const int lastStopLoc = lastStopLocs[i];
                     int minDistanceInRow = INFTY;
                     for (int j = 0; j < transferPoints.size(); j++) {
                         const int tpLoc = transferPoints[j];
                         const int tpTail = inputGraph.edgeTail(tpLoc);
                         const int tpRank = vehCh.rank(tpTail);
                         const int tpRankSelection = chosenTargetsSelection->fullToSubMapping[tpRank];
-                        const int distance = forwardQuery.getDistance(tpRankSelection, i - batchStart) +
-                                             inputGraph.travelTime(tpLoc);
+                        const int distance =
+                                tpLoc == lastStopLoc ? 0 : forwardQuery.getDistance(tpRankSelection, i - batchStart) +
+                                                           inputGraph.travelTime(tpLoc);
 
                         result.distances[idxOffset + j] = distance;
                         minDistanceInRow = std::min(minDistanceInRow, distance);
@@ -302,7 +303,7 @@ namespace karri {
         Query forwardQuery;
         Query reverseQuery;
 
-        LoggerT& selectionLogger;
+        LoggerT &selectionLogger;
 
     };
 

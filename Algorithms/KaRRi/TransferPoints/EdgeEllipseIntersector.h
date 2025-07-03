@@ -168,6 +168,9 @@ namespace karri {
                                std::vector<TransferPoint> &result) {
             result.clear();
 
+            const auto* pVehPtr = &fleet[pVehId];
+            const auto* dVehPtr = &fleet[dVehId];
+
             auto itEdgesPVeh = ellipsePVeh.begin();
             auto itEdgesDVeh = ellipseDVeh.begin();
             const auto endEdgesPVeh = ellipsePVeh.end();
@@ -187,21 +190,17 @@ namespace karri {
                 }
 
                 const int loc = edgePVeh.edge;
-                const int distPVehToTransfer =
-                        edgePVeh.distToTail + inputGraph.travelTime(loc);
+                const int distPVehToTransfer = edgePVeh.distToTail + inputGraph.travelTime(loc);
                 const int distPVehFromTransfer = edgePVeh.distFromHead;
-                const int distDVehToTransfer =
-                        edgeDVeh.distToTail + inputGraph.travelTime(loc);
+                const int distDVehToTransfer = edgeDVeh.distToTail + inputGraph.travelTime(loc);
                 const int distDVehFromTransfer = edgeDVeh.distFromHead;
 
 
                 ++itEdgesPVeh;
                 ++itEdgesDVeh;
 
-                const auto tp = TransferPoint(loc, &fleet[pVehId], &fleet[dVehId], stopIdxPVeh,
-                                              stopIdxDVeh, distPVehToTransfer,
-                                              distPVehFromTransfer,
-                                              distDVehToTransfer, distDVehFromTransfer);
+                const auto tp = TransferPoint(loc, pVehPtr, dVehPtr, stopIdxPVeh, stopIdxDVeh, distPVehToTransfer,
+                                              distPVehFromTransfer, distDVehToTransfer, distDVehFromTransfer);
 
                 // Check whether known transfer points dominate tp
                 bool dominated = false;
@@ -217,10 +216,12 @@ namespace karri {
 
                 // If tp is not dominated, add it to result and remove any dominated by tp
                 result.push_back(tp);
-                for (int i = 0; i < result.size();) {
+                auto numOpt = result.size();
+                for (int i = 0; i < numOpt;) {
                     if (transferPointDominates(tp, result[i])) {
                         std::swap(result[i], result.back());
                         result.pop_back();
+                        --numOpt;
                         continue;
                     }
                     ++i;
