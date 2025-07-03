@@ -163,6 +163,9 @@ namespace karri {
 
 
             // Loop over all the possible combinations of stop pairs between which an ordinary transfer is possible
+            int64_t tryPostponedTime = 0;
+            int64_t numPostponed = 0;
+            Timer postponedTimer;
             innerTimer.restart();
             std::vector<AssignmentWithTransfer> promisingPartials;
             std::vector<AssignmentWithTransfer> postponedFullAssignments;
@@ -201,11 +204,16 @@ namespace karri {
                         continue;
 
                     // Finish the postponed assignments
+                    numPostponed += postponedFullAssignments.size();
+                    postponedTimer.restart();
                     finishAssignments(pVehId, dVehId, postponedFullAssignments);
+                    tryPostponedTime += postponedTimer.elapsed<std::chrono::nanoseconds>();
 
                     postponedFullAssignments.clear();
                 }
             }
+
+
             const auto tryAssignmentsTime = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             // Write the statss
@@ -225,6 +233,8 @@ namespace karri {
             stats.numAssignmentsTriedDropoffORD += numAssignmentsTriedDropoffORD;
             stats.numAssignmentsTriedDropoffALS += numAssignmentsTriedDropoffALS;
             stats.tryAssignmentsTime += tryAssignmentsTime;
+            stats.tryPostponedAssignmentsTime += tryPostponedTime;
+            stats.numPostponedAssignments += numPostponed;
             stats.numStopPairs += numStopPairs;
             stats.numTransferPoints += numTransferPoints;
             stats.intersectEllipsesTime += intersectEllipsesTime;

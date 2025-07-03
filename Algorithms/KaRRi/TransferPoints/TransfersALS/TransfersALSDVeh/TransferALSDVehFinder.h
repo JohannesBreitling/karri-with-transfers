@@ -247,7 +247,10 @@ namespace karri {
                 globalNumAsgnStats += local.numAsgnStats;
             }
 
+            Timer finishPbnsTimer;
+            const auto numPostponedPbnsAssignments = postponedPBNSAssignments.size();
             finishPostponedPBNSAssignments(postponedPBNSAssignments, globalNumAsgnStats);
+            const auto finishPbnsTime = finishPbnsTimer.elapsed<std::chrono::nanoseconds>();
 
             // Try best assignment found
             if (globalBestCost.total < INFTY)
@@ -270,6 +273,8 @@ namespace karri {
             stats.numAssignmentsTriedPickupORD += globalNumAsgnStats.numAssignmentsTriedPickupORD;
             stats.numAssignmentsTriedDropoffALS += globalNumAsgnStats.numAssignmentsTriedDropoffALS;
             stats.tryAssignmentsTime += tryAssignmentsTime;
+            stats.tryPostponedAssignmentsTime += finishPbnsTime;
+            stats.numPostponedAssignments += numPostponedPbnsAssignments;
             stats.numTransferPoints += globalNumAsgnStats.numTransferPoints;
 
             stats.searchTimeLastStopToTransfer += searchTimeLastStopToTransfer;

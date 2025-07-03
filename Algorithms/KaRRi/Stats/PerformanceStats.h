@@ -317,24 +317,25 @@ namespace karri::stats {
                 "total_time\n";
 
         int64_t getTotalTime() const {
-            return initTime + withoutLeewaySearchTime + withoutLeewayConvertToEdgesTime + withLeewaySearchTime + withLeewayConvertToEdgesTime;
+            return initTime + withoutLeewaySearchTime + withoutLeewayConvertToEdgesTime + withLeewaySearchTime +
+                   withLeewayConvertToEdgesTime;
         }
 
         std::string getLoggerRow() const {
             std::stringstream ss;
             ss << withoutLeewayNumEllipses << ", "
-            << withoutLeewaySumSizesEllipses << ", "
-            << withLeewayNumEllipses << ", "
-            << withLeewaySumSizesEllipses << ", "
-            << initTime << ", "
-            << withoutLeewaySearchTime << ", "
-            << withoutLeewayConvertToEdgesTime << ", "
-            << withLeewaySearchTime << ", "
-            << withLeewayConvertToEdgesTime << ", "
-            << withLeewayQuery_initTime << ", "
-            << withLeewayQuery_topoSearchTime << ", "
-            << withLeewayQuery_postprocessTime << ", "
-            << getTotalTime();
+               << withoutLeewaySumSizesEllipses << ", "
+               << withLeewayNumEllipses << ", "
+               << withLeewaySumSizesEllipses << ", "
+               << initTime << ", "
+               << withoutLeewaySearchTime << ", "
+               << withoutLeewayConvertToEdgesTime << ", "
+               << withLeewaySearchTime << ", "
+               << withLeewayConvertToEdgesTime << ", "
+               << withLeewayQuery_initTime << ", "
+               << withLeewayQuery_topoSearchTime << ", "
+               << withLeewayQuery_postprocessTime << ", "
+               << getTotalTime();
             return ss.str();
         }
 
@@ -379,6 +380,8 @@ namespace karri::stats {
         int64_t numAssignmentsTriedDropoffALS;
 
         int64_t tryAssignmentsTime;
+        int64_t tryPostponedAssignmentsTime;
+        int64_t numPostponedAssignments;
 
         // Stats for the transfer search itself
         int64_t numStopPairs;
@@ -401,6 +404,8 @@ namespace karri::stats {
                 "num_assignments_dropoff_ord,"
                 "num_assignments_dropoff_als,"
                 "try_assignments_time,"
+                "try_postponed_assignments_time,"
+                "num_postponed_assignments,"
                 "num_stop_pairs,"
                 "num_transfer_points,"
                 "intersect_ellipses_time\n";
@@ -421,6 +426,8 @@ namespace karri::stats {
                << numAssignmentsTriedDropoffORD << ", "
                << numAssignmentsTriedDropoffALS << ", "
                << tryAssignmentsTime << ", "
+               << tryPostponedAssignmentsTime << ", "
+               << numPostponedAssignments << ", "
                << numStopPairs << ", "
                << numTransferPoints << ", "
                << intersectEllipsesTime;
@@ -446,6 +453,8 @@ namespace karri::stats {
             numAssignmentsTriedDropoffORD = 0;
             numAssignmentsTriedDropoffALS = 0;
             tryAssignmentsTime = 0;
+            tryPostponedAssignmentsTime = 0;
+            numPostponedAssignments = 0;
             numStopPairs = 0;
             numTransferPoints = 0;
             intersectEllipsesTime = 0;
@@ -474,6 +483,8 @@ namespace karri::stats {
         int64_t numAssignmentsTriedDropoffALS;
 
         int64_t tryAssignmentsTime;
+        int64_t tryPostponedAssignmentsTime;
+        int64_t numPostponedAssignments;
 
         // Stats for the transfer search itself
         int64_t numTransferPoints;
@@ -498,6 +509,8 @@ namespace karri::stats {
                 "num_assignments_dropoff_ord,"
                 "num_assignments_dropoff_als,"
                 "try_assignments_time,"
+                "try_postponed_assignments_time,"
+                "num_postponed_assignments,"
                 "num_transfer_points,"
                 "search_time_pickup_als,"
                 "search_time_last_stop_to_transfer,"
@@ -507,18 +520,20 @@ namespace karri::stats {
         std::string getLoggerRow() const {
             std::stringstream ss;
             ss << totalTime << ", "
-                << initTime << ","
+               << initTime << ","
                << numCandidateVehiclesPickupBNS << ", "
-               << numCandidateVehiclesPickupORD << ", "
-               << numCandidateVehiclesPickupALS << ", "
-               << numCandidateVehiclesDropoffORD << ", "
-               << numCandidateVehiclesDropoffALS << ", "
-               << numAssignmentsTriedPickupBNS << ", "
-               << numAssignmentsTriedPickupORD << ", "
-               << numAssignmentsTriedPickupALS << ", "
-               << numAssignmentsTriedDropoffORD << ", "
-               << numAssignmentsTriedDropoffALS << ", "
-               << tryAssignmentsTime << ", "
+                    << numCandidateVehiclesPickupORD << ", "
+                    << numCandidateVehiclesPickupALS << ", "
+                    << numCandidateVehiclesDropoffORD << ", "
+                    << numCandidateVehiclesDropoffALS << ", "
+                    << numAssignmentsTriedPickupBNS << ", "
+                    << numAssignmentsTriedPickupORD << ", "
+                    << numAssignmentsTriedPickupALS << ", "
+                    << numAssignmentsTriedDropoffORD << ", "
+                    << numAssignmentsTriedDropoffALS << ", "
+                    << tryAssignmentsTime << ", "
+                    << tryPostponedAssignmentsTime << ", "
+                    << numPostponedAssignments << ", "
                << numTransferPoints << ", "
                << searchTimePickupALS << ", "
                << searchTimeLastStopToTransfer << ", "
@@ -545,6 +560,8 @@ namespace karri::stats {
             numAssignmentsTriedDropoffORD = 0;
             numAssignmentsTriedDropoffALS = 0;
             tryAssignmentsTime = 0;
+            tryPostponedAssignmentsTime = 0;
+            numPostponedAssignments = 0;
             numTransferPoints = 0;
             searchTimePickupALS = 0;
             searchTimeLastStopToTransfer = 0;
@@ -573,6 +590,8 @@ namespace karri::stats {
         int64_t numAssignmentsTriedDropoffALS;
 
         int64_t tryAssignmentsTime;
+        int64_t tryPostponedAssignmentsTime;
+        int64_t numPostponedAssignments;
 
         // Stats for the transfer search itself
         int64_t numTransferPoints;
@@ -595,6 +614,8 @@ namespace karri::stats {
                 "num_assignments_pickup_ord,"
                 "num_assignments_dropoff_als,"
                 "try_assignments_time,"
+                "try_postponed_assignments_time,"
+                "num_postponed_assignments,"
                 "num_transfer_points,"
                 "search_time_last_stop_to_transfer,"
                 "search_time_pickup_to_transfer,"
@@ -603,22 +624,24 @@ namespace karri::stats {
         std::string getLoggerRow() const {
             std::stringstream ss;
             ss << totalTime << ", "
-                << initTime << ", "
-               << numCandidateVehiclesPickupBNS << ", "
-               << numCandidateVehiclesPickupORD << ", "
-               << numCandidateVehiclesDropoffALS << ", "
-               << numPickups << ", "
-               << numDropoffs << ", "
+               << initTime << ", "
+                    << numCandidateVehiclesPickupBNS << ", "
+                    << numCandidateVehiclesPickupORD << ", "
+                    << numCandidateVehiclesDropoffALS << ", "
+                    << numPickups << ", "
+                    << numDropoffs << ", "
 
-               << numAssignmentsTriedPickupBNS << ", "
-               << numAssignmentsTriedPickupORD << ", "
-               << numAssignmentsTriedDropoffALS << ", "
-               << tryAssignmentsTime << ", "
+                    << numAssignmentsTriedPickupBNS << ", "
+                    << numAssignmentsTriedPickupORD << ", "
+                    << numAssignmentsTriedDropoffALS << ", "
+                    << tryAssignmentsTime << ", "
+                    << tryPostponedAssignmentsTime << ", "
+                    << numPostponedAssignments << ", "
 
                << numTransferPoints << ", "
 
                << searchTimeLastStopToTransfer << ", "
-                << searchTimePickupToTransfer << ", "
+               << searchTimePickupToTransfer << ", "
                << searchTimeTransferToDropoff;
             return ss.str();
         }
@@ -639,6 +662,8 @@ namespace karri::stats {
             numAssignmentsTriedPickupORD = 0;
             numAssignmentsTriedDropoffALS = 0;
             tryAssignmentsTime = 0;
+            tryPostponedAssignmentsTime = 0;
+            numPostponedAssignments = 0;
             numTransferPoints = 0;
             searchTimePickupToTransfer = 0;
             searchTimeLastStopToTransfer = 0;
