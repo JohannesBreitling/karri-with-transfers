@@ -37,90 +37,95 @@ namespace karri {
     public:
 
         CHStrategyALS(
-            const RouteState &routeState,
-            const Fleet &fleet,
-            const InputGraphT &inputGraph,
-            const VehCHEnvT &vehChEnv
-            ) : routeState(routeState),
-                fleet(fleet),
-                inputGraph(inputGraph),
-                vehCh(vehChEnv.getCH()),
-                vehChQuery(vehChEnv.template getFullCHQuery<LabelSetT>()) {}
+                const RouteState &routeState,
+                const Fleet &fleet,
+                const InputGraphT &inputGraph,
+                const VehCHEnvT &vehChEnv
+        ) : routeState(routeState),
+            fleet(fleet),
+            inputGraph(inputGraph),
+            vehCh(vehChEnv.getCH()),
+            vehChQuery(vehChEnv.template getFullCHQuery<LabelSetT>()) {}
 
         template<bool = true>
         void init(const std::vector<int> &) {
             // No selection phase in CHStrategyALS, so we do nothing here.
         }
 
-        FlatRegular2DDistanceArray calculateDistancesFromLastStopToAllTransfers(const std::vector<int> &lastStopLocs,
-                                                                                const std::vector<int> &transferPoints) {
+        const FlatRegular2DDistanceArray &
+        calculateDistancesFromLastStopToAllTransfers(const std::vector<int> &lastStopLocs,
+                                                     const std::vector<int> &transferPoints) {
             const int numTransferPoints = static_cast<int>(transferPoints.size());
-            FlatRegular2DDistanceArray result(lastStopLocs.size(), numTransferPoints);
+            lastStopsToTransfersDistances.init(lastStopLocs.size(), numTransferPoints);
 
             if (lastStopLocs.empty() || transferPoints.empty())
-                return result;
+                return lastStopsToTransfersDistances;
 
             for (int i = 0; i < lastStopLocs.size(); ++i) {
-                const int idxOffset = i * result.width;
-                auto distancesForRow = result.distances.begin() + idxOffset;
+                const int idxOffset = i * numTransferPoints;
+                auto distancesForRow = lastStopsToTransfersDistances.distances.begin() + idxOffset;
                 runOneToMany(lastStopLocs[i], transferPoints, distancesForRow);
-                KASSERT(result.width != 0);
-                result.minDistancePerRow[i] = *std::min_element(distancesForRow, distancesForRow + result.width);
+                KASSERT(numTransferPoints != 0);
+                lastStopsToTransfersDistances.minDistancePerRow[i] = *std::min_element(distancesForRow,
+                                                                                       distancesForRow +
+                                                                                       numTransferPoints);
             }
 
-            return result;
+            return lastStopsToTransfersDistances;
         }
-        FlatRegular2DDistanceArray calculateDistancesFromPickupsToAllTransfers(const std::vector<int> &pickupLocs,
-                                                                               const std::vector<int> &transferPoints) {
+
+        const FlatRegular2DDistanceArray &
+        calculateDistancesFromPickupsToAllTransfers(const std::vector<int> &pickupLocs,
+                                                    const std::vector<int> &transferPoints) {
             const int numTransferPoints = static_cast<int>(transferPoints.size());
-            FlatRegular2DDistanceArray result(pickupLocs.size(), numTransferPoints);
+            pickupsToTransfersDistances.init(pickupLocs.size(), numTransferPoints);
 
             if (pickupLocs.empty() || transferPoints.empty())
-                return result;
+                return pickupsToTransfersDistances;
 
             for (int i = 0; i < pickupLocs.size(); ++i) {
-                const int idxOffset = i * result.width;
-                auto distancesForRow = result.distances.begin() + idxOffset;
+                const int idxOffset = i * numTransferPoints;
+                auto distancesForRow = pickupsToTransfersDistances.distances.begin() + idxOffset;
                 runOneToMany(pickupLocs[i], transferPoints, distancesForRow);
-                KASSERT(result.width != 0);
-                result.minDistancePerRow[i] = *std::min_element(distancesForRow, distancesForRow + result.width);
+                KASSERT(numTransferPoints != 0);
+                pickupsToTransfersDistances.minDistancePerRow[i] = *std::min_element(distancesForRow, distancesForRow + numTransferPoints);
             }
 
-            return result;
+            return pickupsToTransfersDistances;
 
         }
 
-        FlatRegular2DDistanceArray
+        const FlatRegular2DDistanceArray &
         calculateDistancesFromAllTransfersToDropoffs(const std::vector<int> &transferPoints,
                                                      const std::vector<int> &dropoffLocs) {
             const int numTransferPoints = static_cast<int>(transferPoints.size());
-            FlatRegular2DDistanceArray result(dropoffLocs.size(), numTransferPoints);
+            transfersToDropoffsDistances.init(dropoffLocs.size(), numTransferPoints);
 
             if (dropoffLocs.empty() || transferPoints.empty())
-                return result;
+                return transfersToDropoffsDistances;
 
             for (int i = 0; i < dropoffLocs.size(); ++i) {
-                const int idxOffset = i * result.width;
-                auto distancesForRow = result.distances.begin() + idxOffset;
+                const int idxOffset = i * numTransferPoints;
+                auto distancesForRow = transfersToDropoffsDistances.distances.begin() + idxOffset;
                 runManyToOne(transferPoints, dropoffLocs[i], distancesForRow);
-                KASSERT(result.width != 0);
-                result.minDistancePerRow[i] = *std::min_element(distancesForRow, distancesForRow + result.width);
+                KASSERT(numTransferPoints != 0);
+                transfersToDropoffsDistances.minDistancePerRow[i] = *std::min_element(distancesForRow, distancesForRow + numTransferPoints);
             }
 
-            return result;
+            return transfersToDropoffsDistances;
         }
 
 
     private:
         template<typename DistanceStoreIt>
-        void runOneToMany(const int sourceLoc, const std::vector<int>& targetLocs, DistanceStoreIt distances) {
+        void runOneToMany(const int sourceLoc, const std::vector<int> &targetLocs, DistanceStoreIt distances) {
 
             const auto sourceRank = vehCh.rank(inputGraph.edgeHead(sourceLoc));
             std::array<int, K> sourceAsArr;
             sourceAsArr.fill(sourceRank);
 
-            std::array<int, K> targets;
-            std::array<int, K> offsets;
+            std::array<int, K> targets{};
+            std::array<int, K> offsets{};
             const int numBatches = targetLocs.size() / K + (targetLocs.size() % K != 0);
             for (int batchIdx = 0; batchIdx < numBatches; ++batchIdx) {
                 const int batchStart = batchIdx * K;
@@ -144,14 +149,14 @@ namespace karri {
         }
 
         template<typename DistanceStoreIt>
-        void runManyToOne(const std::vector<int>& sourceLocs, const int targetLoc, DistanceStoreIt distances) {
+        void runManyToOne(const std::vector<int> &sourceLocs, const int targetLoc, DistanceStoreIt distances) {
 
             const auto targetRank = vehCh.rank(inputGraph.edgeTail(targetLoc));
             std::array<int, K> targetAsArr;
             targetAsArr.fill(targetRank);
             const int offset = inputGraph.travelTime(targetLoc);
 
-            std::array<int, K> sources;
+            std::array<int, K> sources{};
             const int numBatches = sourceLocs.size() / K + (sourceLocs.size() % K != 0);
             for (int batchIdx = 0; batchIdx < numBatches; ++batchIdx) {
                 const int batchStart = batchIdx * K;
@@ -171,7 +176,7 @@ namespace karri {
                 }
             }
         }
-        
+
         using VehCHQuery = typename VehCHEnvT::template FullCHQuery<LabelSetT>;
 
         const RouteState &routeState;
@@ -179,14 +184,12 @@ namespace karri {
         const InputGraphT &inputGraph;
         const CH &vehCh;
         VehCHQuery vehChQuery;
-    
+
+        // Results of queries. Stored here to avoid reallocation in each query.
+        FlatRegular2DDistanceArray lastStopsToTransfersDistances;
+        FlatRegular2DDistanceArray pickupsToTransfersDistances;
+        FlatRegular2DDistanceArray transfersToDropoffsDistances;
+
     };
-
-
-
-
-
-
-
 
 }

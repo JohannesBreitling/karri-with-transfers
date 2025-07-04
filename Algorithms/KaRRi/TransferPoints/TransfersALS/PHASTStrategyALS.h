@@ -118,8 +118,8 @@ namespace karri {
             KASSERT(chosenTargetsSelection);
 
             // Process queries for last stops in batches of size K.
-            std::array<int, K> sources;
-            std::array<int, K> lastStopLocsInBatchArr;
+            std::array<int, K> sources{};
+            std::array<int, K> lastStopLocsInBatchArr{};
             DistanceLabel lastStopLocsInBatch;
             DistanceLabel minDistPerRow;
             LabelMask anyTpAtLastStop;
@@ -179,8 +179,8 @@ namespace karri {
             KASSERT(chosenTargetsSelection);
 
             // Process queries for pickups in batches of size K.
-            std::array<int, K> sources;
-            std::array<int, K> pickupLocsInBatchArr;
+            std::array<int, K> sources{};
+            std::array<int, K> pickupLocsInBatchArr{};
             DistanceLabel pickupLocsInBatch;
             DistanceLabel minDistPerRow;
             LabelMask anyTpAtPickup;
@@ -240,10 +240,10 @@ namespace karri {
             KASSERT(chosenSourcesSelection);
 
             // Process queries for dropoffs in batches of size K.
-            std::array<int, K> targets;
-            std::array<int, K> dropoffLocsInBatchArr;
+            std::array<int, K> targets{};
+            std::array<int, K> dropoffLocsInBatchArr{};
             DistanceLabel dropoffLocsInBatch;
-            std::array<int, K> dropoffOffsetsArr;
+            std::array<int, K> dropoffOffsetsArr{};
             DistanceLabel dropoffOffsets;
             DistanceLabel minDistPerRow;
             LabelMask anyTpAtDropoff;
