@@ -32,7 +32,14 @@
 
 namespace karri {
 
-    template<typename InputGraphT, typename VehCHEnvT, typename TransferALSStrategyT, typename TransfersPickupALSStrategyT, typename CurVehLocToPickupSearchesT, typename InsertionAsserterT>
+    template<typename InputGraphT,
+            typename VehCHEnvT,
+            typename TransferALSStrategyT,
+            typename TransfersPickupALSStrategyT,
+            typename CurVehLocToPickupSearchesT,
+            bool UseCostLowerBounds,
+            bool DoTransferPointParetoChecks,
+            typename InsertionAsserterT>
     class TransferALSPVehFinder {
 
 
@@ -338,7 +345,8 @@ namespace karri {
             stats.tryPostponedAssignmentsTime += finishPbnsTime;
             stats.numPostponedAssignments += numPostponedPbnsAssignments;
 
-            stats.numTransferPoints += globalNumAsgnStats.numTransferPoints;
+            stats.numInputTransferPoints += allTransferEdges.size();
+            stats.numNonPrunedTransferPoints += globalNumAsgnStats.numTransferPoints;
 
             stats.searchTimePickupALS += searchTimePickupALS;
             stats.searchTimeLastStopToTransfer += searchTimeLastStopToTransfer;
@@ -756,12 +764,14 @@ namespace karri {
                 const int minTripTimeFromTransfer =
                         std::max(minTransferToThisDropoffDistance, minTripTimeTransferToDropoffViaStops +
                                                                    dropoffEntry.distToPDLoc) + dropoff.walkingDist;
-                using F = CostCalculator::CostFunction;
-                const int minCostFromHere =
-                        F::calcTripCost(minTripTimeUntilTransfer + minTripTimeFromTransfer, requestState) +
-                        F::calcVehicleCost(minResPickupDetour) + minDropoffCostWithoutTrip;
-                if (minCostFromHere > std::min(localBestCost.total, requestState.getBestCost()))
-                    break;
+                if constexpr (UseCostLowerBounds) {
+                    using F = CostCalculator::CostFunction;
+                    const int minCostFromHere =
+                            F::calcTripCost(minTripTimeUntilTransfer + minTripTimeFromTransfer, requestState) +
+                            F::calcVehicleCost(minResPickupDetour) + minDropoffCostWithoutTrip;
+                    if (minCostFromHere > std::min(localBestCost.total, requestState.getBestCost()))
+                        break;
+                }
 
                 const int stopId = stopIdsDVeh[i];
                 const auto &transferPoints = ellipseContainer.getEdgesInEllipse(stopId);
@@ -785,17 +795,19 @@ namespace karri {
                     const int distPVehToTransfer = pickupEntry.stopIndex == numStopsPVeh - 1 ? distPickupToTransfer
                                                                                              : pVehLastStopToTransfersDistances[relEdgesToInternalIdx[transferLoc]];
 
-                    if (i > 0) { // Cannot pareto check for transfer BNS because we only know lower bounds
-                        const bool transferAtStopDVeh = transferLoc == stopLocationsDVeh[i];
-                        const int distToTransferDVeh = transferAtStopDVeh ? 0 : edge.distToTail + edgeOffset;
-                        const int distNextLegAfterTransferDVeh = i == dropoffEntry.stopIndex ?
-                                                                 transfersToThisDropoffDistances[relEdgesToInternalIdx[transferLoc]]
-                                                                                             : edge.distFromHead;
-                        const bool notDominated = checkPareto(
-                                TPDistances(distPVehToTransfer, distToTransferDVeh,
-                                            distNextLegAfterTransferDVeh), localParetoOptimalTps);
-                        if (!notDominated)
-                            continue;
+                    if constexpr (DoTransferPointParetoChecks) {
+                        if (i > 0) { // Cannot pareto check for transfer BNS because we only know lower bounds
+                            const bool transferAtStopDVeh = transferLoc == stopLocationsDVeh[i];
+                            const int distToTransferDVeh = transferAtStopDVeh ? 0 : edge.distToTail + edgeOffset;
+                            const int distNextLegAfterTransferDVeh = i == dropoffEntry.stopIndex ?
+                                                                     transfersToThisDropoffDistances[relEdgesToInternalIdx[transferLoc]]
+                                                                                                 : edge.distFromHead;
+                            const bool notDominated = checkPareto(
+                                    TPDistances(distPVehToTransfer, distToTransferDVeh,
+                                                distNextLegAfterTransferDVeh), localParetoOptimalTps);
+                            if (!notDominated)
+                                continue;
+                        }
                     }
 
                     TransferPoint tp = TransferPoint(transferLoc, pVeh, dVeh, numStopsPVeh - 1, i,

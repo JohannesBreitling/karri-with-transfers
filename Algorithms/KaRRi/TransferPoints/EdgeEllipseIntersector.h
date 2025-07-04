@@ -32,12 +32,15 @@
 #include "DataStructures/Containers/TimestampedVector.h"
 
 #include <tbb/parallel_for.h>
+#include <tbb/enumerable_thread_specific.h>
 
 namespace karri {
 
     // Computes the set of vertices contained in the detour ellipse between a pair of consecutive stops in a vehicle
     // route using bucket entries and a CH topological downward search.
     template<typename InputGraphT,
+            bool UseCostLowerBounds,
+            bool DoTransferParetoChecks,
             typename EllipseSizeLoggerT = NullLogger,
             typename EllipseIntersectionSizeLoggerT = NullLogger>
     class EdgeEllipseIntersector {
@@ -45,28 +48,35 @@ namespace karri {
     public:
 
         EdgeEllipseIntersector(const InputGraphT &inputGraph,
-                                const Fleet &fleet,
-                                const RequestState &requestState,
-                                const RouteState &routeState,
-                                CostCalculator &calc)
+                               const Fleet &fleet,
+                               const RequestState &requestState,
+                               const RouteState &routeState,
+                               CostCalculator &calc)
                 : inputGraph(inputGraph),
                   fleet(fleet),
                   requestState(requestState),
                   routeState(routeState),
                   calc(calc),
+                  threadLocalNumTransferPointsBuilt(0),
                   ellipsesSizeLogger(LogManager<EllipseSizeLoggerT>::getLogger("ellipses.csv",
                                                                                "size\n")),
-                  ellipseIntersectionSizeLogger(LogManager<EllipseIntersectionSizeLoggerT>::getLogger("ellipse-intersection.csv",
-                                                                                                      "size\n")) {}
+                  ellipseIntersectionSizeLogger(
+                          LogManager<EllipseIntersectionSizeLoggerT>::getLogger("ellipse-intersection.csv",
+                                                                                "size\n")) {}
 
         // Given a set of stop IDs for pickup vehicles and dropoff vehicles and the previously computed ellipses,
         // this computes the transfer points between any pair of stops in the two sets by intersecting ellipses.
         // The given stop IDs should indicate the first stop in a pair of stops of the respective vehicle.
         void computeTransferPoints(const std::vector<int> &pVehStopIds, const std::vector<int> &dVehStopIds,
-                                   const EdgeEllipseContainer& ellipseContainer) {
+                                   const EdgeEllipseContainer &ellipseContainer,
+                                   int64_t& numTransferPointsBuilt) {
 
+            numTransferPointsBuilt = 0;
             if (pVehStopIds.empty() || dVehStopIds.empty())
                 return;
+
+            for (auto& local : threadLocalNumTransferPointsBuilt)
+                local = 0;
 
             std::fill(idxOfStopPVeh.begin(), idxOfStopPVeh.end(), INVALID_INDEX);
             idxOfStopPVeh.resize(routeState.getMaxStopId() + 1, INVALID_INDEX);
@@ -127,10 +137,16 @@ namespace karri {
 
                 auto &transferPointsForPair = transferPoints[internalIdxPStop * numStopsDVeh + internalIdxDStop];
                 transferPointsForPair.clear();
+                auto& localNumTransferPointsBuilt = threadLocalNumTransferPointsBuilt.local();
                 intersectEllipses(ellipsePStop, ellipseDStop, vehIdPStop, vehIdDStop,
                                   routeState.stopPositionOf(stopIdPStop),
-                                  routeState.stopPositionOf(stopIdDStop), transferPointsForPair);
+                                  routeState.stopPositionOf(stopIdDStop), transferPointsForPair,
+                                  localNumTransferPointsBuilt);
             });
+
+            for (const auto &localNum: threadLocalNumTransferPointsBuilt) {
+                numTransferPointsBuilt += localNum;
+            }
 
             for (const auto &transferPointsForPair: transferPoints) {
                 ellipseIntersectionSizeLogger << transferPointsForPair.size() << "\n";
@@ -166,11 +182,12 @@ namespace karri {
                                const std::vector<EdgeInEllipse> &ellipseDVeh,
                                const int pVehId, const int dVehId,
                                const int stopIdxPVeh, const int stopIdxDVeh,
-                               std::vector<TransferPoint> &result) {
+                               std::vector<TransferPoint> &result,
+                               int64_t &numTransferPointsBuilt) {
             result.clear();
 
-            const auto* pVehPtr = &fleet[pVehId];
-            const auto* dVehPtr = &fleet[dVehId];
+            const auto *pVehPtr = &fleet[pVehId];
+            const auto *dVehPtr = &fleet[dVehId];
 
             auto itEdgesPVeh = ellipsePVeh.begin();
             auto itEdgesDVeh = ellipseDVeh.begin();
@@ -202,42 +219,49 @@ namespace karri {
 
                 const auto tp = TransferPoint(loc, pVehPtr, dVehPtr, stopIdxPVeh, stopIdxDVeh, distPVehToTransfer,
                                               distPVehFromTransfer, distDVehToTransfer, distDVehFromTransfer);
+                ++numTransferPointsBuilt;
 
-                // Check whether known transfer points dominate tp
-                bool dominated = false;
-                for (const auto &knownTP: result) {
-                    if (transferPointDominates(knownTP, tp)) {
-                        dominated = true;
-                        break;
+                if constexpr (DoTransferParetoChecks) {
+                    // Check whether known transfer points dominate tp
+                    bool dominated = false;
+                    for (const auto &knownTP: result) {
+                        if (transferPointDominates(knownTP, tp)) {
+                            dominated = true;
+                            break;
+                        }
                     }
-                }
-                if (dominated) {
-                    continue;
-                }
+                    if (dominated) {
+                        continue;
+                    }
 
-                // If tp is not dominated, add it to result and remove any dominated by tp
-                result.push_back(tp);
-                auto numOpt = result.size();
-                for (int i = 0; i < numOpt;) {
-                    if (transferPointDominates(tp, result[i])) {
+                    // If tp is not dominated, add it to result and remove any dominated by tp
+                    result.push_back(tp);
+                    auto numOpt = result.size();
+                    for (int i = 0; i < numOpt;) {
+                        if (transferPointDominates(tp, result[i])) {
+                            std::swap(result[i], result.back());
+                            result.pop_back();
+                            --numOpt;
+                            continue;
+                        }
+                        ++i;
+                    }
+                } else {
+                    // If we do not check for pareto dominance, we simply add the transfer point
+                    result.push_back(tp);
+                }
+            }
+
+            if constexpr (UseCostLowerBounds) {
+                for (int i = 0; i < result.size();) {
+                    const auto minTpCost = calc.calcMinCostForTransferPoint(result[i], requestState);
+                    if (minTpCost.total > requestState.getBestCost()) {
                         std::swap(result[i], result.back());
                         result.pop_back();
-                        --numOpt;
                         continue;
                     }
                     ++i;
                 }
-            }
-
-            // TODO: validate that this lower bound is correct
-            for (int i = 0; i < result.size();) {
-                const auto minTpCost = calc.calcMinCostForTransferPoint(result[i], requestState);
-                if (minTpCost.total > requestState.getBestCost()) {
-                    std::swap(result[i], result.back());
-                    result.pop_back();
-                    continue;
-                }
-                ++i;
             }
         }
 
@@ -245,7 +269,7 @@ namespace karri {
         const Fleet &fleet;
         const RequestState &requestState;
         const RouteState &routeState;
-        CostCalculator& calc;
+        CostCalculator &calc;
 
         int numStopsPVeh;
         int numStopsDVeh;
@@ -257,6 +281,8 @@ namespace karri {
         // For two stop IDs i (pVeh) and j (dVeh), transferPoints[idxOfStopPVeh[i] * numStopsDVeh + idxOfStopDVeh[j]] contains the
         // transfer points between the two stops.
         std::vector<std::vector<TransferPoint>> transferPoints;
+
+        tbb::enumerable_thread_specific<int64_t> threadLocalNumTransferPointsBuilt;
 
         EllipseSizeLoggerT &ellipsesSizeLogger;
         EllipseIntersectionSizeLoggerT &ellipseIntersectionSizeLogger;

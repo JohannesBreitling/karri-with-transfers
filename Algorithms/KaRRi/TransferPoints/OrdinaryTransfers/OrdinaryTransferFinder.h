@@ -59,6 +59,8 @@ namespace karri {
             typename InputGraphT,
             typename VehCHEnvT,
             typename CurVehLocToPickupSearchesT,
+            bool UseCostLowerBounds,
+            bool DoTransferPointParetoChecks,
             typename InsertionAsserterT,
             typename DirectTransferDistancesFinderT>
     class OrdinaryTransferFinder {
@@ -134,8 +136,9 @@ namespace karri {
                 return;
 
             // Calculate transfer points
+            int64_t numTransferPointsBuilt = 0;
             innerTimer.restart();
-            ellipseIntersector.computeTransferPoints(pVehStopIds, dVehStopIds, ellipseContainer);
+            ellipseIntersector.computeTransferPoints(pVehStopIds, dVehStopIds, ellipseContainer, numTransferPointsBuilt);
             const auto intersectEllipsesTime = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             // Run selection phase for many-to-many searches used to find distances from pickups to transfers and from
@@ -236,7 +239,8 @@ namespace karri {
             stats.tryPostponedAssignmentsTime += tryPostponedTime;
             stats.numPostponedAssignments += numPostponed;
             stats.numStopPairs += numStopPairs;
-            stats.numTransferPoints += numTransferPoints;
+            stats.numInputTransferPoints += numTransferPointsBuilt;
+            stats.numNonPrunedTransferPoints += numTransferPoints;
             stats.intersectEllipsesTime += intersectEllipsesTime;
         }
 
@@ -868,7 +872,7 @@ namespace karri {
 
         using EllipseSizeLogger = NullLogger;
         using EllipseIntersectionSizeLogger = NullLogger;
-        EdgeEllipseIntersector<InputGraphT, EllipseSizeLogger, EllipseIntersectionSizeLogger> ellipseIntersector;
+        EdgeEllipseIntersector<InputGraphT, UseCostLowerBounds, DoTransferPointParetoChecks, EllipseSizeLogger, EllipseIntersectionSizeLogger> ellipseIntersector;
 
         LightweightSubset edgesSubset; // Subset used to deduplicate locations in preparing any-to-any searches
 

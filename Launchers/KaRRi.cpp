@@ -612,7 +612,8 @@ int main(int argc, char *argv[]) {
 
 #if KARRI_TRANSFER_USE_DIJKSTRA_ELLIPSE_RECONSTRUCTION
         using EllipseReconstructorImpl = DijkstraEllipseReconstructor<VehicleInputGraph, VehCHEnv, TravelTimeAttribute, EllipseReconstructorLabelSet>;
-        EllipseReconstructorImpl ellipseReconstructor(vehicleInputGraph, revVehicleGraph, *vehChEnv, reqState, routeState);
+        EllipseReconstructorImpl ellipseReconstructor(vehicleInputGraph, revVehicleGraph, *vehChEnv, reqState,
+                                                      routeState);
 #else
 #if KARRI_TRANSFER_HEURISTIC_LEVEL < 2
 
@@ -639,6 +640,9 @@ int main(int argc, char *argv[]) {
 #endif
 #endif
 
+        static constexpr bool KARRIT_USE_TP_PARETO_CHECKS = KARRI_TRANSFER_USE_TRANSFER_POINT_PARETO_CHECKS;
+        static constexpr bool KARRIT_USE_COST_LOWER_BOUNDS = KARRI_TRANSFER_USE_COST_LOWER_BOUNDS;
+
 #if KARRI_TRANSFER_HEURISTIC_LEVEL < 2
         using DirectTransferDistancesLabelSet = std::conditional_t<KARRI_TRANSFER_DIRECT_DISTANCES_USE_SIMD,
                 SimdLabelSet<KARRI_TRANSFER_DIRECT_DISTANCES_LOG_K, ParentInfo::NO_PARENT_INFO>,
@@ -649,7 +653,7 @@ int main(int argc, char *argv[]) {
         DirectTransferDistancesFinder transferToDropoffDistancesFinder(vehicleInputGraph.numVertices(), *vehChEnv,
                                                                        PDLocType::DROPOFF);
 
-        using OrdinaryTransferInsertionsImpl = OrdinaryTransferFinder<VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, InsertionAsserterImpl, DirectTransferDistancesFinder>;
+        using OrdinaryTransferInsertionsImpl = OrdinaryTransferFinder<VehicleInputGraph, VehCHEnv, CurVehLocToPickupSearchesImpl, KARRIT_USE_COST_LOWER_BOUNDS, KARRIT_USE_TP_PARETO_CHECKS, InsertionAsserterImpl, DirectTransferDistancesFinder>;
         OrdinaryTransferInsertionsImpl ordinaryTransferInsertions = OrdinaryTransferInsertionsImpl(
                 vehicleInputGraph,
                 *vehChEnv,
@@ -697,7 +701,7 @@ int main(int argc, char *argv[]) {
 
 #endif
 
-        using TransferALSPVehFinderImpl = TransferALSPVehFinder<VehicleInputGraph, VehCHEnv, TransferStrategyALSImpl, TransfersPickupALSStrategy, CurVehLocToPickupSearchesImpl, InsertionAsserterImpl>;
+        using TransferALSPVehFinderImpl = TransferALSPVehFinder<VehicleInputGraph, VehCHEnv, TransferStrategyALSImpl, TransfersPickupALSStrategy, CurVehLocToPickupSearchesImpl, KARRIT_USE_COST_LOWER_BOUNDS, KARRIT_USE_TP_PARETO_CHECKS, InsertionAsserterImpl>;
         TransferALSPVehFinderImpl transferALSPVehInsertions(vehicleInputGraph,
                                                             *vehChEnv,
                                                             transferALSStrategy,
@@ -709,7 +713,7 @@ int main(int argc, char *argv[]) {
                                                             routeState, reqState, calc,
                                                             asserter);
 
-        using TransferALSDVehFinderImpl = TransferALSDVehFinder<VehicleInputGraph, VehCHEnv, TransferStrategyALSImpl, CurVehLocToPickupSearchesImpl, InsertionAsserterImpl>;
+        using TransferALSDVehFinderImpl = TransferALSDVehFinder<VehicleInputGraph, VehCHEnv, TransferStrategyALSImpl, CurVehLocToPickupSearchesImpl, KARRIT_USE_COST_LOWER_BOUNDS, KARRIT_USE_TP_PARETO_CHECKS, InsertionAsserterImpl>;
         TransferALSDVehFinderImpl transferALSDVehInsertions(vehicleInputGraph,
                                                             *vehChEnv,
                                                             transferALSStrategy,

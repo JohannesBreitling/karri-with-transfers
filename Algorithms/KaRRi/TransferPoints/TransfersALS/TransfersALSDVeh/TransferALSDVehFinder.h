@@ -26,7 +26,13 @@
 
 namespace karri {
 
-    template<typename InputGraphT, typename VehCHEnvT, typename TransferALSStrategyT, typename CurVehLocToPickupSearchesT, typename InsertionAsserterT>
+    template<typename InputGraphT,
+            typename VehCHEnvT,
+            typename TransferALSStrategyT,
+            typename CurVehLocToPickupSearchesT,
+            bool UseCostLowerBounds,
+            bool DoTransferPointParetoChecks,
+            typename InsertionAsserterT>
     class TransferALSDVehFinder {
 
         struct TPDistances {
@@ -275,7 +281,8 @@ namespace karri {
             stats.tryAssignmentsTime += tryAssignmentsTime;
             stats.tryPostponedAssignmentsTime += finishPbnsTime;
             stats.numPostponedAssignments += numPostponedPbnsAssignments;
-            stats.numTransferPoints += globalNumAsgnStats.numTransferPoints;
+            stats.numInputTransferPoints += allTransferEdges.size();
+            stats.numNonPrunedTransferPoints += globalNumAsgnStats.numTransferPoints;
 
             stats.searchTimeLastStopToTransfer += searchTimeLastStopToTransfer;
             stats.searchTimePickupToTransfer += searchTimePickupToTransfer;
@@ -474,10 +481,12 @@ namespace karri {
                 const auto minTripTimeForLowerBoundStopI = std::max(minTripTimeToStopI,
                                                                     minThisPickupToTransferDistance) +
                                                            minTripTimeAfterTransfer;
-                const auto minCostToStopI = F::calcVehicleCost(minResPickupDetour + minResDVehDetour) +
-                                            F::calcTripCost(minTripTimeForLowerBoundStopI, requestState);
-                if (minCostToStopI > std::min(localBestCost.total, requestState.getBestCost()))
-                    break;
+                if constexpr (UseCostLowerBounds) {
+                    const auto minCostToStopI = F::calcVehicleCost(minResPickupDetour + minResDVehDetour) +
+                                                F::calcTripCost(minTripTimeForLowerBoundStopI, requestState);
+                    if (minCostToStopI > std::min(localBestCost.total, requestState.getBestCost()))
+                        break;
+                }
 
                 const auto vehWaitTimeFromStopIToEndOfRoute =
                         getTotalVehWaitTimeInInterval(pVehId, i, numStopsPVeh - 1, routeState);
@@ -514,16 +523,22 @@ namespace karri {
                             minTripTimeToStopI + distToTransferPVeh + distNextLegAfterTransferDVeh;
                     const auto minResDetourPVehForTp = std::max(
                             detourPVeh - transferLegLength - vehWaitTimeFromStopIToEndOfRoute, 0);
-                    const auto minCostForTp = F::calcVehicleCost(minResDetourPVehForTp + detourDVeh) +
-                                              F::calcTripCost(minTripTimeForTp, requestState);
-                    if (minCostForTp > std::min(localBestCost.total, requestState.getBestCost()))
-                        continue;
 
-                    const int trip = distToTransferPVeh + distNextLegAfterTransferDVeh;
-                    const bool notDominated = checkPareto(TPDistances(detourPVeh, detourDVeh, trip),
-                                                          localParetoOptimalTps);
-                    if (!notDominated)
-                        continue;
+                    if constexpr (UseCostLowerBounds) {
+                        const auto minCostForTp = F::calcVehicleCost(minResDetourPVehForTp + detourDVeh) +
+                                                  F::calcTripCost(minTripTimeForTp, requestState);
+                        if (minCostForTp > std::min(localBestCost.total, requestState.getBestCost()))
+                            continue;
+                    }
+
+
+                    if constexpr (DoTransferPointParetoChecks) {
+                        const int trip = distToTransferPVeh + distNextLegAfterTransferDVeh;
+                        const bool notDominated = checkPareto(TPDistances(detourPVeh, detourDVeh, trip),
+                                                              localParetoOptimalTps);
+                        if (!notDominated)
+                            continue;
+                    }
 
 
                     // Construct the transfer point
@@ -592,10 +607,6 @@ namespace karri {
                     tryPotentiallyUnfinishedAssignment(asgn, postponedPBNSAssignments, localCalc, localBestAssignment,
                                                        localBestCost, localNumAsgnStats);
                 }
-
-                const auto fracParetoOpt = static_cast<double>(localParetoOptimalTps.size()) /
-                                           static_cast<double>(transferPoints.size());
-                unused(fracParetoOpt);
             }
         }
 

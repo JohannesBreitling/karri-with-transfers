@@ -393,7 +393,8 @@ namespace karri::stats {
 
         // Stats for the transfer search itself
         int64_t numStopPairs;
-        int64_t numTransferPoints;
+        int64_t numInputTransferPoints;
+        int64_t numNonPrunedTransferPoints;
         int64_t intersectEllipsesTime;
 
         static constexpr auto LOGGER_NAME = "perf_transf_ord.csv";
@@ -415,7 +416,8 @@ namespace karri::stats {
                 "try_postponed_assignments_time,"
                 "num_postponed_assignments,"
                 "num_stop_pairs,"
-                "num_transfer_points,"
+                "num_input_transfer_points,"
+                "num_non_pruned_transfer_points,"
                 "intersect_ellipses_time\n";
 
         std::string getLoggerRow() const {
@@ -437,7 +439,8 @@ namespace karri::stats {
                << tryPostponedAssignmentsTime << ", "
                << numPostponedAssignments << ", "
                << numStopPairs << ", "
-               << numTransferPoints << ", "
+               << numInputTransferPoints << ", "
+               << numNonPrunedTransferPoints << ", "
                << intersectEllipsesTime;
             return ss.str();
         }
@@ -464,7 +467,8 @@ namespace karri::stats {
             tryPostponedAssignmentsTime = 0;
             numPostponedAssignments = 0;
             numStopPairs = 0;
-            numTransferPoints = 0;
+            numInputTransferPoints = 0;
+            numNonPrunedTransferPoints = 0;
             intersectEllipsesTime = 0;
         }
     };
@@ -495,7 +499,8 @@ namespace karri::stats {
         int64_t numPostponedAssignments;
 
         // Stats for the transfer search itself
-        int64_t numTransferPoints;
+        int64_t numInputTransferPoints;
+        int64_t numNonPrunedTransferPoints;
 
         int64_t searchTimePickupALS;
         int64_t searchTimeLastStopToTransfer;
@@ -519,7 +524,8 @@ namespace karri::stats {
                 "try_assignments_time,"
                 "try_postponed_assignments_time,"
                 "num_postponed_assignments,"
-                "num_transfer_points,"
+                "num_input_transfer_points,"
+                "num_non_pruned_transfer_points,"
                 "search_time_pickup_als,"
                 "search_time_last_stop_to_transfer,"
                 "search_time_pickup_to_transfer,"
@@ -542,7 +548,8 @@ namespace karri::stats {
                << tryAssignmentsTime << ", "
                << tryPostponedAssignmentsTime << ", "
                << numPostponedAssignments << ", "
-               << numTransferPoints << ", "
+               << numInputTransferPoints << ", "
+               << numNonPrunedTransferPoints << ", "
                << searchTimePickupALS << ", "
                << searchTimeLastStopToTransfer << ", "
                << searchTimePickupToTransfer << ", "
@@ -570,7 +577,8 @@ namespace karri::stats {
             tryAssignmentsTime = 0;
             tryPostponedAssignmentsTime = 0;
             numPostponedAssignments = 0;
-            numTransferPoints = 0;
+            numInputTransferPoints = 0;
+            numNonPrunedTransferPoints = 0;
             searchTimePickupALS = 0;
             searchTimeLastStopToTransfer = 0;
             searchTimePickupToTransfer = 0;
@@ -602,7 +610,8 @@ namespace karri::stats {
         int64_t numPostponedAssignments;
 
         // Stats for the transfer search itself
-        int64_t numTransferPoints;
+        int64_t numInputTransferPoints;
+        int64_t numNonPrunedTransferPoints;
 
         // Search from last stop to all stops
         int64_t searchTimeLastStopToTransfer;
@@ -624,7 +633,8 @@ namespace karri::stats {
                 "try_assignments_time,"
                 "try_postponed_assignments_time,"
                 "num_postponed_assignments,"
-                "num_transfer_points,"
+                "num_input_transfer_points,"
+                "num_non_pruned_transfer_points,"
                 "search_time_last_stop_to_transfer,"
                 "search_time_pickup_to_transfer,"
                 "search_time_transfer_to_dropoff\n";
@@ -646,7 +656,8 @@ namespace karri::stats {
                << tryPostponedAssignmentsTime << ", "
                << numPostponedAssignments << ", "
 
-               << numTransferPoints << ", "
+               << numInputTransferPoints << ", "
+               << numNonPrunedTransferPoints << ", "
 
                << searchTimeLastStopToTransfer << ", "
                << searchTimePickupToTransfer << ", "
@@ -672,7 +683,8 @@ namespace karri::stats {
             tryAssignmentsTime = 0;
             tryPostponedAssignmentsTime = 0;
             numPostponedAssignments = 0;
-            numTransferPoints = 0;
+            numInputTransferPoints = 0;
+            numNonPrunedTransferPoints = 0;
             searchTimePickupToTransfer = 0;
             searchTimeLastStopToTransfer = 0;
             searchTimeTransferToDropoff = 0;
