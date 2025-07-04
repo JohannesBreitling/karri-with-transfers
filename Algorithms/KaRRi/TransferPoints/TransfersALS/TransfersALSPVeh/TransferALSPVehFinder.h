@@ -238,21 +238,21 @@ namespace karri {
 
             // Calculate the distances from all last stops (pickup ord, bns) to the potential transfers
             innerTimer.restart();
-            const auto lastStopToTransfersDistances = strategy.calculateDistancesFromLastStopToAllTransfers(
+            const auto &lastStopToTransfersDistances = strategy.calculateDistancesFromLastStopToAllTransfers(
                     relevantLastStopLocs, allTransferEdges);
             const int64_t searchTimeLastStopToTransfer = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             // Calculate the distances from all pickups to the potential transfers
             innerTimer.restart();
             // pickupToTransfersDistances[i][j] stores the distance from i-th pickup to the j-th edge in transferEdges
-            const auto pickupsToTransfersDistances = strategy.calculateDistancesFromPickupsToAllTransfers(pickupLocs,
-                                                                                                          allTransferEdges);
+            const auto &pickupsToTransfersDistances = strategy.calculateDistancesFromPickupsToAllTransfers(pickupLocs,
+                                                                                                           allTransferEdges);
             const int64_t searchTimePickupToTransfer = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             // Calculate the distances from all transfers to the dropoffs
             innerTimer.restart();
             // transferToDropoffDistances[i][j] stores the distance from the j-th edge in transferEdges to the i-th dropoff
-            const auto transfersToDropoffsDistances = strategy.calculateDistancesFromAllTransfersToDropoffs(
+            const auto &transfersToDropoffsDistances = strategy.calculateDistancesFromAllTransfersToDropoffs(
                     allTransferEdges, dropoffLocs);
             const auto searchTimeTransferToDropoff = innerTimer.elapsed<std::chrono::nanoseconds>();
 
@@ -414,7 +414,7 @@ namespace karri {
             static std::vector<int> placeholderLastStopDistances;
             static ConstantVectorRange<int> placeholderLastStopDistanceRange(
                     placeholderLastStopDistances.begin(), placeholderLastStopDistances.end());
-            static int placeholderMinLastStopDistance  = INFTY;
+            static int placeholderMinLastStopDistance = INFTY;
 
             if (wu.pVehType == ORDINARY || wu.pVehType == BEFORE_NEXT_STOP) {
 
@@ -432,7 +432,8 @@ namespace karri {
                 for (const auto &pickupEntry: pickupEntries) {
                     const auto &thisPickupToTransfersDistances = pickupsToTransfersDistances.getDistancesFor(
                             pickupEntry.pdId);
-                    const int minThisPickupToTransferDistance = pickupsToTransfersDistances.getMinDistanceFor(pickupEntry.pdId);
+                    const int minThisPickupToTransferDistance = pickupsToTransfersDistances.getMinDistanceFor(
+                            pickupEntry.pdId);
                     if (wu.dVehType == ORDINARY) {
                         tryDropoffORD(wu.pVehId, pickupEntry, wu.dVehId, postponedToUse,
                                       thisLastStopToTransfersDistances, minThisLastStopToTransferDistance,
@@ -455,7 +456,8 @@ namespace karri {
                     if (distanceToPickup >= INFTY)
                         continue; // Pickup is not reachable
 
-                    const int minThisPickupToTransferDistance = pickupsToTransfersDistances.getMinDistanceFor(pickup.id);
+                    const int minThisPickupToTransferDistance = pickupsToTransfersDistances.getMinDistanceFor(
+                            pickup.id);
                     if (minThisPickupToTransferDistance >= INFTY)
                         continue; // No transfer is reachable from this pickup
 
@@ -464,7 +466,7 @@ namespace karri {
                     const auto &thisPickupToTransfersDistances = pickupsToTransfersDistances.getDistancesFor(
                             pickup.id);
                     KASSERT(minThisPickupToTransferDistance == *std::min_element(thisPickupToTransfersDistances.begin(),
-                                                                   thisPickupToTransfersDistances.end()));
+                                                                                 thisPickupToTransfersDistances.end()));
 
                     if (wu.dVehType == ORDINARY) {
                         tryDropoffORDForPickupALS(wu.pVehId, pickup, distanceToPickup, wu.dVehId,
@@ -722,7 +724,7 @@ namespace karri {
                     pickupEntry.stopIndex == numStopsPVeh - 1 ? minThisPickupToTransferDistance :
                     pickupEntry.distFromPDLocToNextStop + minPVehLastStopToTransferDistance +
                     (pickupEntry.stopIndex + 1 < numStopsPVeh - 1 ? schedArrTimesPVeh[numStopsPVeh - 1] -
-                                                                     schedDepTimesPVeh[pickupEntry.stopIndex + 1] : 0);
+                                                                    schedDepTimesPVeh[pickupEntry.stopIndex + 1] : 0);
 
             // Compute part of cost lower bound that depends only on the dropoff
             const bool dropoffAtExistingStop = isDropoffAtExistingStop(dVehId, INVALID_INDEX,

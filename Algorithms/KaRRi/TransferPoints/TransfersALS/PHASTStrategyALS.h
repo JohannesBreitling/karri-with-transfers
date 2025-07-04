@@ -33,6 +33,8 @@ namespace karri {
     class PHASTStrategyALS {
 
         static constexpr int K = LabelSetT::K;
+        using DistanceLabel = LabelSetT::DistanceLabel;
+        using LabelMask = LabelSetT::LabelMask;
 
     public:
 
@@ -105,18 +107,22 @@ namespace karri {
             }
         }
 
-        FlatRegular2DDistanceArray calculateDistancesFromLastStopToAllTransfers(const std::vector<int> &lastStopLocs,
+        const FlatRegular2DDistanceArray& calculateDistancesFromLastStopToAllTransfers(const std::vector<int> &lastStopLocs,
                                                                                 const std::vector<int> &transferPoints) {
             const int numTransferPoints = static_cast<int>(transferPoints.size());
-            FlatRegular2DDistanceArray result(lastStopLocs.size(), numTransferPoints);
+            lastStopsToTransfersDistances.init(lastStopLocs.size(), numTransferPoints);
 
             if (lastStopLocs.empty() || transferPoints.empty())
-                return result;
+                return lastStopsToTransfersDistances;
 
             KASSERT(chosenTargetsSelection);
 
             // Process queries for last stops in batches of size K.
             std::array<int, K> sources;
+            std::array<int, K> lastStopLocsInBatchArr;
+            DistanceLabel lastStopLocsInBatch;
+            DistanceLabel minDistPerRow;
+            LabelMask anyTpAtLastStop;
             const int numBatches = lastStopLocs.size() / K + (lastStopLocs.size() % K != 0);
             for (int batchIdx = 0; batchIdx < numBatches; ++batchIdx) {
                 const int batchStart = batchIdx * K;
@@ -125,48 +131,59 @@ namespace karri {
                     const int lastStopLoc = lastStopLocs[i];
                     const auto lastStopVertex = inputGraph.edgeHead(lastStopLoc);
                     sources[i - batchStart] = vehCh.rank(lastStopVertex);
+                    lastStopLocsInBatchArr[i - batchStart] = lastStopLoc;
                 }
                 for (int i = batchEnd; i < batchStart + K; ++i) {
                     sources[i - batchStart] = sources[0]; // copy of first source to fill partial batch
+                    lastStopLocsInBatchArr[i - batchStart] = lastStopLocsInBatchArr[0];
                 }
+
 
                 forwardQuery.run(*chosenTargetsSelection, sources);
 
-                for (int i = batchStart; i < batchEnd; ++i) {
-                    const int idxOffset = i * result.width;
-                    const int lastStopLoc = lastStopLocs[i];
-                    int minDistanceInRow = INFTY;
-                    for (int j = 0; j < transferPoints.size(); j++) {
-                        const int tpLoc = transferPoints[j];
-                        const int tpTail = inputGraph.edgeTail(tpLoc);
-                        const int tpRank = vehCh.rank(tpTail);
-                        const int tpRankSelection = chosenTargetsSelection->fullToSubMapping[tpRank];
-                        const int distance =
-                                tpLoc == lastStopLoc ? 0 : forwardQuery.getDistance(tpRankSelection, i - batchStart) +
-                                                           inputGraph.travelTime(tpLoc);
+                lastStopLocsInBatch.loadIntArray(lastStopLocsInBatchArr.data());
+                minDistPerRow = INFTY;
+                anyTpAtLastStop = false;
 
-                        result.distances[idxOffset + j] = distance;
-                        minDistanceInRow = std::min(minDistanceInRow, distance);
+                for (int j = 0; j < numTransferPoints; j++) {
+                    const int tpLoc = transferPoints[j];
+                    const int tpTail = inputGraph.edgeTail(tpLoc);
+                    const int tpRank = vehCh.rank(tpTail);
+                    const int tpRankSelection = chosenTargetsSelection->fullToSubMapping[tpRank];
+                    const DistanceLabel dist = forwardQuery.getDistances(tpRankSelection) + inputGraph.travelTime(tpLoc);
+                    minDistPerRow.min(dist);
+                    anyTpAtLastStop |= (tpLoc == lastStopLocsInBatch);
+                    const auto distArr = dist.toIntArray();
+                    for (int i = batchStart; i < batchEnd; ++i) {
+                        const int idxOffset = i * numTransferPoints;
+                        lastStopsToTransfersDistances.distances[idxOffset + j] = distArr[i - batchStart];
                     }
-                    result.minDistancePerRow[i] = minDistanceInRow;
+                }
+
+                for (int i = batchStart; i < batchEnd; ++i) {
+                    lastStopsToTransfersDistances.minDistancePerRow[i] = anyTpAtLastStop[i - batchStart]? 0 : minDistPerRow[i - batchStart];
                 }
             }
 
-            return result;
+            return lastStopsToTransfersDistances;
         }
 
-        FlatRegular2DDistanceArray calculateDistancesFromPickupsToAllTransfers(const std::vector<int> &pickupLocs,
+        const FlatRegular2DDistanceArray& calculateDistancesFromPickupsToAllTransfers(const std::vector<int> &pickupLocs,
                                                                                const std::vector<int> &transferPoints) {
             const int numTransferPoints = static_cast<int>(transferPoints.size());
-            FlatRegular2DDistanceArray result(pickupLocs.size(), numTransferPoints);
+            pickupsToTransfersDistances.init(pickupLocs.size(), numTransferPoints);
 
             if (pickupLocs.empty() || transferPoints.empty())
-                return result;
+                return pickupsToTransfersDistances;
 
             KASSERT(chosenTargetsSelection);
 
             // Process queries for pickups in batches of size K.
             std::array<int, K> sources;
+            std::array<int, K> pickupLocsInBatchArr;
+            DistanceLabel pickupLocsInBatch;
+            DistanceLabel minDistPerRow;
+            LabelMask anyTpAtPickup;
             const int numBatches = pickupLocs.size() / K + (pickupLocs.size() % K != 0);
             for (int batchIdx = 0; batchIdx < numBatches; ++batchIdx) {
                 const int batchStart = batchIdx * K;
@@ -175,47 +192,61 @@ namespace karri {
                     const int pickupLoc = pickupLocs[i];
                     const auto pickupVertex = inputGraph.edgeHead(pickupLoc);
                     sources[i - batchStart] = vehCh.rank(pickupVertex);
+                    pickupLocsInBatchArr[i - batchStart] = pickupLoc;
                 }
                 for (int i = batchEnd; i < batchStart + K; ++i) {
                     sources[i - batchStart] = sources[0]; // copy of first source to fill partial batch
+                    pickupLocsInBatchArr[i - batchStart] = pickupLocsInBatchArr[0];
                 }
 
                 forwardQuery.run(*chosenTargetsSelection, sources);
 
-                for (int i = batchStart; i < batchEnd; ++i) {
-                    const int idxOffset = i * result.width;
-                    int minDistanceInRow = INFTY;
-                    for (int j = 0; j < transferPoints.size(); j++) {
-                        const int tpLoc = transferPoints[j];
-                        const int tpTail = inputGraph.edgeTail(tpLoc);
-                        const int tpRank = vehCh.rank(tpTail);
-                        const int tpRankInSelection = chosenTargetsSelection->fullToSubMapping[tpRank];
-                        const int distance = forwardQuery.getDistance(tpRankInSelection, i - batchStart) +
-                                             inputGraph.travelTime(tpLoc);
+                pickupLocsInBatch.loadIntArray(pickupLocsInBatchArr.data());
+                minDistPerRow = INFTY;
+                anyTpAtPickup = false;
 
-                        result.distances[idxOffset + j] = distance;
-                        minDistanceInRow = std::min(minDistanceInRow, distance);
+                for (int j = 0; j < numTransferPoints; j++) {
+                    const int tpLoc = transferPoints[j];
+                    const int tpTail = inputGraph.edgeTail(tpLoc);
+                    const int tpRank = vehCh.rank(tpTail);
+                    const int tpRankSelection = chosenTargetsSelection->fullToSubMapping[tpRank];
+                    const DistanceLabel dist = forwardQuery.getDistances(tpRankSelection) + inputGraph.travelTime(tpLoc);
+                    minDistPerRow.min(dist);
+                    anyTpAtPickup |= (tpLoc == pickupLocsInBatch);
+                    const auto distArr = dist.toIntArray();
+                    for (int i = batchStart; i < batchEnd; ++i) {
+                        const int idxOffset = i * numTransferPoints;
+                        pickupsToTransfersDistances.distances[idxOffset + j] = distArr[i - batchStart];
                     }
-                    result.minDistancePerRow[i] = minDistanceInRow;
+                }
+
+                for (int i = batchStart; i < batchEnd; ++i) {
+                    pickupsToTransfersDistances.minDistancePerRow[i] = anyTpAtPickup[i - batchStart]? 0 : minDistPerRow[i - batchStart];
                 }
             }
 
-            return result;
+            return pickupsToTransfersDistances;
         }
 
-        FlatRegular2DDistanceArray
+        const FlatRegular2DDistanceArray&
         calculateDistancesFromAllTransfersToDropoffs(const std::vector<int> &transferPoints,
                                                      const std::vector<int> &dropoffLocs) {
             const int numTransferPoints = static_cast<int>(transferPoints.size());
-            FlatRegular2DDistanceArray result(dropoffLocs.size(), numTransferPoints);
+            transfersToDropoffsDistances.init(dropoffLocs.size(), numTransferPoints);
 
             if (dropoffLocs.empty() || transferPoints.empty())
-                return result;
+                return transfersToDropoffsDistances;
 
             KASSERT(chosenSourcesSelection);
 
             // Process queries for dropoffs in batches of size K.
             std::array<int, K> targets;
+            std::array<int, K> dropoffLocsInBatchArr;
+            DistanceLabel dropoffLocsInBatch;
+            std::array<int, K> dropoffOffsetsArr;
+            DistanceLabel dropoffOffsets;
+            DistanceLabel minDistPerRow;
+            LabelMask anyTpAtDropoff;
             const int numBatches = dropoffLocs.size() / K + (dropoffLocs.size() % K != 0);
             for (int batchIdx = 0; batchIdx < numBatches; ++batchIdx) {
                 const int batchStart = batchIdx * K;
@@ -224,33 +255,43 @@ namespace karri {
                     const int dropoffLoc = dropoffLocs[i];
                     const auto dropoffVertex = inputGraph.edgeTail(dropoffLoc);
                     targets[i - batchStart] = vehCh.rank(dropoffVertex);
+                    dropoffLocsInBatchArr[i - batchStart] = dropoffLoc;
+                    dropoffOffsetsArr[i - batchStart] = inputGraph.travelTime(dropoffLoc);
                 }
                 for (int i = batchEnd; i < batchStart + K; ++i) {
                     targets[i - batchStart] = targets[0]; // copy of first source to fill partial batch
+                    dropoffLocsInBatchArr[i - batchStart] = dropoffLocsInBatchArr[0];
+                    dropoffOffsetsArr[i - batchStart] = dropoffOffsetsArr[0];
                 }
 
                 reverseQuery.run(*chosenSourcesSelection, targets);
 
-                for (int i = batchStart; i < batchEnd; ++i) {
-                    const auto dropoffOffset = inputGraph.travelTime(dropoffLocs[i]);
-                    const int idxOffset = i * result.width;
-                    int minDistanceInRow = INFTY;
-                    for (int j = 0; j < transferPoints.size(); j++) {
-                        const int tpLoc = transferPoints[j];
-                        const int tpHead = inputGraph.edgeHead(tpLoc);
-                        const int tpRank = vehCh.rank(tpHead);
-                        const int tpRankInSelection = chosenSourcesSelection->fullToSubMapping[tpRank];
-                        const int distance =
-                                reverseQuery.getDistance(tpRankInSelection, i - batchStart) + dropoffOffset;
+                dropoffLocsInBatch.loadIntArray(dropoffLocsInBatchArr.data());
+                dropoffOffsets.loadIntArray(dropoffOffsetsArr.data());
+                minDistPerRow = INFTY;
+                anyTpAtDropoff = false;
 
-                        result.distances[idxOffset + j] = distance;
-                        minDistanceInRow = std::min(minDistanceInRow, distance);
+                for (int j = 0; j < numTransferPoints; j++) {
+                    const int tpLoc = transferPoints[j];
+                    const int tpHead = inputGraph.edgeHead(tpLoc);
+                    const int tpRank = vehCh.rank(tpHead);
+                    const int tpRankSelection = chosenSourcesSelection->fullToSubMapping[tpRank];
+                    const DistanceLabel dist = reverseQuery.getDistances(tpRankSelection) + dropoffOffsets;
+                    minDistPerRow.min(dist);
+                    anyTpAtDropoff |= (tpLoc == dropoffLocsInBatch);
+                    const auto distArr = dist.toIntArray();
+                    for (int i = batchStart; i < batchEnd; ++i) {
+                        const int idxOffset = i * numTransferPoints;
+                        transfersToDropoffsDistances.distances[idxOffset + j] = distArr[i - batchStart];
                     }
-                    result.minDistancePerRow[i] = minDistanceInRow;
+                }
+
+                for (int i = batchStart; i < batchEnd; ++i) {
+                    transfersToDropoffsDistances.minDistancePerRow[i] = anyTpAtDropoff[i - batchStart] ? 0 : minDistPerRow[i - batchStart];
                 }
             }
 
-            return result;
+            return transfersToDropoffsDistances;
         }
 
 
@@ -302,6 +343,11 @@ namespace karri {
         using Query = PHASTQuery<CH::SearchGraph, CH::Weight, LabelSetT, dij::NoCriterion>;
         Query forwardQuery;
         Query reverseQuery;
+
+        // Results of queries. Stored here to avoid reallocation in each query.
+        FlatRegular2DDistanceArray lastStopsToTransfersDistances;
+        FlatRegular2DDistanceArray pickupsToTransfersDistances;
+        FlatRegular2DDistanceArray transfersToDropoffsDistances;
 
         LoggerT &selectionLogger;
 

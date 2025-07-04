@@ -190,20 +190,20 @@ namespace karri {
             // lastStopToTransferDistances[i][j] stores the distance from the last stop of the i-th vehicle in
             // relALSDropoffs.getVehiclesWithRelevantPDLocs() to the j-th edge in transferEdges
             innerTimer.restart();
-            const auto lastStopToTransfersDistances = strategy.calculateDistancesFromLastStopToAllTransfers(
+            const auto &lastStopToTransfersDistances = strategy.calculateDistancesFromLastStopToAllTransfers(
                     relevantLastStopLocs, allTransferEdges);
             const auto searchTimeLastStopToTransfer = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             // Calculate the distances from all pickups to the potential transfers
             innerTimer.restart();
             // pickupToTransfersDistances[i][j] stores the distance from i-th pickup to the j-th edge in transferEdges
-            const auto pickupsToTransfersDistances = strategy.calculateDistancesFromPickupsToAllTransfers(pickupLocs,
-                                                                                                          allTransferEdges);
+            const auto &pickupsToTransfersDistances = strategy.calculateDistancesFromPickupsToAllTransfers(pickupLocs,
+                                                                                                           allTransferEdges);
             const int64_t searchTimePickupToTransfer = innerTimer.elapsed<std::chrono::nanoseconds>();
 
             innerTimer.restart();
             // transferToDropoffDistances[i][j] stores the distance from i-th dropoff to the j-th edge in transferEdges
-            const auto transferToDropoffDistances = strategy.calculateDistancesFromAllTransfersToDropoffs(
+            const auto &transferToDropoffDistances = strategy.calculateDistancesFromAllTransfersToDropoffs(
                     allTransferEdges, dropoffLocs);
             const auto searchTimeTransferToDropoff = innerTimer.elapsed<std::chrono::nanoseconds>();
 
@@ -485,7 +485,7 @@ namespace karri {
 
                 const auto transferLegLength = calcLengthOfLegStartingAt(i, pVehId, routeState);
                 localParetoOptimalTps.clear();
-                for (auto edge : transferPoints) {
+                for (auto edge: transferPoints) {
                     const int tpLoc = edge.edge;
                     KASSERT(isEdgeRel.isSet(tpLoc));
 
@@ -510,11 +510,12 @@ namespace karri {
                     const int detourDVeh = distToTransferDVeh + !transferAtLastStopDVeh * stopTime +
                                            distNextLegAfterTransferDVeh;
 
-                    const auto minTripTimeForTp = minTripTimeToStopI + distToTransferPVeh + distNextLegAfterTransferDVeh;
+                    const auto minTripTimeForTp =
+                            minTripTimeToStopI + distToTransferPVeh + distNextLegAfterTransferDVeh;
                     const auto minResDetourPVehForTp = std::max(
                             detourPVeh - transferLegLength - vehWaitTimeFromStopIToEndOfRoute, 0);
                     const auto minCostForTp = F::calcVehicleCost(minResDetourPVehForTp + detourDVeh) +
-                                         F::calcTripCost(minTripTimeForTp, requestState);
+                                              F::calcTripCost(minTripTimeForTp, requestState);
                     if (minCostForTp > std::min(localBestCost.total, requestState.getBestCost()))
                         continue;
 

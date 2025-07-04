@@ -35,12 +35,12 @@ namespace karri {
     struct FlatRegular2DDistanceArray {
 
         ConstantVectorRange<int> getDistancesFor(const int row) const {
-            KASSERT(row >= 0 && (width == 0 || row < distances.size() / width));
+            KASSERT(row >= 0 && row < curNumRows);
             return {distances.begin() + row * width, distances.begin() + (row + 1) * width};
         }
 
         int getMinDistanceFor(const int row) const {
-            KASSERT(row >= 0 && row < minDistancePerRow.size());
+            KASSERT(row >= 0 && row < curNumRows);
             return minDistancePerRow[row];
         }
 
@@ -52,14 +52,25 @@ namespace karri {
         template<typename, typename, typename, typename, typename>
         friend class PHASTStrategyALS;
 
-        // Constructs a 2D distance array with numRows rows and rowWidth distances per row.
-        // No initialization of values takes place.
-        FlatRegular2DDistanceArray(const int numRows, const int rowWidth) : width(rowWidth),
-                                                                            distances(numRows * rowWidth),
-                                                                            minDistancePerRow(numRows, INFTY) {}
 
+        FlatRegular2DDistanceArray() : width(0), curNumRows(0), distances(), minDistancePerRow() {}
+
+        // Initializes 2D distance array to be able to contain at least numRows rows and rowWidth distances per row.
+        // No initialization of values takes place.
+        void init(const int numRows, const int rowWidth) {
+            KASSERT(numRows >= 0 && rowWidth >= 0);
+            width = rowWidth;
+            curNumRows = numRows;
+            const int newMinSize = numRows * rowWidth;
+            std::fill(minDistancePerRow.begin(), minDistancePerRow.end(), INFTY);
+            if (newMinSize > distances.size())
+                distances.resize(numRows * rowWidth);
+            if (numRows > minDistancePerRow.size())
+                minDistancePerRow.resize(numRows, INFTY);
+        }
 
         int width; // Number of distances per row
+        int curNumRows;
         std::vector<int> distances;
         std::vector<int> minDistancePerRow;
     };
