@@ -30,7 +30,8 @@
 #include "Algorithms/Dijkstra/Dijkstra.h"
 #include "VertexInEllipse.h"
 #include "DataStructures/Containers/TimestampedVector.h"
-#include "CHEllipseReconstructorQuery.h"
+
+#include <tbb/parallel_for.h>
 
 namespace karri {
 

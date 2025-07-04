@@ -46,7 +46,10 @@ namespace karri {
         EdgeEllipseContainer() = default;
 
         template<typename, typename, typename, bool, int, typename, typename>
-        friend class CHEllipseReconstructor;
+        friend class PHASTEllipseReconstructor;
+
+        template<typename, typename, typename, typename>
+        friend class DijkstraEllipseReconstructor;
 
         friend class OnlyAtStopEllipseReconstructor;
 

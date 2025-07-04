@@ -31,7 +31,6 @@
 #include "Algorithms/KaRRi/BaseObjects/PD.h"
 #include "Algorithms/KaRRi/RequestState/RelevantPDLocs.h"
 #include "Algorithms/KaRRi/PDDistanceQueries/PDDistances.h"
-#include "Algorithms/KaRRi/TransferPoints/TransferVehicles.h"
 
 namespace karri {
 

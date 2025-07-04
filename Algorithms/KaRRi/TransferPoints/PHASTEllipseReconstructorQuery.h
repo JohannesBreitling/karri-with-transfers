@@ -29,7 +29,7 @@
 #include "DataStructures/Labels/BasicLabelSet.h"
 #include "Algorithms/Dijkstra/Dijkstra.h"
 #include "VertexInEllipse.h"
-#include "CHEllipseReconstructorStats.h"
+#include "EllipseReconstructorStats.h"
 #include "DataStructures/Containers/TimestampedVector.h"
 #include "DataStructures/Containers/FastResetFlagArray.h"
 
@@ -42,7 +42,7 @@ namespace karri {
     // Computes the set of vertices contained in the detour ellipse between a pair of consecutive stops in a vehicle
     // route using bucket entries and a CH topological downward search.
     template<typename EllipticBucketsEnvironmentT, typename LabelSet, int TOP_VERTICES_DIVISOR = 1, typename WeightT = TraversalCostAttribute>
-    class CHEllipseReconstructorQuery {
+    class PHASTEllipseReconstructorQuery {
 
         using DistanceLabel = typename LabelSet::DistanceLabel;
         using LabelMask = typename LabelSet::LabelMask;
@@ -50,13 +50,13 @@ namespace karri {
 
     public:
 
-        CHEllipseReconstructorQuery(const CH &ch,
-                                    const typename CH::SearchGraph &downGraph,
-                                    const typename CH::SearchGraph &upGraph,
-                                    const Permutation &sweepVertexPermutation,
-                                    const std::vector<int>& firstIdxOfLargeLevels,
-                                    const EllipticBucketsEnvironmentT &ellipticBucketsEnv,
-                                    const RouteState &routeState)
+        PHASTEllipseReconstructorQuery(const CH &ch,
+                                       const typename CH::SearchGraph &downGraph,
+                                       const typename CH::SearchGraph &upGraph,
+                                       const Permutation &sweepVertexPermutation,
+                                       const std::vector<int>& firstIdxOfLargeLevels,
+                                       const EllipticBucketsEnvironmentT &ellipticBucketsEnv,
+                                       const RouteState &routeState)
                 : ch(ch),
                   numVertices(downGraph.numVertices()),
                   downGraph(downGraph),
@@ -114,7 +114,7 @@ namespace karri {
                  const DistanceLabel &leeways,
                  const int numEllipses, // number of stopIds actually used in batch
                  std::vector<std::vector<VertexInEllipse>>::iterator firstEllipseInBatch,
-                 CHEllipseReconstructorStats &stats) {
+                 EllipseReconstructorStats &stats) {
             KASSERT(numEllipses <= K);
 
             Timer timer;
@@ -209,14 +209,6 @@ namespace karri {
             }
 
             stats.postprocessTime += timer.elapsed<std::chrono::nanoseconds>();
-        }
-
-        const DistanceLabel &getDistanceLabelFrom(const int v) const {
-            return distFrom[shiftedIndexForAlignment[v]];
-        }
-
-        const DistanceLabel &getDistanceLabelTo(const int v) const {
-            return distTo[shiftedIndexForAlignment[v]];
         }
 
     private:

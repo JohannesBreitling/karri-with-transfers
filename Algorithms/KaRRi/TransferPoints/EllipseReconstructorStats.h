@@ -24,17 +24,10 @@
 
 #pragma once
 
-#include "Algorithms/KaRRi/RouteState.h"
-#include "Algorithms/CH/CH.h"
-#include "DataStructures/Labels/BasicLabelSet.h"
-#include "Algorithms/Dijkstra/Dijkstra.h"
-#include "VertexInEllipse.h"
-#include "DataStructures/Containers/TimestampedVector.h"
-#include "DataStructures/Containers/FastResetFlagArray.h"
 
 namespace karri {
 
-        struct CHEllipseReconstructorStats {
+        struct EllipseReconstructorStats {
             int numVerticesSettled = 0;
             int numEdgesRelaxed = 0;
             int64_t initTime = 0;
@@ -49,7 +42,7 @@ namespace karri {
                 postprocessTime = 0;
             }
 
-            CHEllipseReconstructorStats& operator+=(const CHEllipseReconstructorStats& other) {
+            EllipseReconstructorStats& operator+=(const EllipseReconstructorStats& other) {
                 numVerticesSettled += other.numVerticesSettled;
                 numEdgesRelaxed += other.numEdgesRelaxed;
                 initTime += other.initTime;

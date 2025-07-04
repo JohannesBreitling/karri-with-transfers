@@ -299,6 +299,8 @@ namespace karri::stats {
         int64_t withLeewayQuery_initTime;
         int64_t withLeewayQuery_topoSearchTime;
         int64_t withLeewayQuery_postprocessTime;
+        int64_t withLeewayQuery_numVerticesSettled;
+        int64_t withLeewayQuery_numEdgesRelaxed;
 
         static constexpr auto LOGGER_NAME = "perf_ellipse_reconstruction.csv";
         static constexpr auto LOGGER_COLS =
@@ -314,6 +316,8 @@ namespace karri::stats {
                 "with_leeway_query.init_time,"
                 "with_leeway_query.topo_search_time,"
                 "with_leeway_query.postprocess_time,"
+                "with_leeway_query.num_vertices_settled,"
+                "with_leeway_query.num_edges_relaxed,"
                 "total_time\n";
 
         int64_t getTotalTime() const {
@@ -335,6 +339,8 @@ namespace karri::stats {
                << withLeewayQuery_initTime << ", "
                << withLeewayQuery_topoSearchTime << ", "
                << withLeewayQuery_postprocessTime << ", "
+               << withLeewayQuery_numVerticesSettled << ", "
+               << withLeewayQuery_numEdgesRelaxed << ", "
                << getTotalTime();
             return ss.str();
         }
@@ -352,6 +358,8 @@ namespace karri::stats {
             withLeewayQuery_initTime = 0;
             withLeewayQuery_topoSearchTime = 0;
             withLeewayQuery_postprocessTime = 0;
+            withLeewayQuery_numVerticesSettled = 0;
+            withLeewayQuery_numEdgesRelaxed = 0;
         }
     };
 
@@ -522,18 +530,18 @@ namespace karri::stats {
             ss << totalTime << ", "
                << initTime << ","
                << numCandidateVehiclesPickupBNS << ", "
-                    << numCandidateVehiclesPickupORD << ", "
-                    << numCandidateVehiclesPickupALS << ", "
-                    << numCandidateVehiclesDropoffORD << ", "
-                    << numCandidateVehiclesDropoffALS << ", "
-                    << numAssignmentsTriedPickupBNS << ", "
-                    << numAssignmentsTriedPickupORD << ", "
-                    << numAssignmentsTriedPickupALS << ", "
-                    << numAssignmentsTriedDropoffORD << ", "
-                    << numAssignmentsTriedDropoffALS << ", "
-                    << tryAssignmentsTime << ", "
-                    << tryPostponedAssignmentsTime << ", "
-                    << numPostponedAssignments << ", "
+               << numCandidateVehiclesPickupORD << ", "
+               << numCandidateVehiclesPickupALS << ", "
+               << numCandidateVehiclesDropoffORD << ", "
+               << numCandidateVehiclesDropoffALS << ", "
+               << numAssignmentsTriedPickupBNS << ", "
+               << numAssignmentsTriedPickupORD << ", "
+               << numAssignmentsTriedPickupALS << ", "
+               << numAssignmentsTriedDropoffORD << ", "
+               << numAssignmentsTriedDropoffALS << ", "
+               << tryAssignmentsTime << ", "
+               << tryPostponedAssignmentsTime << ", "
+               << numPostponedAssignments << ", "
                << numTransferPoints << ", "
                << searchTimePickupALS << ", "
                << searchTimeLastStopToTransfer << ", "
@@ -625,18 +633,18 @@ namespace karri::stats {
             std::stringstream ss;
             ss << totalTime << ", "
                << initTime << ", "
-                    << numCandidateVehiclesPickupBNS << ", "
-                    << numCandidateVehiclesPickupORD << ", "
-                    << numCandidateVehiclesDropoffALS << ", "
-                    << numPickups << ", "
-                    << numDropoffs << ", "
+               << numCandidateVehiclesPickupBNS << ", "
+               << numCandidateVehiclesPickupORD << ", "
+               << numCandidateVehiclesDropoffALS << ", "
+               << numPickups << ", "
+               << numDropoffs << ", "
 
-                    << numAssignmentsTriedPickupBNS << ", "
-                    << numAssignmentsTriedPickupORD << ", "
-                    << numAssignmentsTriedDropoffALS << ", "
-                    << tryAssignmentsTime << ", "
-                    << tryPostponedAssignmentsTime << ", "
-                    << numPostponedAssignments << ", "
+               << numAssignmentsTriedPickupBNS << ", "
+               << numAssignmentsTriedPickupORD << ", "
+               << numAssignmentsTriedDropoffALS << ", "
+               << tryAssignmentsTime << ", "
+               << tryPostponedAssignmentsTime << ", "
+               << numPostponedAssignments << ", "
 
                << numTransferPoints << ", "
 

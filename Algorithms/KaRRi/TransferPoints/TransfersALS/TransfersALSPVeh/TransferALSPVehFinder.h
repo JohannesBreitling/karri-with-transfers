@@ -465,8 +465,6 @@ namespace karri {
                             !relORDDropoffs.getVehiclesWithRelevantPDLocs().empty());
                     const auto &thisPickupToTransfersDistances = pickupsToTransfersDistances.getDistancesFor(
                             pickup.id);
-                    KASSERT(minThisPickupToTransferDistance == *std::min_element(thisPickupToTransfersDistances.begin(),
-                                                                                 thisPickupToTransfersDistances.end()));
 
                     if (wu.dVehType == ORDINARY) {
                         tryDropoffORDForPickupALS(wu.pVehId, pickup, distanceToPickup, wu.dVehId,

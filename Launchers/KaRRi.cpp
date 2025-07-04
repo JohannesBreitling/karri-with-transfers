@@ -67,9 +67,8 @@
 #include "Algorithms/KaRRi/DalsAssignments/DALSAssignmentsFinder.h"
 
 #include "Algorithms/KaRRi/TransferPoints/AssignmentsWithTransferFinder.h"
-#include "Algorithms/KaRRi/TransferPoints/DijkstraTransferPointStrategy.h"
-#include "Algorithms/KaRRi/TransferPoints/CHEllipseReconstructor.h"
-#include "Algorithms/KaRRi/TransferPoints/TransferVehicles.h"
+#include "Algorithms/KaRRi/TransferPoints/PHASTEllipseReconstructor.h"
+#include "Algorithms/KaRRi/TransferPoints/DijkstraEllipseReconstructor.h"
 
 #include "Algorithms/KaRRi/TransferPoints/EdgeEllipseIntersector.h"
 #include "Algorithms/KaRRi/TransferPoints/PickupALS/TransfersPickupALSBCHStrategy.h"
@@ -87,6 +86,11 @@
 #include "Algorithms/KaRRi/AssignmentFinder.h"
 #include "Algorithms/KaRRi/SystemStateUpdater.h"
 #include "Algorithms/KaRRi/EventSimulation.h"
+
+#include "Algorithms/KaRRi/TransferPoints/OrdinaryTransfers/DirectTransferDistances/BCHDirectTransferDistancesFinder.h"
+#include "Parallel/hardware_topology.h"
+#include "Parallel/tbb_initializer.h"
+#include "Algorithms/KaRRi/TransferPoints/OnlyAtStopEllipseReconstructor.h"
 
 #ifdef KARRI_USE_CCHS
 
@@ -124,10 +128,6 @@
 #if KARRI_DALS_STRATEGY == KARRI_COL
 
 #include "Algorithms/KaRRi/DalsAssignments/CollectiveBCHStrategy.h"
-#include "Algorithms/KaRRi/TransferPoints/OrdinaryTransfers/DirectTransferDistances/BCHDirectTransferDistancesFinder.h"
-#include "Parallel/hardware_topology.h"
-#include "Parallel/tbb_initializer.h"
-#include "Algorithms/KaRRi/TransferPoints/OnlyAtStopEllipseReconstructor.h"
 
 #elif KARRI_DALS_STRATEGY == KARRI_IND
 
@@ -606,30 +606,31 @@ int main(int argc, char *argv[]) {
         using InsertionAsserterImpl = InsertionAsserter<VehicleInputGraph, VehCHEnv>;
         InsertionAsserterImpl asserter(routeState, vehicleInputGraph, *vehChEnv);
 
-#if KARRI_TRANSFER_HEURISTIC_LEVEL == 0 && KARRI_TRANSFER_USE_DIJKSTRA_ELLIPSE_RECONSTRUCTION
-        using TransferPointsLabelSet = BasicLabelSet<1, ParentInfo::NO_PARENT_INFO>;
-        using TransferPointStrategyImpl = TransferPointStrategies::DijkstraTransferPointStrategy<VehicleInputGraph, TransferPointsLabelSet>;
-        TransferPointStrategyImpl transferPointStrategy(routeState, vehicleInputGraph, revVehicleGraph, fleet);
+        using EllipseReconstructorLabelSet = std::conditional_t<KARRI_TRANSFER_CH_ELLIPSE_RECONSTRUCTOR_USE_SIMD,
+                SimdLabelSet<KARRI_TRANSFER_CH_ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>,
+                BasicLabelSet<KARRI_TRANSFER_CH_ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>>;
+
+#if KARRI_TRANSFER_USE_DIJKSTRA_ELLIPSE_RECONSTRUCTION
+        using EllipseReconstructorImpl = DijkstraEllipseReconstructor<VehicleInputGraph, VehCHEnv, TravelTimeAttribute, EllipseReconstructorLabelSet>;
+        EllipseReconstructorImpl ellipseReconstructor(vehicleInputGraph, revVehicleGraph, *vehChEnv, reqState, routeState);
 #else
 #if KARRI_TRANSFER_HEURISTIC_LEVEL < 2
 
         static constexpr int ELLIPSES_TOP_VERTICES_DIVISOR =
                 KARRI_TRANSFER_HEURISTIC_LEVEL == 0 ? 1 : KARRI_TRANSFER_CH_ELLIPSE_RECONSTRUCTOR_TOP_VERTICES_DIVISOR;
-        using EllipseReconstructorLabelSet = std::conditional_t<KARRI_TRANSFER_CH_ELLIPSE_RECONSTRUCTOR_USE_SIMD,
-                SimdLabelSet<KARRI_TRANSFER_CH_ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>,
-                BasicLabelSet<KARRI_TRANSFER_CH_ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>>;
+
         static constexpr bool PARALLELIZE_PHAST_DETOUR_ELLIPSES = KARRI_TRANSFER_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE;
 
         if (!PARALLELIZE_PHAST_DETOUR_ELLIPSES && clp.isSet("max-num-threads")) {
             std::cout
-                    << "Warning: -max-num-threads is set but KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE is OFF, ignoring -max-num-threads."
+                    << "Warning: -max-num-threads is set but KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE is OFF."
                     << std::endl;
         }
         if (PARALLELIZE_PHAST_DETOUR_ELLIPSES && !clp.isSet("max-num-threads")) {
             std::cout << "Warning: KARRI_CH_ELLIPSE_RECONSTRUCTOR_PARALLELIZE is ON but -max-num-threads is not set. Queries will execute using 1 thread." << std::endl;
         }
 
-        using EllipseReconstructorImpl = CHEllipseReconstructor<VehicleInputGraph, VehCHEnv, EllipticBucketsEnv, PARALLELIZE_PHAST_DETOUR_ELLIPSES, ELLIPSES_TOP_VERTICES_DIVISOR, TraversalCostAttribute, EllipseReconstructorLabelSet>;
+        using EllipseReconstructorImpl = PHASTEllipseReconstructor<VehicleInputGraph, VehCHEnv, EllipticBucketsEnv, PARALLELIZE_PHAST_DETOUR_ELLIPSES, ELLIPSES_TOP_VERTICES_DIVISOR, TraversalCostAttribute, EllipseReconstructorLabelSet>;
         EllipseReconstructorImpl ellipseReconstructor(vehicleInputGraph, *vehChEnv, fleet, ellipticBucketsEnv,
                                                       reqState, routeState, calc);
 #else

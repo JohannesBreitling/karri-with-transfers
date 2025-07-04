@@ -79,6 +79,9 @@ namespace karri {
 
     template<typename, typename, typename, typename, typename>
     class ClosestPDLocToLastStopBCHQuery;
+
+    template<typename, typename, typename>
+    class DijkstraEllipseReconstructorQuery;
 }
 
 
@@ -123,6 +126,10 @@ class Dijkstra {
     template<typename, typename, typename, typename, typename>
     friend
     class karri::ClosestPDLocToLastStopBCHQuery;
+
+    template<typename, typename, typename>
+    friend
+    class karri::DijkstraEllipseReconstructorQuery;
 
 private:
     using Graph = GraphT;                                    // The graph we work on.
