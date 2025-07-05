@@ -606,9 +606,11 @@ int main(int argc, char *argv[]) {
         using InsertionAsserterImpl = InsertionAsserter<VehicleInputGraph, VehCHEnv>;
         InsertionAsserterImpl asserter(routeState, vehicleInputGraph, *vehChEnv);
 
+#if KARRI_TRANSFER_HEURISTIC_LEVEL < 2 || KARRI_TRANSFER_USE_DIJKSTRA_ELLIPSE_RECONSTRUCTION
         using EllipseReconstructorLabelSet = std::conditional_t<KARRI_TRANSFER_CH_ELLIPSE_RECONSTRUCTOR_USE_SIMD,
                 SimdLabelSet<KARRI_TRANSFER_CH_ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>,
                 BasicLabelSet<KARRI_TRANSFER_CH_ELLIPSE_RECONSTRUCTOR_LOG_K, ParentInfo::NO_PARENT_INFO>>;
+#endif
 
 #if KARRI_TRANSFER_USE_DIJKSTRA_ELLIPSE_RECONSTRUCTION
         using EllipseReconstructorImpl = DijkstraEllipseReconstructor<VehicleInputGraph, VehCHEnv, TravelTimeAttribute, EllipseReconstructorLabelSet>;
