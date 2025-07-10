@@ -20,8 +20,7 @@ convertToHHMM <- function(seconds) {
 }
 
 
-# Given the path to the result files of a KaRRi run (e.g. 
-# "<output-dir>/Berlin-1pct_pedestrian/karri-col-simd_300_300"), 
+# Given the path to the result files of a KaRRi run (e.g. "<output-dir>/karrit-exact_0_600_0"),
 # this function returns an overview over the solution quality of the assignments.
 quality <- function(file_base, notransfer = FALSE) {
   
@@ -77,7 +76,7 @@ quality <- function(file_base, notransfer = FALSE) {
   print(df)
 }
 
-
+# Prints statistics for type of assignments for run without transfers.
 asgnTypeStatsNoTransfer <- function(file) {
   df <- read.csv(paste0(file, ".bestassignments.csv"))
   
@@ -95,6 +94,7 @@ asgnTypeStatsNoTransfer <- function(file) {
   print(paste0("Sum: ", numnoveh + numord + numpbns + numpals + numdals))
 }
 
+# Prints statistics for number of legs and type of no-transfer (!) assignments for run with transfers.
 asgnTypeStats <- function(file) {
   dfoverall <- read.csv(paste0(file, ".bestassignmentsoverall.csv"))
   numnoveh <- sum(dfoverall$number_of_legs == 0)
@@ -187,26 +187,6 @@ compareBestAssignments <- function(file1, file2) {
   print("All best insertions are equal.")
 }
 
-compareBestAssignmentsWithTransfer <- function(file1, file2) {
-  bestins1 <- read.csv(paste0(file1, ".bestassignmentswithtransfer.csv"))
-  bestins2 <- read.csv(paste0(file2, ".bestassignmentswithtransfer.csv"))
-  
-  bestins1 <- bestins1[order(bestins1$request_id),]
-  bestins2 <- bestins2[order(bestins2$request_id),]
-  
-  # Get smallest row index where at least one value differs
-  idx <- match(TRUE, rowSums(bestins1 != bestins2) > 0)
-  if (is.na(idx)) {
-    print("All best insertions are equal.")
-  } else {
-    print(bestins1[idx, "request_id"])
-    row1 <- bestins1[idx,]
-    row2 <- bestins2[idx,]
-    View(rbind(row1, row2))
-  }
-}
-
-
 perfStats <- function(file_base, type_name, remove_last_row = FALSE) {
   stats <- read.csv(paste0(file_base, ".perf_", type_name, ".csv"))
   if (remove_last_row) {
@@ -218,60 +198,85 @@ perfStats <- function(file_base, type_name, remove_last_row = FALSE) {
   return(stats)
 }
 
-# Given the path to the result files of a KaRRi run, this function returns an 
+# Given the path to the result files of a KaRRiT run, this function returns an
 # overview over the average runtime per request (in microseconds).
 overallPerfStats <- function(file_base) {
   perfStats(file_base, "overall")
 }
 
-# Given the path to the result files of a KaRRi run, this function returns 
+# Given the path to the result files of a KaRRiT run, this function returns
 # performance statistics for the initialization phase.
 initreqPerfStats <- function(file_base) {
   perfStats(file_base, "initreq")
 }
 
-# Given the path to the result files of a KaRRi run, this function returns 
-# performance statistics for the elliptic BCH searches
+# Given the path to the result files of a KaRRiT run, this function returns
+# performance statistics for the elliptic BCH searches in the no-transfer case.
 ellipticBchPerfStats <- function(file_base) {
   perfStats(file_base, "ellipticbch")
 }
 
-# Given the path to the result files of a KaRRi run, this function returns 
-# performance statistics for the computation of PD-distances.
+# Given the path to the result files of a KaRRiT run, this function returns
+# performance statistics for the computation of PD-distances in the no-transfer case.
 pdDistancesPerfStats <- function(file_base) {
   perfStats(file_base, "pddistances")
 }
 
-# Given the path to the result files of a KaRRi run, this function returns 
-# performance statistics for the ordinary insertions phase.
+# Given the path to the result files of a KaRRiT run, this function returns
+# performance statistics for the no-transfer ordinary insertions phase.
 ordPerfStats <- function(file_base) {
   perfStats(file_base, "ord")
 }
 
-# Given the path to the result files of a KaRRi run, this function returns 
-# performance statistics for the PBNS phase.
+# Given the path to the result files of a KaRRiT run, this function returns
+# performance statistics for the no-transfer PBNS phase.
 pbnsPerfStats <- function(file_base) {
   perfStats(file_base, "pbns")
 }
 
-# Given the path to the result files of a KaRRi run, this function returns 
-# performance statistics for the PALS phase.
+# Given the path to the result files of a KaRRiT run, this function returns
+# performance statistics for the no-transfer PALS phase.
 palsPerfStats <- function(file_base) {
   perfStats(file_base, "pals")
 }
 
-# Given the path to the result files of a KaRRi run, this function returns 
-# performance statistics for the DALS phase.
+# Given the path to the result files of a KaRRiT run, this function returns
+# performance statistics for the no-transfer DALS phase.
 dalsPerfStats <- function(file_base) {
   perfStats(file_base, "dals")
 }
 
-# Given the path to the result files of a KaRRi run, this function returns 
+# Given the path to the result files of a KaRRiT run, this function returns
 # performance statistics for updating the route state for each assignment.
 updatePerfStats <- function(file_base) {
   perfStats(file_base, "update")
 }
 
+# Given the path to the result files of a KaRRiT run, this function returns
+# performance statistics for reconstructing detour ellipses for transfer assignments.
+ellipseReconstructionPerfStats <- function(file_base) {
+  perfStats(file_base, "ellipse_reconstruction")
+}
+
+# Given the path to the result files of a KaRRiT run, this function returns
+# performance statistics for finding ordinary transfer assignments.
+ordinaryTransferPerfStats <- function(file_base) {
+  perfStats(file_base, "transf_ord")
+}
+
+# Given the path to the result files of a KaRRiT run, this function returns
+# performance statistics for finding after-last-stop transfer assignments for
+# the pickup vehicle.
+afterLastStopTransferPVehPerfStats <- function(file_base) {
+  perfStats(file_base, "transf_als_pveh")
+}
+
+# Given the path to the result files of a KaRRiT run, this function returns
+# performance statistics for finding after-last-stop transfer assignments for
+# the dropoff vehicle.
+afterLastStopTransferDVehPerfStats <- function(file_base) {
+  perfStats(file_base, "transf_als_dveh")
+}
 
 # Given the path to the result files of a KaRRi run, this function returns
 # performance statistics for the different types of events in the event 
