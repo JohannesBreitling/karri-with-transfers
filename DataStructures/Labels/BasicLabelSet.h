@@ -181,6 +181,12 @@ public:
             return values;
         }
 
+        void loadIntArray(const int *arr) {
+            for (int i = 0; i < K; ++i) {
+                values[i] = arr[i];
+            }
+        }
+
         // Returns the packed sum of lhs and rhs.
         friend DistanceLabel operator+(const DistanceLabel &lhs, const DistanceLabel &rhs) {
             DistanceLabel sum;

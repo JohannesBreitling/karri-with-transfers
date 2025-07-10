@@ -28,7 +28,6 @@
 #include "Algorithms/KaRRi/RequestState/RelevantPDLocs.h"
 #include "Algorithms/KaRRi/BaseObjects/PD.h"
 #include "Algorithms/KaRRi/PbnsAssignments/CurVehLocToPickupSearches.h"
-#include "Algorithms/KaRRi/TransferPoints/TransferVehicles.h"
 
 namespace karri {
 

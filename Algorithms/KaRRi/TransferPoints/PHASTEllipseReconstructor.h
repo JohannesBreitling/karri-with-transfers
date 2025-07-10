@@ -31,7 +31,7 @@
 #include "Algorithms/CH/CHPathUnpacker.h"
 #include "Algorithms/Dijkstra/Dijkstra.h"
 #include "VertexInEllipse.h"
-#include "CHEllipseReconstructorQuery.h"
+#include "PHASTEllipseReconstructorQuery.h"
 #include "DataStructures/Labels/BasicLabelSet.h"
 #include "DataStructures/Labels/SimdLabelSet.h"
 #include "DataStructures/Containers/TimestampedVector.h"
@@ -49,13 +49,13 @@ namespace karri {
             int TOP_VERTICES_DIVISOR,
             typename WeightT = TraversalCostAttribute,
             typename LabelSetT = SimdLabelSet<3, ParentInfo::NO_PARENT_INFO>>
-    class CHEllipseReconstructor {
+    class PHASTEllipseReconstructor {
 
         using DistanceLabel = typename LabelSetT::DistanceLabel;
         using LabelMask = typename LabelSetT::LabelMask;
         static constexpr int K = LabelSetT::K;
 
-        using Query = CHEllipseReconstructorQuery<EllipticBucketsEnvironmentT, LabelSetT, TOP_VERTICES_DIVISOR, WeightT>;
+        using Query = PHASTEllipseReconstructorQuery<EllipticBucketsEnvironmentT, LabelSetT, TOP_VERTICES_DIVISOR, WeightT>;
 
 
         using P2PLabelSet = BasicLabelSet<0, ParentInfo::FULL_PARENT_INFO>;
@@ -63,13 +63,13 @@ namespace karri {
 
     public:
 
-        CHEllipseReconstructor(const InputGraphT &inputGraph,
-                               const CHEnvT &chEnv,
-                               const Fleet &fleet,
-                               const EllipticBucketsEnvironmentT &ellipticBucketsEnv,
-                               const RequestState &requestState,
-                               const RouteState &routeState,
-                               CostCalculator &calc)
+        PHASTEllipseReconstructor(const InputGraphT &inputGraph,
+                                  const CHEnvT &chEnv,
+                                  const Fleet &fleet,
+                                  const EllipticBucketsEnvironmentT &ellipticBucketsEnv,
+                                  const RequestState &requestState,
+                                  const RouteState &routeState,
+                                  CostCalculator &calc)
                 : inputGraph(inputGraph),
                   ch(chEnv.getCH()),
                   fleet(fleet),
@@ -142,9 +142,6 @@ namespace karri {
 
             Timer totalTimer;
             Timer timer;
-
-            numVerticesSettled = 0;
-            numEdgesRelaxed = 0;
 
             EdgeEllipseContainer container;
             container.idxOfStop.resize(routeState.getMaxStopId() + 1, INVALID_INDEX);
@@ -260,8 +257,6 @@ namespace karri {
                 const auto source = ch.rank(inputGraph.edgeHead(stopLocs[stopIdx]));
                 const auto target = ch.rank(inputGraph.edgeTail(stopLocs[stopIdx + 1]));
                 p2pQuery.run(source, target);
-                numVerticesSettled += p2pQuery.getNumVerticesSettled();
-                numEdgesRelaxed += p2pQuery.getNumEdgeRelaxations();
                 KASSERT(p2pQuery.getDistance() + inputGraph.travelTime(stopLocs[stopIdx + 1]) ==
                         routeState.leewayOfLegStartingAt(stopId));
                 edgePathInInputGraph.clear();
@@ -328,8 +323,8 @@ namespace karri {
             }
 
             stats.withLeewaySearchTime += timer.elapsed<std::chrono::nanoseconds>();
-            numVerticesSettled += queryStats.numVerticesSettled;
-            numEdgesRelaxed += queryStats.numEdgesRelaxed;
+            stats.withLeewayQuery_numVerticesSettled += queryStats.numVerticesSettled;
+            stats.withLeewayQuery_numEdgesRelaxed += queryStats.numEdgesRelaxed;
 
             // Convert vertex ellipses to edge ellipses
             timer.restart();
@@ -412,6 +407,13 @@ namespace karri {
 
                     // Make sure ellipse at least contains edges on shortest path
 
+                    // If the stop is the last stop of the vehicle, the ellipse should only contain the stop itself.
+                    if (stopIdx == routeState.numStopsOf(vehId) - 1) {
+                        KASSERT(ellipse.size() == 1);
+                        KASSERT(ellipse[0].edge == stopLocs[stopIdx]);
+                        continue;
+                    }
+
                     // If stopId is at position 0 in the route and the stop at position 1 has just been inserted as an
                     // intermediate stop, we never generated target entries for stop at position 0 so the ellipse will be
                     // empty. This is okay, since the vehicle is already at this intermediate stop so we can ignore the
@@ -480,15 +482,11 @@ namespace karri {
         Permutation ellipseEdgeIdsToOriginalEdgeIds;
 
         Query query;
-        CHEllipseReconstructorStats queryStats;
+        EllipseReconstructorStats queryStats;
         tbb::enumerable_thread_specific<std::vector<int>> distanceFromVertexToNextStopPerThread;
 
         P2PQuery p2pQuery;
         CHPathUnpacker pathUnpacker;
-
-
-        int64_t numVerticesSettled;
-        int64_t numEdgesRelaxed;
     };
 
 } // karri
