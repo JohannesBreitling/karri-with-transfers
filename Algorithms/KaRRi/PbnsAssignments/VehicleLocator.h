@@ -51,7 +51,7 @@ namespace karri {
 
         VehicleLocation computeCurrentLocation(const Vehicle &veh, const int now) {
             const auto &vehId = veh.vehicleId;
-            assert(routeState.numStopsOf(vehId) > 0);
+            KASSERT(routeState.numStopsOf(vehId) > 0);
 
 
             const auto prevOrCurLoc = routeState.stopLocationsFor(vehId)[0];
@@ -91,7 +91,7 @@ namespace karri {
             // to the pickup.
             // (This sounds like a pathologically rare case, but it actually happens on the Berlin-1pct input.)
             chQuery.run(ch.rank(inputGraph.edgeHead(prevOrCurLoc)), ch.rank(inputGraph.edgeTail(nextLoc)));
-            assert(schedDepTimes[0] + chQuery.getDistance() + inputGraph.travelTime(nextLoc) == schedArrTimes[1]);
+            KASSERT(schedDepTimes[0] + chQuery.getDistance() + inputGraph.travelTime(nextLoc) == schedArrTimes[1]);
 
             path.clear();
             unpacker.unpackUpDownPath(chQuery.getUpEdgePath(), chQuery.getDownEdgePath(), path);
@@ -105,7 +105,7 @@ namespace karri {
                 }
             }
 
-            assert(false);
+            KASSERT(false);
             return {};
         }
 

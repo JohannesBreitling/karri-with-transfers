@@ -52,7 +52,7 @@ namespace karri::PickupAfterLastStopStrategies {
             // assignment than the best known.
             LabelMask doesDistanceNotAdmitBestAsgn(const DistanceLabel &distancesToPickups,
                                                    const bool considerPickupWalkingDists = false) const {
-                assert(strat.requestState.minDirectPDDist < INFTY);
+                KASSERT(strat.requestState.minDirectPDDist < INFTY);
 
                 if (strat.upperBoundCost >= INFTY) {
                     // If current best is INFTY, only indices i with distancesToPickups[i] >= INFTY or
@@ -81,7 +81,7 @@ namespace karri::PickupAfterLastStopStrategies {
             // minDistancesToPickups needs to be a vehicle-independent lower bound on the last stop distance.
             LabelMask doesArrTimeNotAdmitBestAsgn(const DistanceLabel &arrTimesAtPickups,
                                                   const DistanceLabel &minDistancesToPickups) const {
-                assert(strat.requestState.minDirectPDDist < INFTY);
+                KASSERT(strat.requestState.minDirectPDDist < INFTY);
 
                 if (strat.upperBoundCost >= INFTY) {
                     // If current best is INFTY, only indices i with arrTimesAtPickups[i] >= INFTY or
@@ -129,7 +129,7 @@ namespace karri::PickupAfterLastStopStrategies {
             }
 
             void updateUpperBoundCost(const int vehId, const DistanceLabel &distancesToPickups) {
-                assert(allSet(distancesToPickups >= 0));
+                KASSERT(allSet(distancesToPickups >= 0));
                 const DistanceLabel cost = calc.template calcUpperBoundCostForKPairedAssignmentsAfterLastStop<LabelSetT>(
                         strat.fleet[vehId], distancesToPickups, strat.curPassengerArrTimesAtPickups,
                         strat.curDistancesToDest,
@@ -271,7 +271,7 @@ namespace karri::PickupAfterLastStopStrategies {
         }
 
         void runSearchesForPickupBatch(const int firstPickupId) {
-            assert(firstPickupId % K == 0 && firstPickupId < requestState.numPickups());
+            KASSERT(firstPickupId % K == 0 && firstPickupId < requestState.numPickups());
 
 
             std::array<int, K> pickupTails;

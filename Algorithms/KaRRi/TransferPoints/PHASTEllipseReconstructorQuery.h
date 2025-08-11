@@ -66,7 +66,7 @@ namespace karri {
                   ellipticBucketsEnv(ellipticBucketsEnv),
                   routeState(routeState),
                   numVerticesToConsider(numVertices / TOP_VERTICES_DIVISOR),
-                  shiftedIndexForAlignment(downGraph.numVertices()),
+                  shiftedIndexForAlignment(downGraph.numVertices(), INVALID_INDEX),
                   enumerateBucketEntriesSearchSpace(numVertices),
                   distTo(numVertices, INFTY),
                   distFrom(numVertices, INFTY),
@@ -96,6 +96,10 @@ namespace karri {
                 }
             }
 
+            for (int i = 0; i < shiftedIndexForAlignment.size(); ++i)
+                KASSERT(shiftedIndexForAlignment[i] != INVALID_INDEX);
+
+            KASSERT(shiftedIndexForAlignment.back() + 1 >= 0);
             distTo.resize(shiftedIndexForAlignment.back() + 1, INFTY);
             distFrom.resize(shiftedIndexForAlignment.back() + 1, INFTY);
 

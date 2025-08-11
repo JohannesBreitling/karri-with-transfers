@@ -184,7 +184,7 @@ namespace karri::Transfers {
         }
 
         void runSearchesForDropoffBatch(const unsigned int firstDropoffId) {
-            assert(firstDropoffId % K == 0 && firstDropoffId < requestState.numDropoffs());
+            KASSERT(firstDropoffId % K == 0 && firstDropoffId < requestState.numDropoffs());
             const int batchIdx = firstDropoffId / K;
 
             std::array<int, K> dropoffTails;

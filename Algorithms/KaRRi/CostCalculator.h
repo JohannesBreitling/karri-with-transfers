@@ -73,7 +73,7 @@ namespace karri {
         RequestCost calcBase(const Assignment &asgn, const RequestContext &context) {
 
             using namespace time_utils;
-            assert(asgn.vehicle && asgn.pickup && asgn.dropoff);
+            KASSERT(asgn.vehicle && asgn.pickup && asgn.dropoff);
             if (!asgn.vehicle || !asgn.pickup || !asgn.dropoff)
                 return RequestCost::INFTY_COST();
 
@@ -518,8 +518,8 @@ namespace karri {
 //                return RequestCost::INFTY_COST();
 //            }
 //
-//            assert(asgn.dropoff);
-//            assert(costPVeh.walkingCost >= 0 && costPVeh.tripCost >= 0 &&
+//            KASSERT(asgn.dropoff);
+//            KASSERT(costPVeh.walkingCost >= 0 && costPVeh.tripCost >= 0 &&
 //                   costPVeh.waitTimeViolationCost >= 0 && costPVeh.changeInTripCostsOfOthers >= 0 &&
 //                   costPVeh.vehCost >= 0);
 //
@@ -639,7 +639,7 @@ namespace karri {
 //        RequestCost calcPartialCostForPVeh(AssignmentWithTransfer &asgn, const RequestContext &context) const {
 //            using namespace time_utils;
 //
-//            assert(asgn.pVeh && asgn.pickup);
+//            KASSERT(asgn.pVeh && asgn.pickup);
 //            if (!asgn.pVeh || !asgn.pickup) {
 //                return RequestCost::INFTY_COST();
 //            }
@@ -653,9 +653,9 @@ namespace karri {
 //            const auto numStops = routeState.numStopsOf(vehId);
 //            const auto actualDepTimeAtPickup = getActualDepTimeAtPickup(asgn, context, routeState);
 //            asgn.depAtPickup = actualDepTimeAtPickup;
-//            assert(actualDepTimeAtPickup >= context.originalRequest.requestTime);
+//            KASSERT(actualDepTimeAtPickup >= context.originalRequest.requestTime);
 //            const auto initialPickupDetour = calcInitialPickupDetour(asgn, actualDepTimeAtPickup, context, routeState);
-//            assert(initialPickupDetour >= 0);
+//            KASSERT(initialPickupDetour >= 0);
 //
 //            int addedTripTime = calcAddedTripTimeInInterval(vehId, asgn.pickupIdx, asgn.transferIdxPVeh,
 //                                                            initialPickupDetour, routeState);
@@ -663,7 +663,7 @@ namespace karri {
 //            asgn.transferAtStopPVeh = transferAtExistingStop;
 //
 //            const auto initalTransferDetour = calcInitialTransferDetourPVeh(asgn, transferAtExistingStop, routeState);
-//            assert(asgn.pickupIdx == asgn.transferIdxPVeh || initalTransferDetour >= 0);
+//            KASSERT(asgn.pickupIdx == asgn.transferIdxPVeh || initalTransferDetour >= 0);
 //
 //            const auto detourRightAfterTransfer = calcDetourRightAfterTransferPVeh(asgn, initialPickupDetour,
 //                                                                                   initalTransferDetour, routeState);
@@ -683,7 +683,7 @@ namespace karri {
 //            }
 //
 //            addedTripTime += calcAddedTripTimeAffectedByPickupAndTransfer(asgn, detourRightAfterTransfer, routeState);
-//            assert(addedTripTime >= 0);
+//            KASSERT(addedTripTime >= 0);
 //
 //            return calcCostPVeh(asgn, context, initialPickupDetour, residualDetourAtEnd, actualDepTimeAtPickup,
 //                                transferAtExistingStop, addedTripTime);
@@ -694,7 +694,7 @@ namespace karri {
 //        calcPartialCostForPVehLowerBound(AssignmentWithTransfer &asgn, const RequestContext &context) const {
 //            using namespace time_utils;
 //
-//            assert(asgn.pVeh && asgn.pickup);
+//            KASSERT(asgn.pVeh && asgn.pickup);
 //            if (!asgn.pVeh || !asgn.pickup) {
 //                return RequestCost::INFTY_COST();
 //            }
@@ -743,7 +743,7 @@ namespace karri {
         template<typename RequestContext>
         static int calcCostForNotUsingVehicle(const int walkingDist, const int travelTimeOfDestEdge,
                                               const RequestContext &context) {
-            assert(walkingDist >= travelTimeOfDestEdge);
+            KASSERT(walkingDist >= travelTimeOfDestEdge);
 
             if (walkingDist >= INFTY)
                 return INFTY;
@@ -781,7 +781,7 @@ namespace karri {
                 asgn.distToDropoff == INFTY || asgn.distFromDropoff == INFTY)
                 return INFTY;
 
-            assert(asgn.pickupStopIdx == asgn.dropoffStopIdx);
+            KASSERT(asgn.pickupStopIdx == asgn.dropoffStopIdx);
             const auto stopIdx = asgn.pickupStopIdx;
             const auto vehId = asgn.vehicle->vehicleId;
 
@@ -894,8 +894,8 @@ namespace karri {
                 const RequestContext &context) const {
             using DistanceLabel = typename LabelSet::DistanceLabel;
             using LabelMask = typename LabelSet::LabelMask;
-            assert(directDist.horizontalMin() >= 0 && directDist.horizontalMax() < INFTY);
-            assert(pickupWalkingDists.horizontalMin() >= 0 && pickupWalkingDists.horizontalMax() < INFTY);
+            KASSERT(directDist.horizontalMin() >= 0 && directDist.horizontalMax() < INFTY);
+            KASSERT(pickupWalkingDists.horizontalMin() >= 0 && pickupWalkingDists.horizontalMax() < INFTY);
 
 
             // Calculations with INFTY don't work like mathematical infinity, so set cost to INFTY later.
@@ -962,9 +962,9 @@ namespace karri {
             using DistanceLabel = typename LabelSet::DistanceLabel;
             using LabelMask = typename LabelSet::LabelMask;
             using namespace time_utils;
-            assert(psgArrTimesAtPickups.horizontalMin() >= 0 && psgArrTimesAtPickups.horizontalMax() < INFTY);
-            assert(distancesToDest.horizontalMin() >= 0 && distancesToDest.horizontalMax() < INFTY);
-            assert(pickupWalkingDists.horizontalMin() >= 0 && pickupWalkingDists.horizontalMax() < INFTY);
+            KASSERT(psgArrTimesAtPickups.horizontalMin() >= 0 && psgArrTimesAtPickups.horizontalMax() < INFTY);
+            KASSERT(distancesToDest.horizontalMin() >= 0 && distancesToDest.horizontalMax() < INFTY);
+            KASSERT(pickupWalkingDists.horizontalMin() >= 0 && pickupWalkingDists.horizontalMax() < INFTY);
 
             const int &vehId = veh.vehicleId;
 
@@ -1024,7 +1024,7 @@ namespace karri {
             const int vehDepTimeAtPrevStop = std::max(routeState.schedDepTimesFor(vehId)[numStops - 1],
                                                       context.originalRequest.requestTime);
             const int detourUntilDepAtPickup = actualDepTimeAtPickup - vehDepTimeAtPrevStop;
-            assert(!((bool) (detourUntilDepAtPickup < 0)));
+            KASSERT(!((bool) (detourUntilDepAtPickup < 0)));
             const int minDetour = detourUntilDepAtPickup + minDistToDropoff;
 
             if (time_utils::isServiceTimeConstraintViolated(veh, context, minDetour, routeState))
@@ -1033,7 +1033,7 @@ namespace karri {
             const int walkingCost = F::calcWalkingCost(pickup.walkingDist, InputConfig::getInstance().pickupRadius);
             const int waitViolationCost = F::calcWaitViolationCost(actualDepTimeAtPickup, context);
             const int waitTimeIncludingWalking = actualDepTimeAtPickup - context.originalRequest.requestTime;
-            assert(waitTimeIncludingWalking >= 0);
+            KASSERT(waitTimeIncludingWalking >= 0);
             const int minTripTime = waitTimeIncludingWalking + context.minDirectPDDist;
             const int minTripCost = F::calcTripCost(minTripTime, context);
 
@@ -1054,7 +1054,7 @@ namespace karri {
                                                                                  const int distToDropoff,
                                                                                  const int minTripTimeToLastStop,
                                                                                  const RequestContext &context) const {
-            assert(distToDropoff < INFTY);
+            KASSERT(distToDropoff < INFTY);
             if (distToDropoff >= INFTY)
                 return INFTY;
 
@@ -1104,8 +1104,8 @@ namespace karri {
                                                                            const int minDistToDropoff,
                                                                            const int minArrTimeAtDropoff,
                                                                            const RequestContext &context) const {
-            assert(minArrTimeAtDropoff >= context.originalRequest.requestTime);
-            assert(minDistToDropoff < INFTY);
+            KASSERT(minArrTimeAtDropoff >= context.originalRequest.requestTime);
+            KASSERT(minDistToDropoff < INFTY);
             if (minDistToDropoff >= INFTY)
                 return INFTY;
 
@@ -1330,7 +1330,7 @@ namespace karri {
 //            const auto arrTimeAtTransfer = getArrTimeAtTransfer(depTimeAtPickup, asgn, initialPickupDetour,
 //                                                                transferAtExistingStop, routeState);
 //            asgn.arrAtTransferPoint = arrTimeAtTransfer;
-//            assert(asgn.pickupPairedLowerBoundUsed || asgn.pickupBNSLowerBoundUsed ||
+//            KASSERT(asgn.pickupPairedLowerBoundUsed || asgn.pickupBNSLowerBoundUsed ||
 //                   asgn.arrAtTransferPoint > asgn.depAtPickup);
 //
 //            const int pickupIdx = asgn.pickupIdx;
@@ -1339,7 +1339,7 @@ namespace karri {
 //                                                                     routeState);
 //            (void) pickupAtExistingStop;
 //
-//            assert(asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed ||
+//            KASSERT(asgn.pickupBNSLowerBoundUsed || asgn.pickupPairedLowerBoundUsed ||
 //                   asgn.pickupIdx != asgn.transferIdxPVeh || transferAtExistingStop ||
 //                   asgn.arrAtTransferPoint != asgn.depAtPickup);
 //            const int tripTime = arrTimeAtTransfer - context.originalRequest.requestTime;
@@ -1349,10 +1349,10 @@ namespace karri {
 //            const auto tripCostPVeh = F::calcTripCost(tripTime, context);
 //            asgn.waitTimeAtPickup = depTimeAtPickup - context.originalRequest.requestTime;
 //            const auto waitTimeViolationCost = F::calcWaitViolationCost(depTimeAtPickup, context);
-//            assert(addedTripTimeForExistingPassengers >= 0);
+//            KASSERT(addedTripTimeForExistingPassengers >= 0);
 //            const auto changeInTripCostsOfOthers = F::calcChangeInTripCostsOfExistingPassengers(
 //                    addedTripTimeForExistingPassengers);
-//            assert(changeInTripCostsOfOthers >= 0);
+//            KASSERT(changeInTripCostsOfOthers >= 0);
 //            const auto vehCostPVeh = F::calcVehicleCost(residualDetourAtEnd);
 //
 //            RequestCost costPVeh;
@@ -1362,16 +1362,16 @@ namespace karri {
 //            costPVeh.changeInTripCostsOfOthers = changeInTripCostsOfOthers;
 //            costPVeh.vehCost = vehCostPVeh;
 //
-//            assert(walkingCostPVeh >= 0 && tripCostPVeh >= 0 && waitTimeViolationCost >= 0 &&
+//            KASSERT(walkingCostPVeh >= 0 && tripCostPVeh >= 0 && waitTimeViolationCost >= 0 &&
 //                   changeInTripCostsOfOthers >= 0 && vehCostPVeh >= 0);
 //
 //            const int total =
 //                    vehCostPVeh + walkingCostPVeh + tripCostPVeh + waitTimeViolationCost + changeInTripCostsOfOthers;
-//            assert(total >= 0);
+//            KASSERT(total >= 0);
 //
 //            costPVeh.total = total;
 //
-//            assert(costPVeh.total >= 0);
+//            KASSERT(costPVeh.total >= 0);
 //            return costPVeh;
 //        }
 //
@@ -1413,7 +1413,7 @@ namespace karri {
 //            cost.waitTimeViolationCost = costPVeh.waitTimeViolationCost + waitTimeViolationCost;
 //            cost.changeInTripCostsOfOthers = costPVeh.changeInTripCostsOfOthers + changeInTripCostsOfOthers;
 //            cost.vehCost = costPVeh.vehCost + vehCost;
-//            assert(cost.walkingCost >= 0 && cost.tripCost >= 0 && cost.waitTimeViolationCost >= 0 &&
+//            KASSERT(cost.walkingCost >= 0 && cost.tripCost >= 0 && cost.waitTimeViolationCost >= 0 &&
 //                   cost.changeInTripCostsOfOthers >= 0 && cost.vehCost >= 0);
 //
 //            if (cost.walkingCost >= INFTY || cost.tripCost >= INFTY ||
@@ -1424,7 +1424,7 @@ namespace karri {
 //
 //            int total = (costPVeh.total + vehCost + walkingCost + tripCost + waitTimeViolationCost +
 //                         changeInTripCostsOfOthers);
-//            assert(total >= 0);
+//            KASSERT(total >= 0);
 //            cost.total = total;
 //            return cost;
 //        }

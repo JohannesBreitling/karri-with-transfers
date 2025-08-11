@@ -60,19 +60,19 @@ namespace karri {
         }
 
         int getDistance(const int &vehId, const int &pdLocId) {
-            assert(vehId < startIdxForVeh.size());
+            KASSERT(vehId < startIdxForVeh.size());
             const int startIdx = startIdxForVeh[vehId];
             if (startIdx == INVALID_INDEX)
                 return INFTY;
 
             const int batchIdx = pdLocId / K;
-            // assert(distances[startIdx + batchIdx][pdLocId % K] >= 0);
+            // KASSERT(distances[startIdx + batchIdx][pdLocId % K] >= 0);
             const int dist = distances[startIdx + batchIdx][pdLocId % K];
             return dist >= 0 ? dist : INFTY;
         }
 
         DistanceLabel getDistancesForCurBatch(const int &vehId) {
-            assert(vehId < startIdxForVeh.size());
+            KASSERT(vehId < startIdxForVeh.size());
             const int startIdx = startIdxForVeh[vehId];
             if (startIdx == INVALID_INDEX)
                 return DistanceLabel(INFTY);

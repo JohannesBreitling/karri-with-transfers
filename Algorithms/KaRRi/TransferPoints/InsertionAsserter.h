@@ -157,7 +157,7 @@ namespace karri {
                 // Assert paired distance
                 const int dropoff = asgn.dropoff->loc;
                 const int pairedDistance = getDistanceBetweenLocations(transfer, dropoff);
-                assert(asgn.distFromTransferDVeh == 0 && asgn.distToDropoff == pairedDistance);
+                KASSERT(asgn.distFromTransferDVeh == 0 && asgn.distToDropoff == pairedDistance);
 
                 if (asgn.distFromTransferDVeh > 0 || asgn.distToDropoff != pairedDistance) {
                     KASSERT(false);

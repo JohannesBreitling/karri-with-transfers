@@ -52,7 +52,7 @@ namespace karri::Transfers {
             // assignment than the best known.
             LabelMask doesDistanceNotAdmitBestAsgn(const DistanceLabel &distancesToPickups,
                                                    const bool considerPickupWalkingDists) const {
-                assert(strat.requestState.minDirectPDDist < INFTY);
+                KASSERT(strat.requestState.minDirectPDDist < INFTY);
 
                 if (strat.upperBoundCost >= INFTY) {
                     // If current best is INFTY, only indices i with distancesToPickups[i] >= INFTY or
@@ -82,7 +82,7 @@ namespace karri::Transfers {
             // minDistancesToPickups needs to be a vehicle-independent lower bound on the last stop distance.
             LabelMask doesArrTimeNotAdmitBestAsgn(const DistanceLabel &arrTimesAtPickups,
                                                   const DistanceLabel &minDistancesToPickups) const {
-                assert(strat.requestState.minDirectPDDist < INFTY);
+                KASSERT(strat.requestState.minDirectPDDist < INFTY);
 
                 if (strat.upperBoundCost >= INFTY) {
                     // If current best is INFTY, only indices i with arrTimesAtPickups[i] >= INFTY or
@@ -169,7 +169,7 @@ namespace karri::Transfers {
 
         int getDistanceToPickup(const int vehId, const unsigned int pickupId) {
             const int distance = distances.getDistance(vehId, pickupId);
-            assert(distance >= 0);
+            KASSERT(distance >= 0);
             return distance;
         }
 
@@ -199,7 +199,7 @@ namespace karri::Transfers {
         }
 
         void runSearchesForPickupBatch(const int firstPickupId) {
-            assert(firstPickupId % K == 0 && firstPickupId < requestState.numPickups());
+            KASSERT(firstPickupId % K == 0 && firstPickupId < requestState.numPickups());
 
             distances.setCurBatchIdx(firstPickupId / K);
 

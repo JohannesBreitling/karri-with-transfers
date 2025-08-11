@@ -111,6 +111,7 @@ public:
 
     // Changes the number of bits in this bit vector. Newly inserted bits are initialized to init.
     void resize(const int size, const bool init = false) {
+        KASSERT(size >= 0);
 
         if (size == 0) {
             numBits = 0;

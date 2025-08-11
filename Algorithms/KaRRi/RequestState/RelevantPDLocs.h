@@ -63,18 +63,18 @@ namespace karri {
         }
 
         bool hasRelevantSpotsFor(const int vehId) const {
-            assert(vehId >= 0 && vehId < fleetSize);
+            KASSERT(vehId >= 0 && vehId < fleetSize);
             return startOfRelevantPDLocs[vehId] != startOfRelevantPDLocs[vehId + 1];
         }
 
         IteratorRange<It> relevantSpotsFor(const int vehId) const {
-            assert(vehId >= 0 && vehId < fleetSize);
+            KASSERT(vehId >= 0 && vehId < fleetSize);
             return {relevantSpots.begin() + startOfRelevantPDLocs[vehId],
                     relevantSpots.begin() + startOfRelevantPDLocs[vehId + 1]};
         }
 
         IteratorRange<RevIt> relevantSpotsForInReverseOrder(const int vehId) const {
-            assert(vehId >= 0 && vehId < fleetSize);
+            KASSERT(vehId >= 0 && vehId < fleetSize);
             const int rstart = relevantSpots.size() - startOfRelevantPDLocs[vehId + 1];
             const int rend = relevantSpots.size() - startOfRelevantPDLocs[vehId];
             return {relevantSpots.rbegin() + rstart, relevantSpots.rbegin() + rend};

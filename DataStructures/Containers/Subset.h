@@ -42,6 +42,7 @@ class Subset {
   }
 
   void reserve(const int capacity) {
+    KASSERT(capacity >= 0);
       if (capacity > elementsToIndices.size()) {
             elementsToIndices.resize(capacity, INVALID_INDEX);
             elements.reserve(capacity);

@@ -179,6 +179,7 @@ namespace karri {
                 }
             }
 
+            KASSERT(numEllipses >= 0);
             container.edgeEllipses.resize(numEllipses);
 
             const auto initTime = timer.elapsed<std::chrono::nanoseconds>();

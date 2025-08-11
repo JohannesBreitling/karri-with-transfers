@@ -52,7 +52,7 @@ namespace karri {
         }
 
         static inline int calcUpperBoundTripViolationCostDifference(const int tripTimeDifference) {
-            assert(tripTimeDifference >= 0);
+            KASSERT(tripTimeDifference >= 0);
             return TRIP_TIME_VIOLATION_WEIGHT * tripTimeDifference;
         }
 
@@ -127,7 +127,7 @@ namespace karri {
         }
 
         static inline int calcUpperBoundWaitViolationCostDifference(const int diffInTimeTillDepAtPickup) {
-            assert(diffInTimeTillDepAtPickup >= 0);
+            KASSERT(diffInTimeTillDepAtPickup >= 0);
             return WAIT_TIME_VIOLATION_WEIGHT * diffInTimeTillDepAtPickup;
         }
 
@@ -172,7 +172,7 @@ namespace karri {
         calcMinDistFromOrToPDLocSuchThatVehAndTripCostsReachMinCost(const int cost, const int maxLegLength) {
             const auto c = cost + VEHICLE_COST_SCALE * maxLegLength;
             const auto d = VEHICLE_COST_SCALE + PASSENGER_COST_SCALE;
-            assert(d != 0);
+            KASSERT(d != 0);
             return c / d + (c % d != 0);
         }
 

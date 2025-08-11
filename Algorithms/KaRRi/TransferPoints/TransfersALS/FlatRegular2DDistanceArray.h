@@ -62,9 +62,10 @@ namespace karri {
             width = rowWidth;
             curNumRows = numRows;
             const int newMinSize = numRows * rowWidth;
+            KASSERT(newMinSize >= 0);
             std::fill(minDistancePerRow.begin(), minDistancePerRow.end(), INFTY);
             if (newMinSize > distances.size())
-                distances.resize(numRows * rowWidth);
+                distances.resize(newMinSize);
             if (numRows > minDistancePerRow.size())
                 minDistancePerRow.resize(numRows, INFTY);
         }

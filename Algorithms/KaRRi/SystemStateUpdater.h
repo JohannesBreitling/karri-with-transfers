@@ -201,8 +201,8 @@ namespace karri {
             requestState.chosenPDLocsRoadCategoryStats().incCountForCat(inputGraph.osmRoadCategory(asgn.pickup->loc));
             requestState.chosenPDLocsRoadCategoryStats().incCountForCat(inputGraph.osmRoadCategory(asgn.dropoff->loc));
             requestState.chosenPDLocsRoadCategoryStats().incCountForCat(inputGraph.osmRoadCategory(asgn.transfer.loc));
-            assert(asgn.pVeh != nullptr);
-            assert(asgn.dVeh != nullptr);
+            KASSERT(asgn.pVeh != nullptr);
+            KASSERT(asgn.dVeh != nullptr);
 
             const auto pVehId = asgn.pVeh->vehicleId;
             const auto dVehId = asgn.dVeh->vehicleId;
@@ -269,7 +269,7 @@ namespace karri {
                 routeState.schedDepTimesFor(pVehId)[0] < requestState.originalRequest.requestTime) {
                 createIntermediateStopStopAtCurrentLocationForReroute(*asgn.pVeh,
                                                                       requestState.originalRequest.requestTime);
-                assert(routeState.vehicleIdOf(routeState.stopIdsFor(pVehId)[1]) == pVehId);
+                KASSERT(routeState.vehicleIdOf(routeState.stopIdsFor(pVehId)[1]) == pVehId);
 
                 ++pIdxPVeh;
                 ++dIdxPVeh;
@@ -281,7 +281,7 @@ namespace karri {
                 routeState.schedDepTimesFor(dVehId)[0] < requestState.originalRequest.requestTime) {
                 createIntermediateStopStopAtCurrentLocationForReroute(*asgn.dVeh,
                                                                       requestState.originalRequest.requestTime);
-                assert(routeState.vehicleIdOf(routeState.stopIdsFor(dVehId)[1]) == dVehId);
+                KASSERT(routeState.vehicleIdOf(routeState.stopIdsFor(dVehId)[1]) == dVehId);
 
                 ++pIdxDVeh;
                 ++dIdxDVeh;
@@ -290,9 +290,9 @@ namespace karri {
 
             KASSERT(validateRouteDistances(pVehId, intermediateInsertedPVeh? 1 : 0));
             KASSERT(validateRouteDistances(dVehId, intermediateInsertedDVeh? 1 : 0));
-            assert(routeState.assertRoutePVeh(asgn, requestState.originalRequest.requestTime, depTimeAtPickup,
+            KASSERT(routeState.assertRoutePVeh(asgn, requestState.originalRequest.requestTime, depTimeAtPickup,
                                               transferAtStopPVeh, arrTimeAtTransferPoint));
-            assert(routeState.assertRouteDVeh(asgn, requestState.originalRequest.requestTime, arrTimeAtTransferPoint,
+            KASSERT(routeState.assertRouteDVeh(asgn, requestState.originalRequest.requestTime, arrTimeAtTransferPoint,
                                               depTimeAtTransferPoint, arrTimeAtDropoff));
 
 
@@ -304,10 +304,10 @@ namespace karri {
             transferStopIdDVeh = routeState.stopIdsFor(dVehId)[pIdxDVeh];
             dropoffStopId = routeState.stopIdsFor(dVehId)[dIdxDVeh];
 
-            assert(routeState.vehicleIdOf(pickupStopId) == pVehId);
-            assert(routeState.vehicleIdOf(transferStopIdPVeh) == pVehId);
-            assert(routeState.vehicleIdOf(transferStopIdDVeh) == dVehId);
-            assert(routeState.vehicleIdOf(dropoffStopId) == dVehId);
+            KASSERT(routeState.vehicleIdOf(pickupStopId) == pVehId);
+            KASSERT(routeState.vehicleIdOf(transferStopIdPVeh) == pVehId);
+            KASSERT(routeState.vehicleIdOf(transferStopIdDVeh) == dVehId);
+            KASSERT(routeState.vehicleIdOf(dropoffStopId) == dVehId);
 
             // Register the inserted pickup and dropoff with the path data
             pathTracker.registerPdEventsForBestAssignment(pickupStopId, transferStopIdPVeh);
@@ -327,7 +327,7 @@ namespace karri {
             const auto &asgn = requestState.getBestAssignmentWithoutTransfer();
             requestState.chosenPDLocsRoadCategoryStats().incCountForCat(inputGraph.osmRoadCategory(asgn.pickup->loc));
             requestState.chosenPDLocsRoadCategoryStats().incCountForCat(inputGraph.osmRoadCategory(asgn.dropoff->loc));
-            assert(asgn.vehicle != nullptr);
+            KASSERT(asgn.vehicle != nullptr);
 
             const auto vehId = asgn.vehicle->vehicleId;
             const auto numStopsBefore = routeState.numStopsOf(vehId);
@@ -403,7 +403,7 @@ namespace karri {
 
         void notifyVehicleReachedEndOfServiceTime(const Vehicle &veh) {
             const auto vehId = veh.vehicleId;
-            assert(routeState.numStopsOf(vehId) == 1);
+            KASSERT(routeState.numStopsOf(vehId) == 1);
 
             lastStopBucketsEnv.removeIdleBucketEntries(veh, 0);
 
@@ -600,7 +600,7 @@ namespace karri {
         // Intermediate stop gets an arrival time equal to the request time so the stop is reached immediately,
         // making it the new stop 0. Thus, we do not need to compute target bucket entries for the stop.
         void createIntermediateStopStopAtCurrentLocationForReroute(const Vehicle &veh, const int now) {
-            assert(curVehLocs.knowsCurrentLocationOf(veh.vehicleId));
+            KASSERT(curVehLocs.knowsCurrentLocationOf(veh.vehicleId));
             auto loc = curVehLocs.getCurrentLocationOf(veh.vehicleId);
             LIGHT_KASSERT(loc.depTimeAtHead >= now);
             routeState.createIntermediateStopForReroute(veh.vehicleId, loc.location, now, loc.depTimeAtHead);

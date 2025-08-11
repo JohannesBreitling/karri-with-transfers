@@ -144,7 +144,7 @@ namespace karri {
 
                     // Insert entries at this stop
                     if (feasible.hasPotentiallyRelevantPDLocs(stopId)) {
-                        assert(vehiclesWithFeasibleDistances.contains(vehId));
+                        KASSERT(vehiclesWithFeasibleDistances.contains(vehId));
 
                         // Check with lower bounds on dist to and from PD loc whether this stop needs to be regarded
                         const int minDistToPDLoc = feasible.minDistToRelevantPDLocsFor(stopId);
@@ -190,7 +190,7 @@ namespace karri {
 
             rel.startOfRelevantPDLocs[fleet.size()] = rel.relevantSpots.size();
 
-            assert(std::all_of(rel.relevantSpots.begin(), rel.relevantSpots.end(),
+            KASSERT(std::all_of(rel.relevantSpots.begin(), rel.relevantSpots.end(),
                                [&](const auto &h) {
                                    return h.distToPDLoc < INFTY && h.distFromPDLocToNextStop < INFTY;
                                }));
@@ -205,11 +205,11 @@ namespace karri {
 
             const int &vehId = veh.vehicleId;
 
-            assert(routeState.occupanciesFor(vehId)[stopIndex] + requestState.originalRequest.numRiders <= veh.capacity);
+            KASSERT(routeState.occupanciesFor(vehId)[stopIndex] + requestState.originalRequest.numRiders <= veh.capacity);
             if (distFromStopToPickup >= INFTY || distFromPickupToNextStop >= INFTY)
                 return false;
 
-            assert(distFromStopToPickup + distFromPickupToNextStop >=
+            KASSERT(distFromStopToPickup + distFromPickupToNextStop >=
                    calcLengthOfLegStartingAt(stopIndex, vehId, routeState));
 
             const auto &p = requestState.pickups[pickupId];
@@ -250,7 +250,7 @@ namespace karri {
             const auto &numStops = routeState.numStopsOf(vehId);
             const auto &occupancy = routeState.occupanciesFor(vehId)[stopIndex];
             const auto &stopLocations = routeState.stopLocationsFor(vehId);
-            assert(d.loc != stopLocations[stopIndex] || distFromStopToDropoff == 0);
+            KASSERT(d.loc != stopLocations[stopIndex] || distFromStopToDropoff == 0);
             if (stopIndex == numStops - 1 || occupancy + requestState.originalRequest.numRiders > veh.capacity)
                 return d.loc == stopLocations[stopIndex];
 
@@ -265,7 +265,7 @@ namespace karri {
                                                                       distFromDropoffToNextStop,
                                                                       isDropoffAtExistingStop,
                                                                       routeState);
-            assert(initialDropoffDetour >= 0);
+            KASSERT(initialDropoffDetour >= 0);
             if (doesDropoffDetourViolateHardConstraints(veh, requestState, stopIndex, initialDropoffDetour,
                                                         routeState))
                 return false;

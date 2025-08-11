@@ -1007,7 +1007,7 @@ namespace karri {
                     stats.numAssignmentsTriedPickupALS++;
                     break;
                 default:
-                    assert(false);
+                    KASSERT(false);
             }
 
             switch (asgn.dropoffType) {
@@ -1018,7 +1018,7 @@ namespace karri {
                     stats.numAssignmentsTriedDropoffALS++;
                     break;
                 default:
-                    assert(false);
+                    KASSERT(false);
             }
         }
 

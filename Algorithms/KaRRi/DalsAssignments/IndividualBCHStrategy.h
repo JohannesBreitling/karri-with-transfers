@@ -228,7 +228,7 @@ namespace karri::DropoffAfterLastStopStrategies {
                     if (asgn.distToDropoff >= INFTY)
                         continue; // no need to check pickup before next stop
 
-                    assert(asgn.distToDropoff >= 0 && asgn.distToDropoff < INFTY);
+                    KASSERT(asgn.distToDropoff >= 0 && asgn.distToDropoff < INFTY);
                     int curPickupIndex = numStops - 1;
                     auto pickupIt = relevantPickupsInRevOrder.begin();
                     for (; pickupIt < relevantPickupsInRevOrder.end(); ++pickupIt) {
@@ -240,7 +240,7 @@ namespace karri::DropoffAfterLastStopStrategies {
                             if (occupancies[entry.stopIndex] + requestState.originalRequest.numRiders > asgn.vehicle->capacity)
                                 break;
 
-                            assert(entry.stopIndex < numStops - 1);
+                            KASSERT(entry.stopIndex < numStops - 1);
                             const auto minTripTimeToLastStop = routeState.schedDepTimesFor(vehId)[numStops - 1] -
                                                                routeState.schedArrTimesFor(vehId)[entry.stopIndex + 1];
 
@@ -332,8 +332,8 @@ namespace karri::DropoffAfterLastStopStrategies {
                 // Continue with assignments for pickups where exact distance via vehicle location is needed
                 curVehLocToPickupSearches.computeExactDistancesVia(fleet[vehId]);
                 for (const auto &continuation: pbnsContinuations) {
-                    assert(continuation.pickupID >= 0 && continuation.pickupID < requestState.numPickups());
-                    assert(continuation.fromDropoffID >= 0 && continuation.fromDropoffID < requestState.numDropoffs());
+                    KASSERT(continuation.pickupID >= 0 && continuation.pickupID < requestState.numPickups());
+                    KASSERT(continuation.fromDropoffID >= 0 && continuation.fromDropoffID < requestState.numDropoffs());
                     asgn.pickup = &requestState.pickups[continuation.pickupID];
 
                     asgn.distToPickup = curVehLocToPickupSearches.getDistance(vehId,
@@ -380,7 +380,7 @@ namespace karri::DropoffAfterLastStopStrategies {
         }
 
         void runSearchesForDropoffBatch(const unsigned int firstDropoffId) {
-            assert(firstDropoffId % K == 0 && firstDropoffId < requestState.numDropoffs());
+            KASSERT(firstDropoffId % K == 0 && firstDropoffId < requestState.numDropoffs());
             const int batchIdx = firstDropoffId / K;
 
             std::array<int, K> dropoffTails;

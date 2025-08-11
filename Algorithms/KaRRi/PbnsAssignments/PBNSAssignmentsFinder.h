@@ -85,7 +85,7 @@ namespace karri {
                 ordinaryContinuations.clear();
                 pairedContinuations.clear();
 
-                assert(routeState.occupanciesFor(vehId)[0]  + requestState.originalRequest.numRiders <= fleet[vehId].capacity);
+                KASSERT(routeState.occupanciesFor(vehId)[0]  + requestState.originalRequest.numRiders <= fleet[vehId].capacity);
 
                 determineNecessaryExactDistances(fleet[vehId]);
 
@@ -176,7 +176,7 @@ namespace karri {
         // paired assignment needs the exact distance to the pickup via the vehicle. Returns an iterator to the dropoff at
         // which the exact distance is first needed or one-past-end iterator if all combinations could be filtered.
         RelevantPDLocs::It tryLowerBoundsForPaired(Assignment &asgn) {
-            assert(asgn.vehicle && asgn.pickup);
+            KASSERT(asgn.vehicle && asgn.pickup);
             const auto vehId = asgn.vehicle->vehicleId;
 
 
@@ -216,7 +216,7 @@ namespace karri {
         // dropoff at which the exact distance is first needed or one-past-end iterator if all combinations could be filtered.
         RelevantPDLocs::It tryLowerBoundsForOrdinary(Assignment &asgn) {
             using namespace time_utils;
-            assert(asgn.vehicle && asgn.pickup);
+            KASSERT(asgn.vehicle && asgn.pickup);
             const auto vehId = asgn.vehicle->vehicleId;
 
             const auto relevantDropoffs = relOrdinaryDropoffs.relevantSpotsFor(vehId);

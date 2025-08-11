@@ -283,7 +283,7 @@ namespace karri::PickupAfterLastStopStrategies {
             const auto &pickup2 = requestState.pickups[label2.pickupId];
             const auto &dropoff2 = requestState.dropoffs[label2.dropoffId];
 
-            assert(dropoff1.id != dropoff2.id);
+            KASSERT(dropoff1.id != dropoff2.id);
             if (pickup1.id != pickup2.id || label1.distToPickup != label2.distToPickup)
                 return false;
 
@@ -358,7 +358,7 @@ namespace karri::PickupAfterLastStopStrategies {
             int costLowerBound;
             reverseQueue.min(v, costLowerBound);
             labelAtV = reverseLabelBuckets.closeMinOpenLabel(v);
-            assert(lowerBoundCostOfLabel(labelAtV) == costLowerBound);
+            KASSERT(lowerBoundCostOfLabel(labelAtV) == costLowerBound);
 
             // Check if this label can be pruned at v
             const bool pruned = STALL_LABELS && pruneLabel(v, labelAtV);
@@ -398,7 +398,7 @@ namespace karri::PickupAfterLastStopStrategies {
             if (reverseLabelBuckets.getBucketOf(v).open().size() == 0) {
                 int deletedV;
                 reverseQueue.deleteMin(deletedV, costLowerBound);
-                assert(v == deletedV && costLowerBound == lowerBoundCostOfLabel(labelAtV));
+                KASSERT(v == deletedV && costLowerBound == lowerBoundCostOfLabel(labelAtV));
             } else {
                 reverseQueue.increaseKey(v, lowerBoundCostOfLabel(reverseLabelBuckets.minOpenLabel(v)));
             }
@@ -629,7 +629,7 @@ namespace karri::PickupAfterLastStopStrategies {
             // out that a PALS assignment better than the upper bound cost may exist.
             const auto costIgnoringHardConstraints = calculator.calcWithoutHardConstraints(asgn, requestState);
 
-            assert(bestCostWithoutConstraints <= upperBoundCostWithConstraints);
+            KASSERT(bestCostWithoutConstraints <= upperBoundCostWithConstraints);
             if (costIgnoringHardConstraints.total > bestCostWithoutConstraints)
                 return;
 

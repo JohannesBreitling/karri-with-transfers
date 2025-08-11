@@ -248,13 +248,13 @@ namespace karri {
                 case ASSIGNED_TO_PVEH:
                     // When assigned to a vehicle, there should be no request event until the dropoff.
                     // At that point the request state becomes WALKING_TO_DEST.
-                    assert(false);
+                    KASSERT(false);
                     break;
                 case WALKING_TO_DEST:
                     handleWalkingArrivalAtDest(reqId, occTime);
                     break;
                 case FINISHED:
-                    assert(false);
+                    KASSERT(false);
                     break;
                 default:
                     break;
@@ -262,8 +262,8 @@ namespace karri {
         }
 
         void handleVehicleStartup(const int vehId, const int occTime) {
-            assert(vehicleState[vehId] == OUT_OF_SERVICE);
-            assert(fleet[vehId].startOfServiceTime == occTime);
+            KASSERT(vehicleState[vehId] == OUT_OF_SERVICE);
+            KASSERT(fleet[vehId].startOfServiceTime == occTime);
             unused(occTime);
             Timer timer;
 
@@ -286,17 +286,17 @@ namespace karri {
         }
 
         void handleVehicleShutdown(const int vehId, const int occTime) {
-            assert(vehicleState[vehId] == IDLING);
-            assert(fleet[vehId].endOfServiceTime == occTime);
+            KASSERT(vehicleState[vehId] == IDLING);
+            KASSERT(fleet[vehId].endOfServiceTime == occTime);
             unused(occTime);
-            assert(!scheduledStops.hasNextScheduledStop(vehId));
+            KASSERT(!scheduledStops.hasNextScheduledStop(vehId));
             Timer timer;
 
             vehicleState[vehId] = OUT_OF_SERVICE;
 
 //            int id, key;
 ////            vehicleEvents.deleteMin(id, key);
-//            assert(id == vehId && key == occTime);
+//            KASSERT(id == vehId && key == occTime);
             systemStateUpdater.notifyVehicleReachedEndOfServiceTime(fleet[vehId]);
 
             const auto time = timer.elapsed<std::chrono::nanoseconds>();
@@ -304,8 +304,8 @@ namespace karri {
         }
 
         void handleVehicleArrivalAtStop(const int vehId, const int occTime) {
-            assert(vehicleState[vehId] == DRIVING);
-            assert(scheduledStops.getNextScheduledStop(vehId).arrTime == occTime);
+            KASSERT(vehicleState[vehId] == DRIVING);
+            KASSERT(scheduledStops.getNextScheduledStop(vehId).arrTime == occTime);
             Timer timer;
 
             const auto prevStop = scheduledStops.getCurrentOrPrevScheduledStop(vehId);
@@ -343,8 +343,8 @@ namespace karri {
         }
 
         void handleVehicleDepartureFromStop(const int vehId, const int occTime) {
-            assert(vehicleState[vehId] == STOPPING);
-            assert(scheduledStops.getCurrentOrPrevScheduledStop(vehId).depTime == occTime);
+            KASSERT(vehicleState[vehId] == STOPPING);
+            KASSERT(scheduledStops.getCurrentOrPrevScheduledStop(vehId).depTime == occTime);
             Timer timer;
 
             if (!scheduledStops.hasNextScheduledStop(vehId)) {
@@ -379,8 +379,8 @@ namespace karri {
 
         void handleRequestReceipt(const int reqId, const int occTime) {
             ++progressBar;
-            assert(requestState[reqId] == NOT_RECEIVED);
-            assert(requests[reqId].requestTime == occTime);
+            KASSERT(requestState[reqId] == NOT_RECEIVED);
+            KASSERT(requests[reqId].requestTime == occTime);
             Timer timer;
 
             const auto &request = requests[reqId];
@@ -464,7 +464,7 @@ namespace karri {
 
             int id, key;
             requestEvents.deleteMin(id, key); // event for walking arrival at dest inserted at dropoff
-            assert(id == reqId && key == occTime);
+            KASSERT(id == reqId && key == occTime);
 
             const auto &bestAsgn = asgnFinderResponse.getBestAssignmentWithoutTransfer();
             if (!bestAsgn.vehicle || !bestAsgn.pickup || !bestAsgn.dropoff) {
@@ -482,7 +482,7 @@ namespace karri {
             vehiclesWithChangesInRoute.clear();
             systemStateUpdater.insertBestAssignment(pickupStopId, dropoffStopId, vehiclesWithChangesInRoute);
             systemStateUpdater.writePerformanceLogs();
-            assert(pickupStopId >= 0 && dropoffStopId >= 0);
+            KASSERT(pickupStopId >= 0 && dropoffStopId >= 0);
 
             KASSERT(vehiclesWithChangesInRoute.contains(bestAsgn.vehicle->vehicleId));
             for (const auto &vehId: vehiclesWithChangesInRoute) {
@@ -509,14 +509,14 @@ namespace karri {
         }
 
         void handleWalkingArrivalAtDest(const int reqId, const int occTime) {
-            assert(requestState[reqId] == WALKING_TO_DEST);
+            KASSERT(requestState[reqId] == WALKING_TO_DEST);
             Timer timer;
 
             const RequestData &reqData = requestData[reqId];
             requestState[reqId] = FINISHED;
             int id, key;
             requestEvents.deleteMin(id, key);
-            assert(id == reqId && key == occTime);
+            KASSERT(id == reqId && key == occTime);
 
             int waitTime;
             int arrTime;
@@ -532,12 +532,12 @@ namespace karri {
                 arrTime = occTime;
                 tripTime = arrTime - requests[reqId].requestTime;
                 int waitAtTransfer = reqData.depTimeAtTransfer - reqData.arrAtTransferPoint;
-                assert(waitAtTransfer >= 0);
+                KASSERT(waitAtTransfer >= 0);
                 waitTime = reqData.depTimeAtPickup - requests[reqId].requestTime + waitAtTransfer;
                 rideTime = arrTime - reqData.walkingTimeFromDropoff - reqData.depTimeAtPickup - waitAtTransfer;
             }
 
-            assert(waitTime >= 0 && rideTime >= 0);
+            KASSERT(waitTime >= 0 && rideTime >= 0);
 
             assignmentQualityStatsLogger << reqId << ','
                                          << reqData.usingTransfer << ","

@@ -104,6 +104,7 @@ namespace karri {
             allStopIds.insert(allStopIds.end(), dVehStopIds.begin(), dVehStopIds.end());
 
             // Compute pairwise intersections of ellipses
+            KASSERT(numStopsPVeh >= 0 && numStopsDVeh >= 0);
             if (transferPoints.size() < numStopsPVeh * numStopsDVeh)
                 transferPoints.resize(numStopsPVeh * numStopsDVeh);
 
@@ -135,6 +136,7 @@ namespace karri {
 
                 KASSERT(vehIdPStop != vehIdDStop);
 
+                KASSERT(internalIdxPStop * numStopsDVeh + internalIdxDStop >= 0 && internalIdxPStop * numStopsDVeh + internalIdxDStop < transferPoints.size());
                 auto &transferPointsForPair = transferPoints[internalIdxPStop * numStopsDVeh + internalIdxDStop];
                 transferPointsForPair.clear();
                 auto& localNumTransferPointsBuilt = threadLocalNumTransferPointsBuilt.local();

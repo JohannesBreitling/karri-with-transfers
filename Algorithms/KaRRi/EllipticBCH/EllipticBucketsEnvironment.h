@@ -112,7 +112,7 @@ namespace karri {
         }
 
         void generateSourceBucketEntries(const Vehicle &veh, const int stopIndex) {
-            assert(routeState.numStopsOf(veh.vehicleId) > stopIndex + 1);
+            KASSERT(routeState.numStopsOf(veh.vehicleId) > stopIndex + 1);
 
             const int stopId = routeState.stopIdsFor(veh.vehicleId)[stopIndex];
             const int leeway = std::max(routeState.maxArrTimesFor(veh.vehicleId)[stopIndex + 1],
@@ -138,7 +138,7 @@ namespace karri {
         }
 
         void generateTargetBucketEntries(const Vehicle &veh, const int stopIndex) {
-            assert(stopIndex > 0);
+            KASSERT(stopIndex > 0);
 
             const int stopId = routeState.stopIdsFor(veh.vehicleId)[stopIndex];
             const int leeway = std::max(routeState.maxArrTimesFor(veh.vehicleId)[stopIndex],

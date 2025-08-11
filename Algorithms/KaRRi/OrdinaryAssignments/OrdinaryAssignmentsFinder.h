@@ -124,11 +124,11 @@ namespace karri {
         // Note that startIdxInRegularStops has to be an absolute index in relevantRegularHaltingSpots.
         int tryDropoffLaterThanPickup(Assignment &asgn,
                                       const RelevantPDLocs::It &startItInRegularDropoffs) {
-            assert(asgn.vehicle && asgn.pickup);
+            KASSERT(asgn.vehicle && asgn.pickup);
             const auto &vehId = asgn.vehicle->vehicleId;
 
             const auto relevantDropoffs = relDropoffs.relevantSpotsFor(vehId);
-            assert(startItInRegularDropoffs >= relevantDropoffs.begin() &&
+            KASSERT(startItInRegularDropoffs >= relevantDropoffs.begin() &&
                    startItInRegularDropoffs <= relevantDropoffs.end());
 
             if (!relDropoffs.getVehiclesWithRelevantPDLocs().contains(vehId))
@@ -275,7 +275,7 @@ namespace karri {
                                 asgn.pickup = &requestState.pickups[pickupEntry.pdId];
                                 asgn.distToPickup = pickupEntry.distToPDLoc;
 
-                                assert(asgn.distToPickup < INFTY && asgn.distFromDropoff < INFTY);
+                                KASSERT(asgn.distToPickup < INFTY && asgn.distFromDropoff < INFTY);
                                 asgn.distToDropoff = pdDistances.getDirectDistance(*asgn.pickup, *asgn.dropoff);
                                 requestState.tryAssignment(asgn);
                                 ++numAssignmentsTried;

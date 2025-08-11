@@ -102,9 +102,10 @@ namespace karri::PickupAfterLastStopStrategies {
                         promisingDropoffIds.push_back(dropoff.id);
                     }
                 }
-                assert(promisingDropoffIds.front() == 0); // Assert destination itself is always promising
+                KASSERT(promisingDropoffIds.front() == 0); // Assert destination itself is always promising
                 stats.collective_pickupVehDistQueryTime += vehicleToPDLocQuery.getRunTime();
             } else {
+                KASSERT(requestState.numDropoffs() >= 0);
                 promisingDropoffIds.resize(requestState.numDropoffs());
                 std::iota(promisingDropoffIds.begin(), promisingDropoffIds.end(), 0u);
             }
@@ -142,7 +143,7 @@ namespace karri::PickupAfterLastStopStrategies {
                 // If assignment found by collective search adheres to service time constraint, we have found the
                 // best PALS assignment.
                 const auto cost = calculator.calc(asgn, requestState);
-                assert(cost.total == minCost);
+                KASSERT(cost.total == minCost);
                 requestState.tryAssignmentWithKnownCost(asgn, cost);
 
                 const auto tryAssignmentsTime = timer.elapsed<std::chrono::nanoseconds>();

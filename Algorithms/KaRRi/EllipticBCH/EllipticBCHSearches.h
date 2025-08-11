@@ -127,7 +127,7 @@ namespace karri {
             LabelMask operator()(const int meetingVertex, const BucketEntryWithLeeway &entry,
                                  const DistanceLabel &distsToPDLocs) {
 
-                assert(curFeasible);
+                KASSERT(curFeasible);
                 return curFeasible->updateDistanceFromStopToPDLoc(entry.targetId, curFirstIdOfBatch,
                                                                   distsToPDLocs, meetingVertex);
             }
@@ -160,7 +160,7 @@ namespace karri {
                 if (prevStopId == INVALID_ID)
                     return LabelMask(false);
 
-                assert(curFeasible);
+                KASSERT(curFeasible);
                 return curFeasible->updateDistanceFromPDLocToNextStop(prevStopId, curFirstIdOfBatch,
                                                                       distsFromPDLocs, meetingVertex);
             }
@@ -302,7 +302,7 @@ namespace karri {
         template<typename SpotContainerT>
         void runRegularBCHSearchesFrom(const int startId, const int endId,
                                        const SpotContainerT &pdLocs) {
-            assert(endId > startId && endId - startId <= K);
+            KASSERT(endId > startId && endId - startId <= K);
 
             std::array<int, K> pdLocHeads;
 
@@ -327,7 +327,7 @@ namespace karri {
         template<typename SpotContainerT>
         void runRegularBCHSearchesTo(const int startId, const int endId,
                                      const SpotContainerT &pdLocs) {
-            assert(endId > startId && endId - startId <= K);
+            KASSERT(endId > startId && endId - startId <= K);
 
             std::array<int, K> travelTimes;
             std::array<int, K> pdLocTails;

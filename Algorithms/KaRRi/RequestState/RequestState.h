@@ -88,23 +88,23 @@ namespace karri {
         }
 
         int getOriginalReqMaxTripTime() const {
-            assert(originalReqDirectDist >= 0);
+            KASSERT(originalReqDirectDist >= 0);
             return static_cast<int>(InputConfig::getInstance().alpha * static_cast<double>(originalReqDirectDist)) + InputConfig::getInstance().beta;
         }
 
         int getPassengerArrAtPickup(const int pickupId) const {
-            assert(pickupId < numPickups());
+            KASSERT(pickupId < numPickups());
             return originalRequest.requestTime + pickups[pickupId].walkingDist;
         }
 
         int getMaxPDTripTime(const int pickupId, const int dropoffId) const {
-            assert(pickupId < numPickups() && dropoffId < numDropoffs());
-            assert(originalReqDirectDist >= 0);
+            KASSERT(pickupId < numPickups() && dropoffId < numDropoffs());
+            KASSERT(originalReqDirectDist >= 0);
             return getOriginalReqMaxTripTime() - (pickups[pickupId].walkingDist + dropoffs[dropoffId].walkingDist);
         }
 
         int getMaxArrTimeAtDropoff(const int pickupId, const int dropoffId) const {
-            assert(pickupId < numPickups() && dropoffId < numDropoffs());
+            KASSERT(pickupId < numPickups() && dropoffId < numDropoffs());
             return getPassengerArrAtPickup(pickupId) + getMaxPDTripTime(pickupId, dropoffId);
         }
 
@@ -190,7 +190,7 @@ namespace karri {
         }
 
         bool tryAssignmentWithKnownCost(const Assignment &asgn, const RequestCost cost) {
-            assert(calculator.calc(asgn, *this).total == cost.total);
+            KASSERT(calculator.calc(asgn, *this).total == cost.total);
 
             if (cost.total < INFTY && (cost.total < bestCostOneLeg || (cost.total == bestCostOneLeg &&
                                     breakCostTie(asgn, bestAssignmentOneLeg)))) {

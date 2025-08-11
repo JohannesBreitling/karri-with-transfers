@@ -630,7 +630,7 @@ namespace karri {
                     break;
 
                 default:
-                    assert(false);
+                    KASSERT(false);
             }
             numAsgnStats.numAssignmentsTriedDropoffALS++;
         }

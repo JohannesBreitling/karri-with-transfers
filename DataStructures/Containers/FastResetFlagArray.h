@@ -38,6 +38,7 @@ public:
 
     // Ensures that this container can hold the specified number of flags.
     void resize(const int size) {
+        KASSERT(size >= 0);
         const auto currentSize = timestamps.size();
         if (size < currentSize) {
             timestamps.erase(timestamps.begin() + size, timestamps.end());

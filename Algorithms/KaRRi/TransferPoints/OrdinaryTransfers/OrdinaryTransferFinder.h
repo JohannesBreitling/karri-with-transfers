@@ -288,7 +288,7 @@ namespace karri {
                 asgn.pickupType = ORDINARY;
                 asgn.transferTypePVeh = ORDINARY;
 
-                assert(asgn.pickup->id >= 0);
+                KASSERT(asgn.pickup->id >= 0);
                 // Try the partial assignment
                 tryPartialAssignment(asgn, promisingPartials);
             }
@@ -314,7 +314,7 @@ namespace karri {
                 asgn.pickupType = BEFORE_NEXT_STOP;
                 asgn.transferTypePVeh = trIdxPVeh == 0 ? BEFORE_NEXT_STOP : ORDINARY;
 
-                assert(asgn.pickup->id >= 0);
+                KASSERT(asgn.pickup->id >= 0);
                 // Try the partial assignment
                 tryPartialAssignment(asgn, promisingPartials);
             }
@@ -365,8 +365,8 @@ namespace karri {
                 return;
 
             for (const auto &dropoff: relBNSDropoffs.relevantSpotsFor(partialAsgn.dVeh->vehicleId)) {
-                assert(partialAsgn.transferIdxDVeh == 0);
-                assert(dropoff.stopIndex == 0);
+                KASSERT(partialAsgn.transferIdxDVeh == 0);
+                KASSERT(dropoff.stopIndex == 0);
 
                 PDLoc *dropoffPDLoc = &requestState.dropoffs[dropoff.pdId];
                 if (dropoffPDLoc->loc == partialAsgn.transfer.loc)
@@ -557,8 +557,8 @@ namespace karri {
                 searches.computeExactTransferDistancesVia(fleet[dVehId]);
 
             for (auto &asgn: currentlyCalculating) {
-                assert(searches.knowsDistanceTransfer(dVehId, asgn.transfer.loc));
-                assert(searches.knowsCurrentLocationOf(dVehId));
+                KASSERT(searches.knowsDistanceTransfer(dVehId, asgn.transfer.loc));
+                KASSERT(searches.knowsCurrentLocationOf(dVehId));
                 const int distance = searches.getDistanceTransfer(dVehId, asgn.transfer.loc);
                 asgn.distToTransferDVeh = distance;
                 asgn.dropoffBNSLowerBoundUsed = false;
@@ -585,7 +585,7 @@ namespace karri {
             offsets.clear();
 
             for (auto &asgn: toCalculate) {
-                assert(asgn.dropoffPairedLowerBoundUsed);
+                KASSERT(asgn.dropoffPairedLowerBoundUsed);
 
                 const int transferRank = vehCh.rank(inputGraph.edgeHead(asgn.transfer.loc));
                 transferToDropoffDistancesFinder.runQueryForTransferRank(transferRank);
@@ -596,7 +596,7 @@ namespace karri {
                 asgn.dropoffPairedLowerBoundUsed = false;
 
                 // Try the assignments with the calculated distances
-                assert(asgn.isFinished());
+                KASSERT(asgn.isFinished());
                 total = calc.calc(asgn, requestState);
                 requestState.tryFinishedTransferAssignmentWithKnownCost(asgn, total);
             }
@@ -613,7 +613,7 @@ namespace karri {
             const int pickupIdx = asgn.pickupIdx;
             const int transferIdx = asgn.transferIdxPVeh;
 
-            assert(pickupIdx < numStops - 1);
+            KASSERT(pickupIdx < numStops - 1);
 
             const int pickup = asgn.pickup->loc;
             const int transfer = asgn.transfer.loc;
@@ -749,7 +749,7 @@ namespace karri {
                     ++numAssignmentsTriedPickupORD;
                     break;
                 default:
-                    assert(false);
+                    KASSERT(false);
             }
 
             switch (asgn.dropoffType) {
@@ -763,7 +763,7 @@ namespace karri {
                     ++numAssignmentsTriedDropoffALS;
                     break;
                 default:
-                    assert(false);
+                    KASSERT(false);
             }
 
             if (!asgn.isFinished()) {
@@ -843,7 +843,7 @@ namespace karri {
                 distFromTransferPVeh != tp.distancePVehFromTransfer ||
                 distToTransferDVeh != tp.distanceDVehToTransfer ||
                 distFromTransferDVeh != tp.distanceDVehFromTransfer) {
-                assert(false);
+                KASSERT(false);
             }
 
             return true;
